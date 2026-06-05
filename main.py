@@ -171,6 +171,47 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 # Setup templates
 templates = Jinja2Templates(directory=templates_dir)
 
+# === Fix: Jinja2's _load_template uses (loader_ref, name) as cache key and
+# passes globals (which may contain unhashable dicts/lists) into the cache.
+# Monkey-patch _load_template to skip the cache lookup entirely.
+import jinja2 as _jinja2
+from jinja2.utils import LRUCache as _LRUCache
+
+# Monkey-patch LRUCache.__getitem__ to avoid hash-based dict lookup
+# which fails when cache keys contain unhashable types (dicts/lists).
+_orig_lru_getitem = _LRUCache.__getitem__
+def _safe_lru_getitem(self, key):
+    with self._wlock:
+        for k, v in self._mapping.items():
+            if k == key:
+                if self._queue[-1] != key:
+                    try:
+                        self._remove(key)
+                    except ValueError:
+                        pass
+                    self._append(key)
+                return v
+        raise KeyError(key)
+_LRUCache.__getitem__ = _safe_lru_getitem
+
+# Also monkey-patch LRUCache.get so it uses our patched __getitem__
+_LRUCache.get = lambda self, key, default=None: self[key] if key in [k for k in self._mapping.keys()] else default
+
+# Monkey-patch _load_template to bypass cache lookup with unhashable keys
+_orig_load_template = _jinja2.Environment._load_template
+def _safe_load_template(self, name, globals):
+    if self.loader is None:
+        raise TypeError("no loader for this environment specified")
+    # Always load fresh template, bypass cache.get()
+    template = self.loader.load(self, name, self.make_globals(globals))
+    if self.cache is not None:
+        cache_key = (self.loader, name)  # use loader object directly instead of weakref
+        self.cache[cache_key] = template
+    return template
+_jinja2.Environment._load_template = _safe_load_template
+
+
+
 # Load Fortune 1000 companies
 COMPANIES_FILE = os.path.join(BASE_DIR, "companies.json")
 companies = []
@@ -565,7 +606,19 @@ async def build_page(request: Request):
     # Check for voice session data (new voice_sessions from voice_api)
     voice_data = None
     if voice_session and voice_session in voice_session_store:
-        voice_data = voice_session_store[voice_session].get("data", {})
+        raw_data = voice_session_store[voice_session].get("data", {}).copy()
+        # Parse JSON string fields into proper arrays
+        for field in ["experience", "education"]:
+            val = raw_data.get(field)
+            if isinstance(val, str):
+                try:
+                    raw_data[field] = json.loads(val)
+                except Exception:
+                    raw_data[field] = []
+        # Parse skills string into array
+        if isinstance(raw_data.get("skills"), str):
+            raw_data["skills"] = [s.strip() for s in raw_data["skills"].split(",") if s.strip()]
+        voice_data = raw_data
         print(f"[BUILD] Loading voice session {voice_session}")
     
     # Determine mode
@@ -584,10 +637,11 @@ async def build_page(request: Request):
     if is_mobile:
         return templates.TemplateResponse(request=request, name="voice_chat.html")
     else:
-        return templates.TemplateResponse(request=request, name="index.html", context={
+        ctx = {
             "voice_data": json.dumps(voice_data) if voice_data else "null",
             "session_id": voice_session
-        })
+        }
+        return templates.TemplateResponse(request=request, name="index.html", context=ctx)
 
 @app.get("/debug/storage")
 async def debug_storage():
@@ -2820,7 +2874,7 @@ async def get_resume_state(session_id: str):
 @app.get("/voice", response_class=HTMLResponse)
 async def voice_page(request: Request):
     """Voice-first resume builder page"""
-    return templates.TemplateResponse("voice.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="voice_chat.html")
 
 
 # === Voice feature ends ===
