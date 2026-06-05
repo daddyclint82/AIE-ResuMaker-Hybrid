@@ -203,8 +203,7 @@
                     // Don't advance turn — stay on same question
                     addMessage('ai', 'Got it. Anything else for this?', false);
                 } else {
-                    // Normal flow
-                    addMessage('user', text, true, true);
+                    // Normal flow — user message already added at top of function
                     addMessage('ai', data.question, false);
                     updateProgress(data.turn);
                 }
