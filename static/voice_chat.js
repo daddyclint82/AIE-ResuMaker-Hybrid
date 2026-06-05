@@ -186,7 +186,7 @@
                 clearInput();
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
             }
         } catch (e) {
             hideTyping();
@@ -221,7 +221,7 @@
                 clearInput();
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
             }
         } catch (e) {
             hideTyping();
@@ -262,7 +262,7 @@
             clearInput();
             updateProgress(currentStepIndex);
             updateContextLabel(data.context_label);
-            updateNavButtons(data.can_go_back, data.field);
+            updateNavButtons(data.can_go_back, data.field, data.show_add_job);
         } catch (e) {
             hideTyping();
             addMessage('ai', 'Sorry, something went wrong. Please refresh and try again.', false);
@@ -302,7 +302,7 @@
                 clearInput();
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
 
                 // Show done state
                 if (data.done) {
@@ -371,7 +371,7 @@
         contextLabel.classList.remove('hidden');
     }
 
-    function updateNavButtons(canBack, field) {
+    function updateNavButtons(canBack, field, showAddJob) {
         canGoBack = canBack;
         
         // Show nav buttons if we can go back or if this is a loop field
@@ -381,8 +381,10 @@
              field === 'community_org' || field === 'cert_name');
         
         const isDecisionPoint = field === '_decision';
+        const isBulletField = field === '_bullet';
+        const inExperience = isLoopField || isBulletField || showAddJob;
         
-        if (canBack || isLoopField || isDecisionPoint) {
+        if (canBack || isLoopField || isDecisionPoint || isBulletField || showAddJob) {
             navButtons.classList.remove('hidden');
         } else {
             navButtons.classList.add('hidden');
@@ -391,11 +393,13 @@
         // Show/hide individual buttons
         backBtn.style.display = canBack ? 'inline-block' : 'none';
         
-        // Show add button at decision points or for loop fields
-        if (isDecisionPoint || isLoopField) {
+        // Show add button at decision points, loop fields, or when show_add_job is true
+        if (isDecisionPoint || isLoopField || isBulletField || showAddJob) {
             addBtn.style.display = 'inline-block';
             if (isDecisionPoint) {
                 addBtn.textContent = '+ Add Another';
+            } else if (inExperience) {
+                addBtn.textContent = '+ Add Job';
             }
         } else {
             addBtn.style.display = 'none';
