@@ -111,6 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     checkReferral(); // async but doesn't block
     setupAutoSave();
     updateEditCounterUI();
+    setupModeSwitch(); // Add voice mode toggle
     
     // Save on page unload/refresh
     window.addEventListener('beforeunload', () => {
@@ -653,6 +654,20 @@ function loadSavedProgress() {
         console.error('[AIE ResuMaker] Load error:', error);
         return false;
     }
+}
+
+function setupModeSwitch() {
+    const modeBtn = document.getElementById('mode-switch-btn');
+    if (!modeBtn) return;
+    
+    modeBtn.addEventListener('click', () => {
+        // Save current progress before switching
+        saveProgress(false);
+        localStorage.setItem('aie_mode', 'voice');
+        
+        // Redirect to voice mode
+        window.location.href = '/build?mode=voice';
+    });
 }
 
 function setupEventListeners() {

@@ -36,6 +36,18 @@
             if (e.key === 'Enter') sendMessage();
         });
         micBtn.addEventListener('click', toggleRecording);
+        
+        // Mode toggle
+        const modeToggle = document.getElementById('mode-toggle');
+        if (modeToggle) {
+            modeToggle.addEventListener('click', () => {
+                const url = sessionId 
+                    ? `/build?mode=form&voice_session=${sessionId}`
+                    : '/build?mode=form';
+                localStorage.setItem('aie_mode', 'form');
+                window.location.href = url;
+            });
+        }
 
         // Start session
         startSession();
