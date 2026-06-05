@@ -191,10 +191,25 @@
             if (data.error) {
                 addMessage('ai', 'Sorry: ' + data.error + '. Please try again.', false);
             } else {
-                addMessage('ai', data.question, false);
-                updateProgress(data.turn);
+                if (isAddingMore) {
+                    // User is adding to previous answer — update the stored text
+                    lastUserText += ' ' + text;
+                    // Update the displayed message
+                    if (lastUserMessageDiv) {
+                        const bubble = lastUserMessageDiv.querySelector('.message-bubble');
+                        if (bubble) bubble.textContent = lastUserText;
+                    }
+                    isAddingMore = false;
+                    // Don't advance turn — stay on same question
+                    addMessage('ai', 'Got it. Anything else for this?', false);
+                } else {
+                    // Normal flow
+                    addMessage('user', text, true, true);
+                    addMessage('ai', data.question, false);
+                    updateProgress(data.turn);
+                }
                 
-                // Clear input and accumulated text for next question
+                // Clear input and accumulated text
                 textInput.value = '';
                 accumulatedFinal = '';
 
@@ -215,13 +230,38 @@
     }
 
     // UI Helpers
-    function addMessage(type, text, isUser) {
+    let lastUserMessageDiv = null;
+    let lastUserText = '';
+    let isAddingMore = false;
+    
+    function addMessage(type, text, isUser, showAddMore = false) {
         const div = document.createElement('div');
         div.className = `message ${type}-message`;
         div.innerHTML = `
             <div class="message-bubble">${escapeHtml(text)}</div>
             <div class="message-time">${formatTime()}</div>
         `;
+        
+        if (isUser && showAddMore) {
+            lastUserMessageDiv = div;
+            lastUserText = text;
+            
+            const addMoreBtn = document.createElement('button');
+            addMoreBtn.className = 'add-more-btn';
+            addMoreBtn.innerHTML = '↩️ I had more to say';
+            addMoreBtn.onclick = () => {
+                isAddingMore = true;
+                // Remove the button so they can't click twice
+                addMoreBtn.remove();
+                // Put previous text back in input so they can append
+                textInput.value = lastUserText + ' ';
+                accumulatedFinal = lastUserText + ' ';
+                textInput.focus();
+                addMessage('ai', 'Go ahead — add to what you already told me.', false);
+            };
+            div.appendChild(addMoreBtn);
+        }
+        
         chatMessages.appendChild(div);
         scrollToBottom();
     }
