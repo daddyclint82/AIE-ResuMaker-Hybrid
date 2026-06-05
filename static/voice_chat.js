@@ -17,6 +17,7 @@
     let sessionId = null;
     let isRecording = false;
     let recognition = null;
+    let accumulatedFinal = ''; // Speech transcript accumulator (module-level)
     const totalQuestions = 12;
 
     // Initialize
@@ -61,9 +62,6 @@
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
-        // Accumulated transcript storage
-        let accumulatedFinal = '';
-        
         recognition.onresult = (event) => {
             let newFinal = '';
             let interimTranscript = '';
