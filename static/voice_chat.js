@@ -352,11 +352,10 @@
             clearInput(true);
         }
         
-        // Update add button label for bullets
-        if (isBulletField && addBtn) {
-            addBtn.textContent = bulletCount > 1 ? `+ Add bullet ${bulletCount + 1}` : '+ Add bullet 2';
-        } else if (data.field === '_decision') {
-            addBtn.textContent = '+ Add Another';
+        // Update add button label — always "+ Add New Job" during experience phase
+        const isExperiencePhase = isBulletField || data.field === '_decision' || data.show_add_job;
+        if (isExperiencePhase && addBtn) {
+            addBtn.textContent = '+ Add New Job';
         }
     }
 
