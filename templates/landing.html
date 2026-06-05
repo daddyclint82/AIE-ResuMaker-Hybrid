@@ -834,17 +834,23 @@
             });
         });
 
-        // Handle "Back to Builder" — check if user has saved progress
-        function handleBackToBuilder() {
-            const hasProgress = localStorage.getItem('aie_resume_progress');
-            if (!hasProgress) {
-                // No saved data — just go to build page to start fresh
-                window.location.href = '/build';
-                return false;
-            }
-            // Has saved data — go to build page, auto-load will restore
-            window.location.href = '/build';
+        // Detect mobile/desktop and store preference
+        function detectMode() {
+            const savedMode = localStorage.getItem('aie_mode');
+            if (savedMode) return savedMode;
+            const isMobile = window.innerWidth < 768;
+            return isMobile ? 'voice' : 'form';
+        }
+
+        function goToBuilder() {
+            const mode = detectMode();
+            window.location.href = mode === 'voice' ? '/build?mode=voice' : '/build?mode=form';
             return false;
+        }
+
+        // Handle "Back to Builder"
+        function handleBackToBuilder() {
+            return goToBuilder();
         }
     </script>
     <!-- STICKY MARQUEE BANNER -->
