@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIE ResuMaker - Build Your Professional Resume</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-branding">
+                <img src="/static/images/logo.png" alt="AIe ResuMaker Logo" class="app-logo" onerror="this.style.display='none'; this.nextElementSibling.style.marginLeft='0';">
+                <h1>AIE ResuMaker</h1>
+            </div>
+            <div class="save-progress-container">
+                <button id="save-progress-btn" class="btn-save" title="Save your progress">
+                    💾 Save Progress
+                </button>
+                <span id="save-status" class="save-status"></span>
+            </div>
+            <div class="edit-counter-container">
+                <span id="edit-counter" class="edit-counter">✏️ <strong>5</strong> edits remaining</span>
+            </div>
+            <div class="theme-controls">
+                <label>Theme:</label>
+                <select id="theme-select" name="template_style" form="resume-form">
+                    <option value="professional">Professional</option>
+                    <option value="modern">Modern</option>
+                    <option value="minimal">Minimal</option>
+                </select>
+                <button id="toggle-preview" class="mobile-only">Preview</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Form Section -->
+            <div class="form-section">
+                <form id="resume-form">
+                    <!-- Job Target -->
+                    <div class="form-group">
+                        <h2>Job Target</h2>
+                        
+                        <!-- Industry hint popup -->
+                        <div id="industry-hint" class="hint-popup" style="display: none;">
+                            <div class="hint-content">
+                                <span class="hint-icon">💡</span>
+                                <span class="hint-text">Your progress auto-saves! Click <strong>💾 Save Progress</strong> in the header to manually save anytime.</span>
+                                <button type="button" class="hint-close" onclick="this.parentElement.parentElement.style.display='none'">×</button>
+                            </div>
+                        </div>
+                        
+                        <div class="field-row">
+                            <label for="industry">Industry</label>
+                            <select id="industry" name="industry">
+                                <option value="">Select Industry</option>
+                                <option value="Technology">Technology</option>
+                                <option value="Healthcare">Healthcare</option>
+                                <option value="Finance">Finance</option>
+                                <option value="Education">Education</option>
+                                <option value="Marketing">Marketing</option>
+                                <option value="Sales">Sales</option>
+                                <option value="Operations">Operations</option>
+                                <option value="Legal">Legal</option>
+                                <option value="Engineering">Engineering</option>
+                                <option value="Design">Design</option>
+                                <option value="Human Resources">Human Resources</option>
+                                <option value="Customer Service">Customer Service</option>
+                                <option value="Manufacturing">Manufacturing</option>
+                                <option value="Retail">Retail</option>
+                            </select>
+                        </div>
+                        <div class="field-row">
+                            <label for="education-level">Education Level</label>
+                            <select id="education-level" name="education_level">
+                                <option value="">Select Education</option>
+                                <option value="high-school">High School / GED</option>
+                                <option value="associate">Associate Degree</option>
+                                <option value="bachelor">Bachelor's Degree</option>
+                                <option value="master">Master's Degree</option>
+                                <option value="doctorate">Doctorate / PhD</option>
+                                <option value="professional">Professional Degree (JD, MD, etc.)</option>
+                                <option value="certification">Certification / License</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="field-row">
+                            <label for="job-title">Job Title</label>
+                            <input type="text" id="job-title" name="job_title" placeholder="Type to search job titles..." autocomplete="off">
+                            <div id="job-suggestions" class="suggestions"></div>
+                        </div>
+                        <div class="field-row">
+                            <label for="experience-level">Experience Level</label>
+                            <select id="experience-level" name="experience_level">
+                                <option value="entry">Entry Level (0-2 years)</option>
+                                <option value="mid">Mid Level (3-5 years)</option>
+                                <option value="senior">Senior Level (6+ years)</option>
+                                <option value="executive">Executive / C-Suite</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Contact Info -->
+                    <div class="form-group">
+                        <h2>User Contact Information</h2>
+                        <div class="field-row">
+                            <label for="full-name">Full Name *</label>
+                            <input type="text" id="full-name" name="full_name" placeholder="John Doe" required>
+                        </div>
+                        <div class="field-row">
+                            <label for="email">Email *</label>
+                            <input type="email" id="email" name="email" placeholder="john@example.com" required>
+                        </div>
+                        <div class="field-row">
+                            <label for="phone">Phone</label>
+                            <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567">
+                        </div>
+                        <div class="field-row">
+                        <div class="field-row">
+                            <label for="state">State</label>
+                            <select id="state" name="state">
+                                <option value="">Select State</option>
+                            </select>
+                        </div>
+                        <div class="field-row">
+                            <label for="city">City</label>
+                            <input type="text" id="city" name="city" placeholder="Type to search cities..." autocomplete="off" disabled>
+                            <div id="city-suggestions" class="suggestions"></div>
+                        </div>
+                        </div>
+                        <div class="field-row">
+                            <label for="linkedin">LinkedIn</label>
+                            <input type="url" id="linkedin" name="linkedin" placeholder="https://linkedin.com/in/johndoe">
+                        </div>
+                        <div class="field-row">
+                            <label for="website">Website / Portfolio</label>
+                            <input type="url" id="website" name="website" placeholder="https://johndoe.com">
+                        </div>
+                    </div>
+
+                    <!-- Summary -->
+                    <div class="form-group">
+                        <h2>User Professional Summary</h2>
+                        <div class="field-row">
+                            <textarea id="summary" name="summary" rows="6" maxlength="1000" placeholder="Write a brief summary of your professional background, key achievements, and career goals..."></textarea>
+                            <span class="char-counter"><span id="summary-count">0</span> / 1000</span>
+                        </div>
+                    </div>
+
+                    <!-- Experience -->
+                    <div class="form-group">
+                        <h2>User Experience</h2>
+                        <div id="experience-list">
+                            <!-- Experience entries added here -->
+                        </div>
+                        <button type="button" id="add-experience" class="btn-secondary">+ Add Job</button>
+                    </div>
+
+                    <!-- Education -->
+                    <div class="form-group">
+                        <h2>Education</h2>
+                        <div id="education-list">
+                            <!-- Education entries added here -->
+                        </div>
+                        <button type="button" id="add-education" class="btn-secondary">+ Add School</button>
+                    </div>
+
+                    <!-- Skills -->
+                    <div class="form-group">
+                        <h2>Skills</h2>
+                        <div class="field-row">
+                            <input type="text" id="skill-input" placeholder="Type a skill and press Enter">
+                            <div id="skills-tags" class="tags-container"></div>
+                            <input type="hidden" id="skills" name="skills">
+                        </div>
+                    </div>
+
+                    <!-- Projects -->
+                    <div class="form-group">
+                        <h2>Projects (Optional)</h2>
+                        <div id="projects-list">
+                            <!-- Project entries added here -->
+                        </div>
+                        <button type="button" id="add-project" class="btn-secondary">+ Add Project</button>
+                    </div>
+
+                    <!-- Notable Competencies -->
+                    <div class="form-group">
+                        <h2>Notable Competencies (Optional)</h2>
+                        <div id="competencies-list">
+                            <!-- Competency entries added here -->
+                        </div>
+                        <button type="button" id="add-competency" class="btn-secondary">+ Add Competency</button>
+                    </div>
+
+                    <!-- Community Involvement -->
+                    <div class="form-group">
+                        <h2>Community Involvement (Optional)</h2>
+                        <div id="community-list">
+                            <!-- Community entries added here -->
+                        </div>
+                        <button type="button" id="add-community" class="btn-secondary">+ Add Community Entry</button>
+                    </div>
+
+                    <!-- Certifications -->
+                    <div class="form-group">
+                        <h2>Certifications (Optional)</h2>
+                        <div id="certifications-list">
+                            <!-- Certification entries added here -->
+                        </div>
+                        <button type="button" id="add-certification" class="btn-secondary">+ Add Certification</button>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="form-actions">
+                        <button type="button" id="preview-btn" class="btn-secondary">Preview Resume</button>
+                        <button type="submit" id="build-btn" class="btn-primary">Build Resume</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="preview-section" id="preview-section">
+                <div class="preview-header">
+                    <h2>Live Preview</h2>
+                    <div class="preview-actions">
+                        <div class="purchase-options">
+                            <button id="buy-premium" class="btn-logo-purchase regular">
+                                <img src="/static/images/logo-regular.png" alt="Regular" class="logo-purchase-img">
+                                <span class="logo-purchase-price">$9.99</span>
+                            </button>
+                            <button id="buy-referral" class="btn-logo-purchase student">
+                                <img src="/static/images/logo-discount.png" alt="Share & Save" class="logo-purchase-img">
+                                <span class="logo-purchase-price">$4.99</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="preview-container" id="preview-container">
+                    <div class="preview-placeholder">
+                        <p>Fill out the form to see your resume preview</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <p>© 2026 AIe ResuMaker | 
+            <a href="/terms" target="_blank">Terms of Service</a> | 
+            All purchases are final. No refunds.
+        </p>
+    </footer>
+
+    <!-- Stripe Integration -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="/static/app.js?v=4"></script>
+</body>
+</html>

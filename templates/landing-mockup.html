@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIe ResuMaker — Build a Professional Resume in 10 Minutes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            padding-bottom: 50px;
+        }
+        
+        /* STICKY MARQUEE BANNER */
+        .marquee-banner {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 12px 0;
+            z-index: 1000;
+            overflow: hidden;
+            border-top: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .marquee-track {
+            display: flex;
+            width: max-content;
+            animation: marquee 20s linear infinite;
+        }
+        
+        .marquee-text {
+            padding: 0 50px;
+            font-size: 16px;
+            font-weight: 600;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .marquee-highlight {
+            background: rgba(255,255,255,0.25);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            color: #fef3c7;
+        }
+        
+        @keyframes marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        
+        /* NAVIGATION BAR */
+        .navbar {
+            background: rgba(30, 58, 138, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 0 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+        
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: white;
+            font-weight: 700;
+            font-size: 20px;
+        }
+        
+        .nav-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+        
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.15);
+            color: white;
+        }
+        
+        .nav-cta {
+            background: #10b981;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.2s;
+            margin-left: 8px;
+        }
+        
+        .nav-cta:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+        
+        /* SHARE MODAL */
+        .share-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .share-modal.active {
+            display: flex;
+        }
+        
+        .share-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        
+        .share-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #1e3a8a;
+        }
+        
+        .share-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .share-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .share-copy {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .share-copy:hover {
+            background: #2563eb;
+        }
+        
+        .share-x {
+            background: #000000;
+            color: white;
+        }
+        
+        .share-x:hover {
+            background: #1a1a1a;
+        }
+        
+        .share-facebook {
+            background: #1877f2;
+            color: white;
+        }
+        
+        .share-facebook:hover {
+            background: #166fe5;
+        }
+        
+        .share-linkedin {
+            background: #0a66c2;
+            color: white;
+        }
+        
+        .share-linkedin:hover {
+            background: #0958a8;
+        }
+        
+        .share-native {
+            background: #10b981;
+            color: white;
+        }
+        
+        .share-native:hover {
+            background: #059669;
+        }
+        
+        .share-close {
+            background: #f3f4f6;
+            color: #333;
+        }
+        
+        .share-close:hover {
+            background: #e5e7eb;
+        }
+        
+        .share-url {
+            background: #f3f4f6;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #666;
+            word-break: break-all;
+            margin-bottom: 15px;
+        }
+        
+        .hero {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: white;
+            padding: 40px 20px 80px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .brand-lockup {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            z-index: 1;
+            position: relative;
+        }
+        
+        .brand-logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        
+        .brand-title {
+            font-size: 48px;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            letter-spacing: -0.5px;
+        }
+        
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            opacity: 0.1;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.3);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 20px;
+        }
+        
+        .hero-title {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 16px;
+            line-height: 1.2;
+        }
+        
+        .hero-subtitle {
+            font-size: 20px;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 30px;
+        }
+        
+        .cta-button {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 16px 40px;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+        }
+        
+        .features-section {
+            padding: 60px 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .section-title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 40px;
+            color: #1e3a8a;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: transform 0.2s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+        }
+        
+        .feature-icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
+        
+        .feature-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #1e3a8a;
+        }
+        
+        .how-it-works {
+            background: white;
+            padding: 60px 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .step-number {
+            background: #3b82f6;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        
+        .step-content h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+            color: #1e3a8a;
+        }
+        
+        .stats-section {
+            background: white;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        
+        .stats-row {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 36px;
+            font-weight: 800;
+            color: #3b82f6;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 4px;
+        }
+        
+        .pricing-section {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            padding: 60px 20px;
+            text-align: center;
+        }
+        
+        .pricing-card {
+            background: white;
+            max-width: 400px;
+            margin: 30px auto 0;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .price-tag {
+            font-size: 48px;
+            font-weight: 800;
+            color: #60a5fa;
+            margin: 20px 0;
+        }
+        
+        .price-note {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .student-discount {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+            color: #92400e;
+        }
+        
+        .student-workflow {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .student-workflow h4 {
+            color: #92400e;
+            font-size: 18px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        .student-workflow p {
+            color: #78350f;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        
+        .student-email-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .student-verify-btn {
+            background: #f59e0b;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+        }
+        
+        .student-verify-btn:hover {
+            background: #d97706;
+            transform: translateY(-1px);
+        }
+        
+        .student-price {
+            font-size: 36px;
+            font-weight: 800;
+            color: #059669;
+        }
+        
+        .price-compare {
+            text-decoration: line-through;
+            color: #9ca3af;
+            font-size: 20px;
+        }
+        
+        .workflow-divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        
+        .workflow-divider::before,
+        .workflow-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .workflow-divider span {
+            padding: 0 15px;
+        }
+        
+        .footer {
+            background: #1e3a8a;
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        
+        .footer a {
+            color: #93c5fd;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 640px) {
+            .hero-title {
+                font-size: 32px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-brand">
+                <img src="/static/images/logo.png" alt="" class="nav-logo">
+                <span>AIE ResuMaker</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#how-it-works" class="nav-link">How It Works</a>
+                <a href="#pricing" class="nav-link">Pricing</a>
+                <span class="nav-link" onclick="openShare()">Share</span>
+                <a href="/terms" class="nav-cta">Build Resume</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- SHARE MODAL -->
+    <div class="share-modal" id="shareModal">
+        <div class="share-content">
+            <h3 class="share-title">Share AIE ResuMaker</h3>
+            <div class="share-url" id="shareUrl">https://aie-resumaker.onrender.com</div>
+            <div class="share-buttons">
+                <button class="share-btn share-x" onclick="shareToX()">X / Twitter</button>
+                <button class="share-btn share-facebook" onclick="shareToFacebook()">Facebook</button>
+                <button class="share-btn share-linkedin" onclick="shareToLinkedIn()">LinkedIn</button>
+                <button class="share-btn share-native" onclick="shareNative()" id="nativeShareBtn" style="display: none;">Share</button>
+                <button class="share-btn share-copy" onclick="copyShareUrl()">Copy Link</button>
+                <button class="share-btn share-close" onclick="closeShare()">Close</button>
+            </div>
+            <p style="font-size: 12px; color: #999;">Help friends build their resume!</p>
+        </div>
+    </div>
+
+    <div class="hero">
+        <div class="brand-lockup">
+            <img src="/static/images/logo.png" alt="AIE ResuMaker" class="brand-logo">
+            <span class="brand-title">AIE ResuMaker</span>
+        </div>
+        <div class="badge">🗽 Created in the US for the US</div>
+        <h1 class="hero-title">Make the Hiring Process Faster.<br>Build a Professional Resume in 10 Minutes.</h1>
+        <p class="hero-subtitle">
+            AI-powered resume builder designed for American students and job seekers. 
+            From first jobs to dream careers.
+        </p>
+        <a href="/terms" class="cta-button">Build My Resume — $9.99</a>
+        <p style="margin-top: 16px; font-size: 14px; opacity: 0.8;">
+            One-time payment • No subscription • Professional PDF + DOCX
+        </p>
+    </div>
+
+    <div class="features-section" id="features">
+        <h2 class="section-title">Why Students Choose AIe ResuMaker</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3 class="feature-title">10 Minutes to Done</h3>
+                <p>Fill in your info, pick a template, download a professional PDF + DOCX. No formatting headaches.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3 class="feature-title">Job Market Ready</h3>
+                <p>Templates optimized for US employers — from local businesses to Fortune 500.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3 class="feature-title">Privacy First</h3>
+                <p>Your data stays in your browser. No account required. No spam. Built by a trusted developer.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💾</div>
+                <h3 class="feature-title">Auto-Saves Progress</h3>
+                <p>Phone died? No problem. Your resume auto-saves as you type. Pick up where you left off.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3 class="feature-title">Works on Your Phone</h3>
+                <p>Build your resume between classes, on the bus, or at the library. Fully mobile-optimized.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎓</div>
+                <h3 class="feature-title">From Work Permit to Career</h3>
+                <p>Whether you're 15 with a work permit or a graduating senior, we help you look professional.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3 class="feature-title">Smart Auto-Complete</h3>
+                <p>AI-powered suggestions speed up form filling. Faster, smarter resume building.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="how-it-works" id="how-it-works">
+        <h2 class="section-title">How It Works</h2>
+        <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>Fill Out Your Info</h3>
+                <p>Name, experience, education, skills — we guide you through every section. Auto-saves as you type.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h3>Preview Your Resume</h3>
+                <p>See exactly how it looks before you pay. 3-second preview, then watermarked until purchase.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h3>Pay & Download</h3>
+                <p>One-time payment. No subscription. Download your professional PDF + DOCX instantly. Use it forever.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="stats-section">
+        <h2 class="section-title">Built in the US, For the US</h2>
+        <p style="max-width: 600px; margin: 0 auto; color: #666;">
+            Created by a US developer who knows the American job market. 
+            Not some Silicon Valley app — this is made for where you live.
+        </p>
+        <div class="stats-row">
+            <div class="stat-item">
+                <div class="stat-number">1st</div>
+                <div class="stat-label">Resume Sold<br>(May 29, 2026)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">$9.99</div>
+                <div class="stat-label">Full Price<br>(One-time payment)</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-number">5⭐</div>
+                <div class="stat-label">Template Quality<br>(Professional PDF + DOCX)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pricing-section" id="pricing">
+        <h2 class="section-title">Simple Pricing</h2>
+        <div class="pricing-card">
+            <h3 style="font-size: 24px; margin-bottom: 10px;">Full Resume Download</h3>
+            <div class="price-tag">$9.99</div>
+            <p class="price-note">One-time payment • No subscription • Professional PDF + DOCX</p>
+            <p style="font-size: 14px; color: #dc2626; font-weight: 600; margin: 10px 0;">All Sales Final — No Refunds</p>
+            <a href="/terms" class="cta-button" style="width: 100%; text-align: center;">Build My Resume</a>
+            
+            <div class="workflow-divider"><span>OR</span></div>
+            
+            <div class="student-workflow">
+                <h4>College Student?</h4>
+                <p>Use your .edu email and save 50%</p>
+                <div class="student-price">$4.99</div>
+                <div class="price-compare">$9.99</div>
+                <p style="font-size: 12px; margin-top: 8px;">Verify your student status</p>
+                <input type="email" class="student-email-input" id="studentEmail" placeholder="yourname@university.edu">
+                <button class="student-verify-btn" onclick="startStudentWorkflow()">Verify & Get $4.99 Price</button>
+            </div>
+            
+            <p style="margin-top: 16px; font-size: 12px; color: #666;">
+                13+ required • Parental consent if under 18 • All sales final • Secure Stripe checkout
+            </p>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p style="font-size: 18px; margin-bottom: 20px;">
+            🗽 Built in the US • Made for Americans • By a US Developer
+        </p>
+        <p style="opacity: 0.8; font-size: 14px;">
+            Questions? <a href="mailto:aiexperimental@gmail.com">aiexperimental@gmail.com</a>
+        </p>
+        <p style="margin-top: 20px; font-size: 12px; opacity: 0.6;">
+            <a href="/terms">Terms of Service</a> • © 2026 AIe ResuMaker
+        </p>
+    </div>
+
+    <script>
+        function openShare() {
+            document.getElementById('shareModal').classList.add('active');
+            
+            // Show native share button if supported (mobile)
+            if (navigator.share) {
+                document.getElementById('nativeShareBtn').style.display = 'flex';
+            }
+        }
+        
+        function closeShare() {
+            document.getElementById('shareModal').classList.remove('active');
+        }
+        
+        function copyShareUrl() {
+            const url = document.getElementById('shareUrl').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.querySelector('.share-copy');
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                    btn.textContent = 'Copy Link';
+                }, 2000);
+            });
+        }
+        
+        function shareToX() {
+            const url = encodeURIComponent(document.getElementById('shareUrl').textContent);
+            const text = encodeURIComponent('Build a professional resume in 10 minutes with AIe ResuMaker! 🚀');
+            window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank', 'width=600,height=400');
+        }
+        
+        function shareToFacebook() {
+            const url = encodeURIComponent(document.getElementById('shareUrl').textContent);
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank', 'width=600,height=400');
+        }
+        
+        function shareToLinkedIn() {
+            const url = encodeURIComponent(document.getElementById('shareUrl').textContent);
+            window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}`, '_blank', 'width=600,height=400');
+        }
+        
+        function shareNative() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'AIE ResuMaker',
+                    text: 'Build a professional resume in 10 minutes!',
+                    url: document.getElementById('shareUrl').textContent
+                }).catch(err => console.log('Share cancelled'));
+            }
+        }
+        
+        // Close modal on outside click
+        document.getElementById('shareModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeShare();
+            }
+        });
+        
+        // Smooth scroll for nav links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth' });
+                }
+            });
+        });
+    </script>
+    <script>
+        function startStudentWorkflow() {
+            const email = document.getElementById('studentEmail').value.trim();
+            
+            if (!email.toLowerCase().endsWith('.edu')) {
+                alert('Please enter a valid .edu email address');
+                return;
+            }
+            
+            // Store student email for verification
+            localStorage.setItem('aie_student_email', email);
+            
+            // Redirect to builder with student flag
+            window.location.href = '/terms?student=true&email=' + encodeURIComponent(email);
+        }
+    </script>
+    <!-- STICKY MARQUEE BANNER -->
+    <div class="marquee-banner">
+        <div class="marquee-track">
+            <div class="marquee-text">
+                College Students: Use your <span class="marquee-highlight">.edu email</span> at checkout for exclusive discounts
+            </div>
+            <div class="marquee-text">
+                College Students: Use your <span class="marquee-highlight">.edu email</span> at checkout for exclusive discounts
+            </div>
+            <div class="marquee-text">
+                College Students: Use your <span class="marquee-highlight">.edu email</span> at checkout for exclusive discounts
+            </div>
+            <div class="marquee-text">
+                College Students: Use your <span class="marquee-highlight">.edu email</span> at checkout for exclusive discounts
+            </div>
+        </div>
+    </div>
+</body>
+</html>
