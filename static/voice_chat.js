@@ -26,6 +26,7 @@
     let totalSteps = 9; // Approximate for progress bar
     let canGoBack = false;
     let isDecisionPoint = false;
+    let currentField = '';
 
     // Initialize
     init();
@@ -184,6 +185,7 @@
                 // Show re-ask
                 addMessage('ai', data.question, false);
                 clearInput(data.field === '_bullet');
+                currentField = data.field;
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
@@ -224,6 +226,7 @@
             } else {
                 addMessage('ai', data.question, false);
                 clearInput(data.field === '_bullet');
+                currentField = data.field;
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
@@ -266,6 +269,7 @@
             
             addMessage('ai', data.question, false);
             clearInput(data.field === '_bullet');
+            currentField = data.field;
             updateProgress(currentStepIndex);
             updateContextLabel(data.context_label);
             updateNavButtons(data.can_go_back, data.field, data.show_add_job);
@@ -307,6 +311,7 @@
             } else {
                 addMessage('ai', data.question, false);
                 clearInput(data.field === '_bullet');
+                currentField = data.field;
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
