@@ -36,12 +36,12 @@ SIMPLE_STEPS = [
     {"field": "education_level", "question": "Education level — high school, associate, bachelor's, master's, doctorate, or certification?", "group": "target"},
 ]
 
-# Experience loop steps
+# Experience loop steps — bullets for description
 EXPERIENCE_STEPS = [
     {"field": "company", "question": "What company did you work at?", "subfield": "company"},
     {"field": "title", "question": "What was your title there?", "subfield": "title"},
     {"field": "dates", "question": "When did you work there? Say '2020 to 2022'", "subfield": "dates"},
-    {"field": "description", "question": "What did you do there? Describe in your own words.", "subfield": "description"},
+    {"field": "description", "question": "What did you do there? Say bullet 1.", "subfield": "description", "is_bullet": True},
 ]
 
 # Education loop steps
@@ -88,17 +88,44 @@ def get_next_step(session: dict) -> dict:
     # Phase 2: Experience loop
     exp_idx = step_index - len(SIMPLE_STEPS)
     if context.get("phase") == "experience":
-        # Check if we're in the experience steps or at the decision point
+        # Check if we're in the experience steps or at a decision point
         exp_count = len(context.get("experience", []))
         substep = context.get("exp_substep", 0)
+        bullet_count = context.get("exp_bullet_count", 0)
         
-        if substep < len(EXPERIENCE_STEPS):
+        if substep < len(EXPERIENCE_STEPS) - 1:
+            # Standard fields: company, title, dates
             step = EXPERIENCE_STEPS[substep].copy()
             step["context_label"] = f"Job {exp_count + 1}"
+            step["show_add_job"] = True  # Show "Add Job" button
+            return step
+        elif substep == len(EXPERIENCE_STEPS) - 1:
+            # Description/bullet field
+            step = EXPERIENCE_STEPS[substep].copy()
+            step["context_label"] = f"Job {exp_count + 1}"
+            step["show_add_job"] = True
+            if bullet_count > 0:
+                step["question"] = f"Bullet {bullet_count + 1}?"
             return step
         else:
-            # Decision point
-            return {"field": "_decision", "question": f"Great! Job {exp_count} saved. Add another job? Say 'yes' or 'done'.", "context_label": "Jobs"}
+            # After all standard fields, check if we're in bullet loop
+            in_bullet_loop = context.get("in_bullet_loop", False)
+            if in_bullet_loop:
+                # Ask for next bullet
+                return {
+                    "field": "_bullet",
+                    "question": f"Bullet {bullet_count + 1}?",
+                    "context_label": f"Job {exp_count}",
+                    "show_add_job": True
+                }
+            else:
+                # Decision: add another job?
+                return {
+                    "field": "_decision",
+                    "question": f"Great! Job {exp_count} saved. Add another job? Say 'yes' or 'done'.",
+                    "context_label": "Jobs",
+                    "show_add_job": False
+                }
     
     # Phase 3: Education loop
     if context.get("phase") == "education":
@@ -197,23 +224,59 @@ def advance_state(session: dict, extracted: str) -> None:
     if context.get("phase") == "experience":
         substep = context.get("exp_substep", 0)
         exp_list = context.setdefault("experience", [])
+        bullet_count = context.get("exp_bullet_count", 0)
+        in_bullet_loop = context.get("in_bullet_loop", False)
         
-        if substep < len(EXPERIENCE_STEPS):
-            # Building current experience entry
+        # Handle "add_job" action — skip to new job immediately
+        if extracted == "__ADD_JOB__":
+            # Finalize current job if it has any data
+            if exp_list and not any(k in exp_list[-1] for k in ["company", "title"]):
+                exp_list.pop()
+            context["exp_substep"] = 0
+            context["exp_bullet_count"] = 0
+            context["in_bullet_loop"] = False
+            return
+        
+        if substep < len(EXPERIENCE_STEPS) - 1:
+            # Standard fields: company, title, dates (indices 0, 1, 2)
             if not exp_list or len(exp_list[-1]) >= len(EXPERIENCE_STEPS):
                 exp_list.append({})
             exp_list[-1][EXPERIENCE_STEPS[substep]["subfield"]] = extracted
             context["exp_substep"] = substep + 1
+        elif substep == len(EXPERIENCE_STEPS) - 1:
+            # Description field (index 3) — this is the first bullet
+            if not exp_list or len(exp_list[-1]) >= len(EXPERIENCE_STEPS):
+                exp_list.append({})
+            exp_list[-1]["description"] = [extracted]
+            context["in_bullet_loop"] = True
+            context["exp_bullet_count"] = 1
+            # Set substep past EXPERIENCE_STEPS so get_next_step enters bullet loop logic
+            context["exp_substep"] = len(EXPERIENCE_STEPS)
         else:
-            # Decision point
-            if extracted.lower() in ["yes", "y", "add", "another", "more"]:
-                context["exp_substep"] = 0
+            # substep >= len(EXPERIENCE_STEPS) — we're in bullet loop mode
+            if not in_bullet_loop:
+                # Shouldn't happen, but just in case
+                if exp_list:
+                    exp_list[-1]["description"] = [extracted]
+                context["in_bullet_loop"] = True
+                context["exp_bullet_count"] = 1
             else:
-                # Move to education
-                data["experience"] = exp_list
-                context["phase"] = "education"
-                context["edu_substep"] = 0
-                context["education"] = []
+                # In bullet loop — check if user wants more bullets or is done
+                if extracted.lower() in ["done", "no", "n", "finished", "complete", "that's it", "thats it"]:
+                    # Done with bullets, move to "add another job?" decision
+                    context["in_bullet_loop"] = False
+                    context["exp_bullet_count"] = 0
+                elif extracted.lower() in ["yes", "y", "add", "another", "more"]:
+                    # User said yes to "add another bullet?" — ask for next bullet
+                    context["exp_bullet_count"] = bullet_count + 1
+                else:
+                    # User provided another bullet
+                    if exp_list and "description" in exp_list[-1]:
+                        if isinstance(exp_list[-1]["description"], list):
+                            exp_list[-1]["description"].append(extracted)
+                        else:
+                            exp_list[-1]["description"] = [exp_list[-1]["description"], extracted]
+                    context["exp_bullet_count"] = bullet_count + 1
         return
     
     # Phase 3: Education
@@ -370,6 +433,24 @@ def go_back(session: dict) -> dict:
     if context.get("phase") == "experience":
         substep = context.get("exp_substep", 0)
         exp_list = context.get("experience", [])
+        bullet_count = context.get("exp_bullet_count", 0)
+        in_bullet_loop = context.get("in_bullet_loop", False)
+        
+        if in_bullet_loop and bullet_count > 0:
+            # In bullet loop — go back one bullet
+            context["exp_bullet_count"] = bullet_count - 1
+            if exp_list and "description" in exp_list[-1]:
+                if isinstance(exp_list[-1]["description"], list) and len(exp_list[-1]["description"]) > 0:
+                    exp_list[-1]["description"].pop()
+                    if len(exp_list[-1]["description"]) == 0:
+                        del exp_list[-1]["description"]
+                        context["in_bullet_loop"] = False
+            return {
+                "field": "_bullet",
+                "question": f"Bullet {bullet_count}?" if bullet_count > 1 else "What did you do there? Say bullet 1.",
+                "context_label": f"Job {len(exp_list)}",
+                "show_add_job": True
+            }
         
         if substep > 0:
             context["exp_substep"] = substep - 1
@@ -378,17 +459,29 @@ def go_back(session: dict) -> dict:
                 field = EXPERIENCE_STEPS[substep - 1]["subfield"]
                 if field in exp_list[-1]:
                     del exp_list[-1][field]
-            return EXPERIENCE_STEPS[substep - 1]
+            step = EXPERIENCE_STEPS[substep - 1].copy()
+            step["context_label"] = f"Job {len(exp_list)}"
+            step["show_add_job"] = True
+            return step
         elif exp_list:
             # Going back to previous job's last field
             exp_list.pop()
             if exp_list:
                 context["exp_substep"] = len(EXPERIENCE_STEPS) - 1
-                return EXPERIENCE_STEPS[-1]
+                context["in_bullet_loop"] = True
+                context["exp_bullet_count"] = len(exp_list[-1].get("description", [])) if "description" in exp_list[-1] else 0
+                return {
+                    "field": "_bullet",
+                    "question": f"Bullet {context['exp_bullet_count'] + 1}?",
+                    "context_label": f"Job {len(exp_list)}",
+                    "show_add_job": True
+                }
             else:
                 # Back to simple fields
                 session["step_index"] = len(SIMPLE_STEPS) - 1
                 context.pop("phase", None)
+                context.pop("in_bullet_loop", None)
+                context.pop("exp_bullet_count", None)
                 return SIMPLE_STEPS[-1]
     
     # Add more back logic for other phases as needed
@@ -414,6 +507,8 @@ async def groq_extract(transcript: str, field: str) -> str:
         prompt = f"Extract the {field}. Return ONLY the value."
     elif field in ["dates", "cert_date"]:
         prompt = "Extract dates. Return ONLY the dates in format 'YYYY to YYYY' or 'Month YYYY to Month YYYY'."
+    elif field == "_bullet":
+        prompt = "Extract the achievement/responsibility bullet point. Return ONLY the bullet text."
     elif field in ["description", "project_description"]:
         prompt = "Extract the description. Return ONLY the description text."
     elif field == "skills":
@@ -476,7 +571,8 @@ async def voice_start():
         "context_label": step.get("context_label", ""),
         "step_index": 0,
         "done": False,
-        "can_go_back": False
+        "can_go_back": False,
+        "show_add_job": step.get("show_add_job", False)
     }
 
 
@@ -513,7 +609,8 @@ async def voice_turn(request: Request):
                 "context_label": step.get("context_label", ""),
                 "step_index": session["step_index"],
                 "done": False,
-                "can_go_back": session["step_index"] > 0,
+                "can_go_back": session["step_index"] > 0 or session.get("context", {}).get("exp_substep", 0) > 0 or session.get("context", {}).get("in_bullet_loop", False),
+                "show_add_job": step.get("show_add_job", False),
                 "action": "back"
             }
         
@@ -521,7 +618,12 @@ async def voice_turn(request: Request):
         if action == "add":
             context = session.get("context", {})
             if context.get("phase") == "experience":
-                context["exp_substep"] = 0
+                # In bullet loop, "add" means "add another bullet"
+                if context.get("in_bullet_loop", False):
+                    # Just increment bullet count, ask for next bullet
+                    context["exp_bullet_count"] = context.get("exp_bullet_count", 0) + 1
+                else:
+                    context["exp_substep"] = 0
             elif context.get("phase") == "education":
                 context["edu_substep"] = 0
             elif context.get("phase") == "optional":
@@ -545,8 +647,27 @@ async def voice_turn(request: Request):
                 "step_index": session["step_index"],
                 "done": False,
                 "can_go_back": True,
+                "show_add_job": step.get("show_add_job", False),
                 "action": "add"
             }
+        
+        # Handle ADD_JOB action — skip to new job immediately
+        if action == "add_job":
+            context = session.get("context", {})
+            if context.get("phase") == "experience":
+                advance_state(session, "__ADD_JOB__")
+                step = get_next_step(session)
+                return {
+                    "session_id": session_id,
+                    "question": step["question"],
+                    "field": step["field"],
+                    "context_label": step.get("context_label", ""),
+                    "step_index": session["step_index"],
+                    "done": False,
+                    "can_go_back": True,
+                    "show_add_job": step.get("show_add_job", False),
+                    "action": "add_job"
+                }
         
         # Normal answer flow
         if action not in ["back", "add"] and not transcript:
@@ -559,8 +680,19 @@ async def voice_turn(request: Request):
         step = get_next_step(session)
         field = step["field"]
         
-        # Extract with Groq
-        extracted = await groq_extract(transcript, field)
+        # For bullet loop, use raw transcript (don't send "done" or bullet text to Groq)
+        if field == "_bullet":
+            # Check if user wants to stop adding bullets
+            transcript_lower = transcript.lower().strip()
+            if transcript_lower in ["done", "no", "n", "finished", "complete", "that's it", "thats it", "skip"]:
+                extracted = "done"
+            elif transcript_lower in ["yes", "y", "add", "another", "more"]:
+                extracted = "yes"
+            else:
+                extracted = transcript  # Use raw bullet text
+        else:
+            # Extract with Groq for all other fields
+            extracted = await groq_extract(transcript, field)
         
         # Store in history
         session["history"].append({
@@ -583,7 +715,8 @@ async def voice_turn(request: Request):
             "context_label": next_step.get("context_label", ""),
             "step_index": session["step_index"],
             "done": next_step.get("done", False),
-            "can_go_back": session["step_index"] > 0 or session.get("context", {}).get("exp_substep", 0) > 0,
+            "can_go_back": session["step_index"] > 0 or session.get("context", {}).get("exp_substep", 0) > 0 or session.get("context", {}).get("in_bullet_loop", False),
+            "show_add_job": next_step.get("show_add_job", False),
             "data_preview": {k: v for k, v in session["data"].items() if k not in ["experience", "education", "projects", "competencies", "community", "certifications"]},
             "extracted": extracted
         }
