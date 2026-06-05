@@ -1,6 +1,6 @@
 /**
- * Voice Chat Resume Builder
- * Conversational interface with SpeechRecognition + text fallback
+ * Voice Chat Resume Builder - ADHD Optimized
+ * Conversational interface with Back/Add buttons, micro-questions
  */
 
 (function() {
@@ -12,13 +12,20 @@
     const recordingStatus = document.getElementById('recording-status');
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
+    const contextLabel = document.getElementById('context-label');
+    const navButtons = document.getElementById('nav-buttons');
+    const backBtn = document.getElementById('back-btn');
+    const addBtn = document.getElementById('add-btn');
 
     // State
     let sessionId = null;
     let isRecording = false;
     let recognition = null;
-    let accumulatedFinal = ''; // Speech transcript accumulator (module-level)
-    const totalQuestions = 12;
+    let accumulatedFinal = '';
+    let currentStepIndex = 0;
+    let totalSteps = 9; // Approximate for progress bar
+    let canGoBack = false;
+    let isDecisionPoint = false;
 
     // Initialize
     init();
@@ -60,6 +67,14 @@
             });
         }
 
+        // Navigation buttons
+        if (backBtn) {
+            backBtn.addEventListener('click', goBack);
+        }
+        if (addBtn) {
+            addBtn.addEventListener('click', addAnother);
+        }
+
         // Start session
         startSession();
     }
@@ -85,12 +100,10 @@
                 }
             }
             
-            // Append new finalized text to accumulated buffer
             if (newFinal) {
                 accumulatedFinal += newFinal;
             }
             
-            // Show accumulated + current interim
             textInput.value = (accumulatedFinal + interimTranscript).trim();
         };
 
@@ -112,7 +125,6 @@
     function toggleRecording() {
         if (isRecording) {
             stopRecording();
-            // Auto-send if we got text
             if (textInput.value.trim()) {
                 sendMessage();
             }
@@ -143,6 +155,86 @@
         textInput.placeholder = 'Type your answer...';
     }
 
+    // Navigation Actions
+    async function goBack() {
+        if (!sessionId || !canGoBack) return;
+        
+        textInput.disabled = true;
+        sendBtn.disabled = true;
+        showTyping();
+
+        try {
+            const response = await fetch('/api/voice/turn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, transcript: '', action: 'back' })
+            });
+            const data = await response.json();
+            hideTyping();
+
+            if (data.error) {
+                addMessage('ai', 'Sorry: ' + data.error, false);
+            } else {
+                // Remove the last user message from chat
+                removeLastUserMessage();
+                
+                // Show re-ask
+                addMessage('ai', data.question, false);
+                updateProgress(data.step_index);
+                updateContextLabel(data.context_label);
+                updateNavButtons(data.can_go_back, data.field);
+            }
+        } catch (e) {
+            hideTyping();
+            console.error('Back error:', e);
+        } finally {
+            textInput.disabled = false;
+            sendBtn.disabled = false;
+            textInput.focus();
+        }
+    }
+
+    async function addAnother() {
+        if (!sessionId) return;
+        
+        textInput.disabled = true;
+        sendBtn.disabled = true;
+        showTyping();
+
+        try {
+            const response = await fetch('/api/voice/turn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, transcript: '', action: 'add' })
+            });
+            const data = await response.json();
+            hideTyping();
+
+            if (data.error) {
+                addMessage('ai', 'Sorry: ' + data.error, false);
+            } else {
+                addMessage('ai', data.question, false);
+                updateProgress(data.step_index);
+                updateContextLabel(data.context_label);
+                updateNavButtons(data.can_go_back, data.field);
+            }
+        } catch (e) {
+            hideTyping();
+            console.error('Add error:', e);
+        } finally {
+            textInput.disabled = false;
+            sendBtn.disabled = false;
+            textInput.focus();
+        }
+    }
+
+    function removeLastUserMessage() {
+        const messages = chatMessages.querySelectorAll('.user-message');
+        if (messages.length > 0) {
+            messages[messages.length - 1].remove();
+        }
+    }
+
     // API Calls
     async function startSession() {
         try {
@@ -155,8 +247,16 @@
             hideTyping();
 
             sessionId = data.session_id;
+            currentStepIndex = data.step_index || 0;
+            
+            // Clear welcome and show first question
+            const welcome = document.getElementById('welcome-message');
+            if (welcome) welcome.remove();
+            
             addMessage('ai', data.question, false);
-            updateProgress(data.turn);
+            updateProgress(currentStepIndex);
+            updateContextLabel(data.context_label);
+            updateNavButtons(data.can_go_back, data.field);
         } catch (e) {
             hideTyping();
             addMessage('ai', 'Sorry, something went wrong. Please refresh and try again.', false);
@@ -174,6 +274,7 @@
         // Add user message
         addMessage('user', text, true);
         textInput.value = '';
+        accumulatedFinal = '';
         textInput.disabled = true;
         sendBtn.disabled = true;
 
@@ -183,7 +284,7 @@
             const response = await fetch('/api/voice/turn', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sessionId, transcript: text })
+                body: JSON.stringify({ session_id: sessionId, transcript: text, action: 'answer' })
             });
             const data = await response.json();
             hideTyping();
@@ -191,26 +292,10 @@
             if (data.error) {
                 addMessage('ai', 'Sorry: ' + data.error + '. Please try again.', false);
             } else {
-                if (isAddingMore) {
-                    // User is adding to previous answer — update the stored text
-                    lastUserText += ' ' + text;
-                    // Update the displayed message
-                    if (lastUserMessageDiv) {
-                        const bubble = lastUserMessageDiv.querySelector('.message-bubble');
-                        if (bubble) bubble.textContent = lastUserText;
-                    }
-                    isAddingMore = false;
-                    // Don't advance turn — stay on same question
-                    addMessage('ai', 'Got it. Anything else for this?', false);
-                } else {
-                    // Normal flow — user message already added at top of function
-                    addMessage('ai', data.question, false);
-                    updateProgress(data.turn);
-                }
-                
-                // Clear input and accumulated text
-                textInput.value = '';
-                accumulatedFinal = '';
+                addMessage('ai', data.question, false);
+                updateProgress(data.step_index);
+                updateContextLabel(data.context_label);
+                updateNavButtons(data.can_go_back, data.field);
 
                 // Show done state
                 if (data.done) {
@@ -229,38 +314,13 @@
     }
 
     // UI Helpers
-    let lastUserMessageDiv = null;
-    let lastUserText = '';
-    let isAddingMore = false;
-    
-    function addMessage(type, text, isUser, showAddMore = false) {
+    function addMessage(type, text, isUser) {
         const div = document.createElement('div');
         div.className = `message ${type}-message`;
         div.innerHTML = `
             <div class="message-bubble">${escapeHtml(text)}</div>
             <div class="message-time">${formatTime()}</div>
         `;
-        
-        if (isUser && showAddMore) {
-            lastUserMessageDiv = div;
-            lastUserText = text;
-            
-            const addMoreBtn = document.createElement('button');
-            addMoreBtn.className = 'add-more-btn';
-            addMoreBtn.innerHTML = '↩️ I had more to say';
-            addMoreBtn.onclick = () => {
-                isAddingMore = true;
-                // Remove the button so they can't click twice
-                addMoreBtn.remove();
-                // Put previous text back in input so they can append
-                textInput.value = lastUserText + ' ';
-                accumulatedFinal = lastUserText + ' ';
-                textInput.focus();
-                addMessage('ai', 'Go ahead — add to what you already told me.', false);
-            };
-            div.appendChild(addMoreBtn);
-        }
-        
         chatMessages.appendChild(div);
         scrollToBottom();
     }
@@ -283,16 +343,58 @@
         if (indicator) indicator.remove();
     }
 
-    function updateProgress(turn) {
-        const pct = Math.min(Math.round((turn / totalQuestions) * 100), 100);
+    function updateProgress(stepIndex) {
+        currentStepIndex = stepIndex;
+        const pct = Math.min(Math.round((stepIndex / totalSteps) * 100), 100);
         progressFill.style.width = pct + '%';
         progressText.textContent = pct + '%';
+    }
+
+    function updateContextLabel(label) {
+        if (!label) {
+            contextLabel.classList.add('hidden');
+            return;
+        }
+        contextLabel.textContent = label;
+        contextLabel.classList.remove('hidden');
+    }
+
+    function updateNavButtons(canBack, field) {
+        canGoBack = canBack;
+        
+        // Show nav buttons if we can go back or if this is a loop field
+        const isLoopField = field && !field.startsWith('_') && 
+            (field === 'company' || field === 'title' || field === 'school' || 
+             field === 'degree' || field === 'project_name' || field === 'competency' ||
+             field === 'community_org' || field === 'cert_name');
+        
+        const isDecisionPoint = field === '_decision';
+        
+        if (canBack || isLoopField || isDecisionPoint) {
+            navButtons.classList.remove('hidden');
+        } else {
+            navButtons.classList.add('hidden');
+        }
+        
+        // Show/hide individual buttons
+        backBtn.style.display = canBack ? 'inline-block' : 'none';
+        
+        // Show add button at decision points or for loop fields
+        if (isDecisionPoint || isLoopField) {
+            addBtn.style.display = 'inline-block';
+            if (isDecisionPoint) {
+                addBtn.textContent = '+ Add Another';
+            }
+        } else {
+            addBtn.style.display = 'none';
+        }
     }
 
     function showViewResumeButton() {
         micBtn.style.display = 'none';
         textInput.style.display = 'none';
         sendBtn.style.display = 'none';
+        navButtons.style.display = 'none';
 
         const btn = document.createElement('a');
         btn.href = `/build?mode=form&voice_session=${sessionId}`;
@@ -300,7 +402,7 @@
         btn.textContent = '👁️ View Your Resume';
         document.querySelector('.voice-chat-container').appendChild(btn);
 
-        addMessage('ai', 'Great! Your resume is ready. Click the button below to preview and purchase.', false);
+        addMessage('ai', 'Great! Your resume is ready. Click below to preview and purchase.', false);
     }
 
     function scrollToBottom() {
