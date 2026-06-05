@@ -95,6 +95,9 @@ function showEditDialog() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Check for voice session data first
+    loadVoiceData();
+    
     // Load saved progress FIRST (before adding empty defaults)
     const hasSavedData = loadSavedProgress();
     
@@ -396,6 +399,93 @@ function collectFormDataForSave() {
     data.certifications = certifications;
     
     return data;
+}
+
+function loadVoiceData() {
+    try {
+        const script = document.getElementById('voice-data');
+        if (!script) return;
+        
+        const voiceData = JSON.parse(script.textContent);
+        if (!voiceData || Object.keys(voiceData).length === 0) return;
+        
+        console.log('[AIE ResuMaker] Loading voice session data:', voiceData);
+        
+        // Map voice fields to form fields
+        const fieldMap = {
+            'full_name': 'full_name',
+            'email': 'email',
+            'phone': 'phone',
+            'city': 'city',
+            'industry': 'industry',
+            'job_title': 'job_title',
+            'experience_level': 'experience_level',
+            'summary': 'summary',
+            'linkedin': 'linkedin',
+            'website': 'website'
+        };
+        
+        // Set simple fields
+        Object.entries(fieldMap).forEach(([voiceKey, formKey]) => {
+            const el = form.querySelector(`[name="${formKey}"]`);
+            if (el && voiceData[voiceKey]) {
+                el.value = voiceData[voiceKey];
+                console.log(`[Voice→Form] Set ${formKey} = ${voiceData[voiceKey]}`);
+            }
+        });
+        
+        // Set skills
+        if (voiceData.skills && Array.isArray(voiceData.skills)) {
+            skills = [...voiceData.skills];
+            renderSkillsTags();
+            console.log('[Voice→Form] Set skills:', skills);
+        }
+        
+        // Set experience entries
+        if (voiceData.experience && Array.isArray(voiceData.experience)) {
+            voiceData.experience.forEach((exp, i) => {
+                if (i === 0) {
+                    // First entry might already exist
+                    const firstEntry = document.querySelector('.experience-entry');
+                    if (firstEntry) {
+                        firstEntry.querySelector('[name*="title"]').value = exp.title || '';
+                        firstEntry.querySelector('[name*="company"]').value = exp.company || '';
+                        firstEntry.querySelector('[name*="dates"]').value = exp.dates || '';
+                        firstEntry.querySelector('[name*="description"]').value = exp.description || '';
+                    }
+                } else {
+                    addExperienceEntry(exp);
+                }
+            });
+            console.log('[Voice→Form] Set experience entries:', voiceData.experience.length);
+        }
+        
+        // Set education entries
+        if (voiceData.education && Array.isArray(voiceData.education)) {
+            voiceData.education.forEach((edu, i) => {
+                if (i === 0) {
+                    const firstEntry = document.querySelector('.education-entry');
+                    if (firstEntry) {
+                        firstEntry.querySelector('[name*="school"]').value = edu.school || '';
+                        firstEntry.querySelector('[name*="degree"]').value = edu.degree || '';
+                        firstEntry.querySelector('[name*="field"]').value = edu.field || '';
+                        firstEntry.querySelector('[name*="dates"]').value = edu.dates || '';
+                    }
+                } else {
+                    addEducationEntry(edu);
+                }
+            });
+            console.log('[Voice→Form] Set education entries:', voiceData.education.length);
+        }
+        
+        // Save to localStorage so user doesn't lose it
+        saveProgress(false);
+        
+        console.log('[AIE ResuMaker] Voice data loaded successfully');
+        
+    } catch (e) {
+        console.error('[AIE ResuMaker] Failed to load voice data:', e);
+    }
 }
 
 function loadSavedProgress() {

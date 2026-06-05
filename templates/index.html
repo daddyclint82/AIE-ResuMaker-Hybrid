@@ -255,6 +255,9 @@
         </p>
     </footer>
 
+    <!-- Voice Session Data (if coming from voice chat) -->
+    <script id="voice-data" type="application/json">{{ voice_data | safe }}</script>
+    
     <!-- Stripe Integration -->
     <script src="https://js.stripe.com/v3/"></script>
     <script src="/static/app.js?v=4"></script>

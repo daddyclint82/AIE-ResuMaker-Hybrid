@@ -146,7 +146,7 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
 print(f"[AIE ResuMaker] Environment: {APP_ENV}")
 print(f"[AIE ResuMaker] Stripe key prefix: {STRIPE_SECRET_KEY[:7]}..." if STRIPE_SECRET_KEY else "[AIE ResuMaker] WARNING: No Stripe secret key configured!")
 
-from voice_api import router as voice_router
+from voice_api import router as voice_router, voice_sessions as voice_session_store
 
 app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
@@ -564,8 +564,8 @@ async def build_page(request: Request):
     
     # Check for voice session data (new voice_sessions from voice_api)
     voice_data = None
-    if voice_session and voice_session in voice_api.voice_sessions:
-        voice_data = voice_api.voice_sessions[voice_session].get("data", {})
+    if voice_session and voice_session in voice_session_store:
+        voice_data = voice_session_store[voice_session].get("data", {})
         print(f"[BUILD] Loading voice session {voice_session}")
     
     # Determine mode
