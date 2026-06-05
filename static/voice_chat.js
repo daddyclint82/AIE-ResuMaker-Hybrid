@@ -135,6 +135,9 @@
 
     function startRecording() {
         if (!recognition) return;
+        // Clear previous transcript so each question starts fresh
+        accumulatedFinal = '';
+        textInput.value = '';
         try {
             recognition.start();
             isRecording = true;
@@ -180,6 +183,7 @@
                 
                 // Show re-ask
                 addMessage('ai', data.question, false);
+                clearInput();
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field);
@@ -214,6 +218,7 @@
                 addMessage('ai', 'Sorry: ' + data.error, false);
             } else {
                 addMessage('ai', data.question, false);
+                clearInput();
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field);
@@ -254,6 +259,7 @@
             if (welcome) welcome.remove();
             
             addMessage('ai', data.question, false);
+            clearInput();
             updateProgress(currentStepIndex);
             updateContextLabel(data.context_label);
             updateNavButtons(data.can_go_back, data.field);
@@ -293,6 +299,7 @@
                 addMessage('ai', 'Sorry: ' + data.error + '. Please try again.', false);
             } else {
                 addMessage('ai', data.question, false);
+                clearInput();
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field);
@@ -314,6 +321,11 @@
     }
 
     // UI Helpers
+    function clearInput() {
+        textInput.value = '';
+        accumulatedFinal = '';
+    }
+
     function addMessage(type, text, isUser) {
         const div = document.createElement('div');
         div.className = `message ${type}-message`;
