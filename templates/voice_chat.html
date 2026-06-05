@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AIe ResuMaker — Voice Build</title>
+    <link rel="stylesheet" href="/static/voice_chat.css">
+</head>
+<body>
+    <div class="voice-chat-container">
+        <!-- Header -->
+        <header class="chat-header">
+            <a href="/" class="back-btn">←</a>
+            <div class="chat-title">
+                <span class="logo">🎓</span>
+                <span>AIe ResuMaker</span>
+            </div>
+            <button class="mode-toggle" onclick="window.location.href='/build?mode=form'">✏️ Type</button>
+        </header>
+
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+            <span class="progress-text" id="progress-text">0%</span>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="chat-messages" id="chat-messages">
+            <div class="message ai-message" id="welcome-message">
+                <div class="message-bubble">Hey! I'm AIe ResuMaker. Let's build your resume together. First — what's your full name?</div>
+                <div class="message-time">Now</div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="chat-input-area">
+            <button class="mic-btn" id="mic-btn" title="Tap to speak">
+                <span class="mic-icon">🎤</span>
+            </button>
+            <input 
+                type="text" 
+                id="text-input" 
+                class="text-input" 
+                placeholder="Type your answer..."
+                autocomplete="off"
+            >
+            <button class="send-btn" id="send-btn">➤</button>
+        </div>
+
+        <!-- Recording Status -->
+        <div class="recording-status hidden" id="recording-status">
+            <span class="recording-dot"></span>
+            <span>Listening...</span>
+        </div>
+    </div>
+
+    <script src="/static/voice_chat.js"></script>
+</body>
+</html>

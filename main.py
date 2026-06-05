@@ -540,11 +540,16 @@ async def preview_mockup_page(request: Request):
 async def home(request: Request):
     return templates.TemplateResponse(request=request, name="landing.html")
 
+@app.get("/voice_chat", response_class=HTMLResponse)
+async def voice_chat_page(request: Request):
+    """Direct voice chat page."""
+    return templates.TemplateResponse(request=request, name="voice_chat.html")
+
 @app.get("/build", response_class=HTMLResponse)
 async def build_page(request: Request):
     ref_code = request.query_params.get("ref", "")
-    voice_session = request.query_params.get("session_id", "")
-    voice_mode = request.query_params.get("voice", "")
+    mode = request.query_params.get("mode", "")
+    voice_session = request.query_params.get("voice_session", "")
     
     # Track referral visit if ref code provided
     if ref_code and ref_code in referral_codes:
@@ -557,17 +562,32 @@ async def build_page(request: Request):
         })
         print(f"[REFERRAL] Visit tracked for code: {ref_code}, total visits: {referral_codes[ref_code]['visits']}")
     
-    # Check for voice session data
+    # Check for voice session data (new voice_sessions from voice_api)
     voice_data = None
-    if voice_session and voice_session in resume_sessions:
-        state = resume_sessions[voice_session]
-        voice_data = state.to_resume_dict()
-        print(f"[BUILD] Loading voice session {voice_session}, progress: {state.calculate_progress()}%")
+    if voice_session and voice_session in voice_api.voice_sessions:
+        voice_data = voice_api.voice_sessions[voice_session].get("data", {})
+        print(f"[BUILD] Loading voice session {voice_session}")
     
-    return templates.TemplateResponse(request=request, name="index.html", context={
-        "voice_data": json.dumps(voice_data) if voice_data else "null",
-        "session_id": voice_session
-    })
+    # Determine mode
+    if mode == "voice":
+        return templates.TemplateResponse(request=request, name="voice_chat.html")
+    elif mode == "form":
+        return templates.TemplateResponse(request=request, name="index.html", context={
+            "voice_data": json.dumps(voice_data) if voice_data else "null",
+            "session_id": voice_session
+        })
+    
+    # Auto-detect: mobile -> voice, desktop -> form
+    user_agent = request.headers.get("user-agent", "").lower()
+    is_mobile = any(device in user_agent for device in ["iphone", "android", "ipad", "mobile"])
+    
+    if is_mobile:
+        return templates.TemplateResponse(request=request, name="voice_chat.html")
+    else:
+        return templates.TemplateResponse(request=request, name="index.html", context={
+            "voice_data": json.dumps(voice_data) if voice_data else "null",
+            "session_id": voice_session
+        })
 
 @app.get("/debug/storage")
 async def debug_storage():
