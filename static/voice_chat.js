@@ -183,10 +183,11 @@
                 
                 // Show re-ask
                 addMessage('ai', data.question, false);
-                clearInput();
+                clearInput(data.field === '_bullet');
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateBulletUI(data);
             }
         } catch (e) {
             hideTyping();
@@ -218,10 +219,11 @@
                 addMessage('ai', 'Sorry: ' + data.error, false);
             } else {
                 addMessage('ai', data.question, false);
-                clearInput();
+                clearInput(data.field === '_bullet');
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateBulletUI(data);
             }
         } catch (e) {
             hideTyping();
@@ -259,10 +261,11 @@
             if (welcome) welcome.remove();
             
             addMessage('ai', data.question, false);
-            clearInput();
+            clearInput(data.field === '_bullet');
             updateProgress(currentStepIndex);
             updateContextLabel(data.context_label);
             updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+            updateBulletUI(data);
         } catch (e) {
             hideTyping();
             addMessage('ai', 'Sorry, something went wrong. Please refresh and try again.', false);
@@ -299,10 +302,11 @@
                 addMessage('ai', 'Sorry: ' + data.error + '. Please try again.', false);
             } else {
                 addMessage('ai', data.question, false);
-                clearInput();
+                clearInput(data.field === '_bullet');
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateBulletUI(data);
 
                 // Show done state
                 if (data.done) {
@@ -321,9 +325,39 @@
     }
 
     // UI Helpers
-    function clearInput() {
-        textInput.value = '';
+    function clearInput(addBulletPrefix) {
+        textInput.value = addBulletPrefix ? '• ' : '';
         accumulatedFinal = '';
+    }
+
+    function updateBulletUI(data) {
+        const helperText = document.getElementById('helper-text');
+        const isFirstBullet = data.is_first_bullet;
+        const isBulletField = data.field === '_bullet';
+        const bulletCount = data.bullet_count || 0;
+        const jobCount = data.job_count || 0;
+        
+        // Show helper text only on first bullet of each job
+        if (helperText) {
+            if (isFirstBullet && isBulletField) {
+                helperText.textContent = `Say one descriptive sentence explaining one task you did at Job ${jobCount}, then press send.`;
+                helperText.classList.remove('hidden');
+            } else {
+                helperText.classList.add('hidden');
+            }
+        }
+        
+        // Pre-fill bullet prefix for all bullet fields
+        if (isBulletField) {
+            clearInput(true);
+        }
+        
+        // Update add button label for bullets
+        if (isBulletField && addBtn) {
+            addBtn.textContent = bulletCount > 1 ? `+ Add bullet ${bulletCount + 1}` : '+ Add bullet 2';
+        } else if (data.field === '_decision') {
+            addBtn.textContent = '+ Add Another';
+        }
     }
 
     function addMessage(type, text, isUser) {

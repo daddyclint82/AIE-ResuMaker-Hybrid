@@ -106,6 +106,9 @@ def get_next_step(session: dict) -> dict:
             step["show_add_job"] = True
             if bullet_count > 0:
                 step["question"] = f"Bullet {bullet_count + 1}?"
+            step["is_first_bullet"] = bullet_count == 0
+            step["bullet_count"] = bullet_count + 1
+            step["job_count"] = exp_count + 1
             return step
         else:
             # After all standard fields, check if we're in bullet loop
@@ -116,7 +119,10 @@ def get_next_step(session: dict) -> dict:
                     "field": "_bullet",
                     "question": f"Bullet {bullet_count + 1}?",
                     "context_label": f"Job {exp_count}",
-                    "show_add_job": True
+                    "show_add_job": True,
+                    "is_first_bullet": bullet_count == 1,
+                    "bullet_count": bullet_count + 1,
+                    "job_count": exp_count
                 }
             else:
                 # Decision: add another job?
@@ -717,6 +723,9 @@ async def voice_turn(request: Request):
             "done": next_step.get("done", False),
             "can_go_back": session["step_index"] > 0 or session.get("context", {}).get("exp_substep", 0) > 0 or session.get("context", {}).get("in_bullet_loop", False),
             "show_add_job": next_step.get("show_add_job", False),
+            "is_first_bullet": next_step.get("is_first_bullet", False),
+            "bullet_count": next_step.get("bullet_count", 0),
+            "job_count": next_step.get("job_count", 0),
             "data_preview": {k: v for k, v in session["data"].items() if k not in ["experience", "education", "projects", "competencies", "community", "certifications"]},
             "extracted": extracted
         }

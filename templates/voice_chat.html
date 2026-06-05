@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIe ResuMaker — Voice Build</title>
-    <link rel="stylesheet" href="/static/voice_chat.css">
+    <link rel="stylesheet" href="/static/voice_chat.css?v=3">
 </head>
 <body>
     <div class="voice-chat-container">
@@ -46,13 +46,16 @@
             <button class="mic-btn" id="mic-btn" title="Tap to speak">
                 <span class="mic-icon">🎤</span>
             </button>
-            <input 
-                type="text" 
-                id="text-input" 
-                class="text-input" 
-                placeholder="Type your answer..."
-                autocomplete="off"
-            >
+            <div class="input-wrapper">
+                <div class="helper-text hidden" id="helper-text"></div>
+                <input 
+                    type="text" 
+                    id="text-input" 
+                    class="text-input" 
+                    placeholder="Type your answer..."
+                    autocomplete="off"
+                >
+            </div>
             <button class="clear-btn" id="clear-btn" title="Clear text">✕</button>
             <button class="send-btn" id="send-btn">➤</button>
         </div>
@@ -64,6 +67,6 @@
         </div>
     </div>
 
-    <script src="/static/voice_chat.js?v=2"></script>
+    <script src="/static/voice_chat.js?v=3"></script>
 </body>
 </html>
