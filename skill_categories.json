@@ -1,0 +1,51 @@
+{
+  "version": "2.0",
+  "description": "Personalized skill categories for ResumeForge POC. Tailored to Clint's resume.",
+  "categories": {
+    "AI / ML Integration": [
+      "LLM Inference & Deployment (Ollama, llama.cpp)",
+      "Speech-to-Text (Whisper)",
+      "Text-to-Speech (Piper, Google Cloud TTS)",
+      "Context Engineering",
+      "AI Protocol Architecture (MCP)",
+      "Cloud Models (Kimi, Qwen, Gemma)"
+    ],
+    "Backend Development": [
+      "Node.js",
+      "Python (Flask/FastAPI)",
+      "REST API Design",
+      "SQLite",
+      "Discord Bot Development (discord.js, discord.py)"
+    ],
+    "Frontend & UI": [
+      "HTML5",
+      "CSS3",
+      "JavaScript (ES6+)",
+      "Web Audio API",
+      "WebSocket",
+      "Responsive Design"
+    ],
+    "DevOps & Infrastructure": [
+      "Linux System Administration",
+      "systemd",
+      "Bash Scripting",
+      "Git",
+      "Tailscale",
+      "WSL2/Windows Bridging",
+      "Docker (learning)"
+    ],
+    "Architecture & Design": [
+      "Microservices Orchestration",
+      "API Gateway Patterns",
+      "Self-Contained Deployment",
+      "Legal Document Automation"
+    ],
+    "Community & Education": [
+      "Technical Tutorial Development",
+      "Reddit Community Building",
+      "Technical Documentation",
+      "Voice Interface Design"
+    ],
+    "Other": []
+  }
+}
