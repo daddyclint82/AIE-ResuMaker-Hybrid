@@ -185,6 +185,10 @@
             } else {
                 addMessage('ai', data.question, false);
                 updateProgress(data.turn);
+                
+                // Clear input and accumulated text for next question
+                textInput.value = '';
+                accumulatedFinal = '';
 
                 // Show done state
                 if (data.done) {
