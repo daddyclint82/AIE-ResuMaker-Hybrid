@@ -207,10 +207,14 @@
         showTyping();
 
         try {
+            // Use 'add_job' action to skip to new job, 'add' for other loops
+            const action = currentField === '_bullet' || currentField === 'company' || 
+                          currentField === 'title' || currentField === 'dates' ? 'add_job' : 'add';
+            
             const response = await fetch('/api/voice/turn', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sessionId, transcript: '', action: 'add' })
+                body: JSON.stringify({ session_id: sessionId, transcript: '', action: action })
             });
             const data = await response.json();
             hideTyping();
