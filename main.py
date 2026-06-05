@@ -146,7 +146,10 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
 print(f"[AIE ResuMaker] Environment: {APP_ENV}")
 print(f"[AIE ResuMaker] Stripe key prefix: {STRIPE_SECRET_KEY[:7]}..." if STRIPE_SECRET_KEY else "[AIE ResuMaker] WARNING: No Stripe secret key configured!")
 
+from voice_api import router as voice_router
+
 app = FastAPI(title="AIE ResuMaker", version="1.0")
+app.include_router(voice_router)
 
 @app.head("/")
 @app.get("/healthz")
