@@ -100,27 +100,27 @@ def get_next_step(session: dict) -> dict:
             step["show_add_job"] = True  # Show "Add Job" button
             return step
         elif substep == len(EXPERIENCE_STEPS) - 1:
-            # Description/bullet field
-            step = EXPERIENCE_STEPS[substep].copy()
-            step["context_label"] = f"Job {exp_count + 1}"
-            step["show_add_job"] = True
-            if bullet_count > 0:
-                step["question"] = f"Bullet {bullet_count + 1}?"
-            step["is_first_bullet"] = bullet_count == 0
-            step["bullet_count"] = bullet_count + 1
-            step["job_count"] = exp_count + 1
-            return step
+            # Description/bullet field — first bullet of this job
+            return {
+                "field": "_bullet",
+                "question": "What did you do there? Say bullet 1.",
+                "context_label": f"Job {exp_count + 1}",
+                "show_add_job": True,
+                "is_first_bullet": True,
+                "bullet_count": 1,
+                "job_count": exp_count
+            }
         else:
             # After all standard fields, check if we're in bullet loop
             in_bullet_loop = context.get("in_bullet_loop", False)
             if in_bullet_loop:
-                # Ask for next bullet
+                # Ask for next bullet (bullet 2, 3, 4...)
                 return {
                     "field": "_bullet",
                     "question": f"Bullet {bullet_count + 1}?",
                     "context_label": f"Job {exp_count}",
                     "show_add_job": True,
-                    "is_first_bullet": bullet_count == 1,
+                    "is_first_bullet": False,
                     "bullet_count": bullet_count + 1,
                     "job_count": exp_count
                 }
