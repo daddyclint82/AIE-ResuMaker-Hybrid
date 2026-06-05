@@ -61,25 +61,29 @@
         recognition.interimResults = true;
         recognition.lang = 'en-US';
 
+        // Accumulated transcript storage
+        let accumulatedFinal = '';
+        
         recognition.onresult = (event) => {
-            let finalTranscript = '';
+            let newFinal = '';
             let interimTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const transcript = event.results[i][0].transcript;
                 if (event.results[i].isFinal) {
-                    finalTranscript += transcript + ' ';
+                    newFinal += transcript + ' ';
                 } else {
-                    interimTranscript += transcript;
+                    interimTranscript = transcript;
                 }
             }
-
-            if (finalTranscript) {
-                textInput.value = finalTranscript.trim();
+            
+            // Append new finalized text to accumulated buffer
+            if (newFinal) {
+                accumulatedFinal += newFinal;
             }
-            if (interimTranscript) {
-                textInput.value = interimTranscript;
-            }
+            
+            // Show accumulated + current interim
+            textInput.value = (accumulatedFinal + interimTranscript).trim();
         };
 
         recognition.onerror = (event) => {
