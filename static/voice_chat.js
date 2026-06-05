@@ -38,6 +38,16 @@
         });
         micBtn.addEventListener('click', toggleRecording);
         
+        // Clear button
+        const clearBtn = document.getElementById('clear-btn');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                textInput.value = '';
+                accumulatedFinal = '';
+                textInput.focus();
+            });
+        }
+
         // Mode toggle
         const modeToggle = document.getElementById('mode-toggle');
         if (modeToggle) {
