@@ -11,18 +11,18 @@ This is a **separate project** from the live [AIE ResuMaker](https://aie-resumak
 ## What Works
 
 ### Voice Chat Mode (`/build?mode=voice`)
-- **Conversational flow** — AI asks 12 questions one at a time (name, email, jobs, education, skills, etc.)
+- **Conversational flow** — AI asks questions one at a time
 - **Speech recognition** — Browser-native `SpeechRecognition` API, continuous listening
-- **Pause-safe** — Pausing mid-sentence no longer overwrites text (accumulates finalized transcripts)
+- **Pause-safe** — Pausing mid-sentence no longer overwrites text
 - **Text fallback** — Type if you don't want to use mic
-- **Clear button** — ✕ wipes text + accumulated transcript if speech recognition messes up
-- **"I had more to say"** — After sending, tap ↩️ to append more info without advancing to next question
+- **Clear button** — ✕ wipes text + accumulated transcript
+- **"I had more to say"** — After sending, tap ↩️ to append more info
 - **Progress bar** — Shows % complete at top
 - **Mode toggle** — ✏️ Type button switches to form mode
 
 ### Form Builder Mode (`/build?mode=form`)
 - **Full form** — All fields from original AIE ResuMaker
-- **Auto-populate from voice** — When user clicks "View Resume" after voice chat, all collected data fills the form
+- **Auto-populate from voice** — Partially works (simple fields OK, arrays buggy)
 - **Mode toggle** — 🎤 Voice button switches back to voice mode
 - **localStorage persistence** — Saves progress every 10 seconds
 
@@ -36,71 +36,32 @@ This is a **separate project** from the live [AIE ResuMaker](https://aie-resumak
   - `POST /api/voice/start` — Creates session, returns first question
   - `POST /api/voice/turn` — Accepts transcript, returns next question + extracted data
   - `POST /api/voice/finish` — Returns all collected data
-- **Groq integration** — `llama-3.1-8b-instant` for per-field extraction (name, email, experience, etc.)
+- **Groq integration** — `llama-3.1-8b-instant` for per-field extraction
 - **Fallback** — If no Groq key or API error, uses raw transcript
 - **Simple dict sessions** — No classes, no persistence, in-memory only
 
 ---
 
-## What Has Stumped Us
+## Known Issues
 
-### 1. Context Loss During Development
-Multiple times the assistant lost context mid-task, outputting garbled text or repeating failed commands. This burned a lot of session time.
+### Major: Form Builder Auto-Populate (Partially Broken)
+**User reported:** "does not work that well"
+**Suspected problems:**
+- City/State split fails — "Austin, Texas" probably dumps into `city` field only
+- Experience array — Logic tries to find `.experience-entry` class but dynamic fields may not exist yet
+- Function name mismatch — `addExperienceEntry()` / `addEducationEntry()` may not exist in `app.js`
+- **Needs:** Real browser test to see which fields fill correctly
 
-**Workaround:** Use `update_plan` to checkpoint progress, restart if output becomes garbled.
+### Major: Voice Question Flow (Needs Redesign for ADHD)
+**Current:** Big chunky questions like "Tell me about your work history — company, title, dates, description"
+**Problem:** Overwhelming for users with ADHD
+**User requirement:** Break into micro-questions for incremental wins. This is core to product strategy.
 
-### 2. Subagent Failed with Forked Context
-Spawned subagent with `context="fork"` inherited 328 messages of broken attempts, then aborted.
-
-**Lesson:** Always use `context="isolated"` for clean subagents.
-
-### 3. Forward Reference Type Annotation Crash
-`resume_sessions: Dict[str, "ResumeState"] = {}` crashed at module load because `ResumeState` class didn't exist yet.
-
-**Fix:** Moved class before variable, then later stripped all ResumeState code entirely.
-
-### 4. Overengineering the First Voice Attempt
-Original voice code (June 4 early session) had 550+ lines of `ResumeState` class with confidence scores, complex merge logic. It never worked.
-
-**Lesson:** Start with dicts, add classes only when complexity demands.
-
-### 5. Speech Recognition Overwriting on Pause
-Browser `SpeechRecognition` finalizes segments on pause, then restarts fresh — which overwrote the previous text.
-
-**Fix:** Accumulate finalized transcripts in module-level `accumulatedFinal` variable.
-
-### 6. Scope Bugs in JavaScript
-`accumulatedFinal` was declared inside `setupSpeechRecognition()` function scope, so `sendMessage()` couldn't clear it.
-
-**Fix:** Moved to module-level scope.
-
----
-
-## Future Hurdles
-
-### High Priority
-| Hurdle | Why It Matters |
-|--------|---------------|
-| **Browser testing** | SpeechRecognition only works in Chrome/Safari. Need real device testing. |
-| **Field mapping accuracy** | Groq sometimes returns weird formats for experience/education arrays. Need robust parsing. |
-| **Mobile UX polish** | Chat bubbles, progress bar, buttons need real-world mobile testing. |
-| **Error recovery** | Network failures, Groq timeouts, mic permission denials need graceful handling. |
-
-### Medium Priority
-| Hurdle | Why It Matters |
-|--------|---------------|
-| **GitHub push** | Project is local only. Needs remote repo. |
-| **Render deployment** | Need separate Render instance from live app. |
-| **Stripe integration** | Payment flow exists but untested in hybrid context. |
-| **Resume preview** | Watermarked preview generation needs testing with voice-collected data. |
-
-### Low Priority
-| Hurdle | Why It Matters |
-|--------|---------------|
-| **Multi-language support** | SpeechRecognition defaults to `en-US`. |
-| **Voice session timeout** | Sessions stay in memory forever. Need cleanup. |
-| **Conversation history** | No way to review/edit previous answers in chat. |
-| **Skip questions** | No "skip this question" button yet. |
+### Minor
+- SpeechRecognition only works in Chrome/Safari (not Firefox)
+- Voice sessions stay in memory forever (no cleanup)
+- Untested on actual mobile devices
+- Not deployed or pushed to GitHub
 
 ---
 
@@ -153,13 +114,43 @@ kill $(cat /tmp/hybrid.pid)
 
 ---
 
+## Next Steps (Priority Order)
+
+### 1. Redesign Voice Flow for ADHD Users (HIGHEST PRIORITY)
+**User's explicit direction:** "Breaking down questions little by little so they get little wins is key to making this app addicting."
+
+**New architecture:**
+- Each work history entry = 4 separate micro-questions (company → title → dates → description)
+- Each education entry = 4 separate micro-questions
+- After each entry, ask "Add another? Say 'yes' or 'done'"
+- Show context: "Job 1 — Company" so user knows where they are
+- Celebrate each step: "Great! Now the title." → "Perfect! When were you there?"
+
+**Backend changes:**
+- `VOICE_QUESTIONS` becomes a state machine, not static array
+- Track which field and which array index
+- Handle "yes"/"done" for loop control
+- Store partial experience/education objects
+
+### 2. Fix Form Builder Auto-Populate
+**Test first:** Complete voice session → click "View Resume" → inspect which fields filled
+**Likely fixes:** City/state split, create dynamic entries before populating, add error handling
+
+### 3. Continue Testing
+- Real mobile browser test
+- Verify all questions flow smoothly
+- Check mode toggles work both ways
+- Push to GitHub when stable
+
+---
+
 ## Git History
 
 | Commit | What |
 |--------|------|
 | `80877d4` | Initial: copy from aie-resumaker, strip broken voice code |
-| `c886396` | Voice API backend: 3 endpoints, Groq integration |
-| `9c3f5e4` | Voice chat frontend: HTML/JS/CSS |
+| `c886396` | Voice API backend |
+| `9c3f5e4` | Voice chat frontend |
 | `6a238aa` | Landing page mode detection |
 | `972be36` | Wire voice data into form builder |
 | `e83e4f1` | Mode toggle buttons |
@@ -168,29 +159,29 @@ kill $(cat /tmp/hybrid.pid)
 | `099e876` | Fix accumulator scope bug |
 | `a09d05d` | Add clear button |
 | `8d836ee` | Add "I had more to say" button |
+| `a8593be` | Add README and PROJECT_LOG |
 
 ---
 
-## Known Issues
+## Development Notes
 
-1. **SpeechRecognition browser support** — Only Chrome, Safari, Edge. Firefox not supported.
-2. **No session cleanup** — Voice sessions stay in memory forever. Server restart wipes all.
-3. **Experience/education array parsing** — Groq sometimes returns malformed JSON. Needs better error handling.
-4. **Untested on actual mobile** — All testing done via curl and desktop browser.
-5. **Not deployed** — Local development only.
+### Pitfalls We Hit
+1. **Context loss** — Use `update_plan`, restart if garbled
+2. **Subagent fork** — Always `context="isolated"`
+3. **Forward reference crash** — Use plain `dict = {}`
+4. **Overengineering** — Dicts first, classes later
+5. **JS scope** — Module-level vs function-level variables
+6. **Git repo confusion** — `cd` into project first
+7. **Server crashes** — Use `nohup`, write PID file
 
----
-
-## Next Steps (Priority Order)
-
-1. Test full voice→form flow on real phone with Chrome
-2. Fix any field mapping bugs found during testing
-3. Push to GitHub repo
-4. Deploy to Render (separate instance from live app)
-5. Add "skip question" button
-6. Add conversation history / review previous answers
+### User Requirements (Locked In)
+- Mobile users: voice chat only (no form fields)
+- Desktop users: form default, can switch to voice
+- ADHD-friendly: incremental micro-questions, little wins
+- Separate from live app until merge-ready
 
 ---
 
 *Project started: 2026-06-04*
-*Last updated: 2026-06-04 22:24 CDT*
+*Last updated: 2026-06-04 22:30 CDT*
+*Next focus: Redesign voice flow for incremental ADHD-friendly questions*
