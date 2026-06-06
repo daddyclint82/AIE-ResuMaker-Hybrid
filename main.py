@@ -328,16 +328,18 @@ def categorize_skills(skills_list):
         # 1. Exact match in reverse lookup
         if user_skill_lower in skill_to_category:
             category = skill_to_category[user_skill_lower]
-            grouped[category].append(user_skill_stripped)
-            matched.add(user_skill_lower)
+            if user_skill_lower not in matched:
+                grouped[category].append(user_skill_stripped)
+                matched.add(user_skill_lower)
             found = True
         
         # 2. Substring match: user_skill is contained in a known skill
         if not found:
             for known_skill, category in skill_to_category.items():
                 if user_skill_lower in known_skill or known_skill in user_skill_lower:
-                    grouped[category].append(user_skill_stripped)
-                    matched.add(user_skill_lower)
+                    if user_skill_lower not in matched:
+                        grouped[category].append(user_skill_stripped)
+                        matched.add(user_skill_lower)
                     found = True
                     break
         
@@ -347,8 +349,9 @@ def categorize_skills(skills_list):
             for word in words:
                 if len(word) > 2 and word in skill_to_category:
                     category = skill_to_category[word]
-                    grouped[category].append(user_skill_stripped)
-                    matched.add(user_skill_lower)
+                    if user_skill_lower not in matched:
+                        grouped[category].append(user_skill_stripped)
+                        matched.add(user_skill_lower)
                     found = True
                     break
         
@@ -1010,11 +1013,19 @@ def generate_docx(resume_id: str, data: dict):
         
         for comp in data["competencies"]:
             if isinstance(comp, dict):
-                comp_para = doc.add_paragraph()
-                label_run = comp_para.add_run(f"{comp.get('label', '')}: ")
-                label_run.bold = True
-                label_run.font.size = Pt(9.5)
-                desc_run = comp_para.add_run(comp.get('description', ''))
+                label = comp.get('label', '') or comp.get('name', '')
+                desc = comp.get('description', '')
+                if label and desc:
+                    comp_para = doc.add_paragraph()
+                    label_run = comp_para.add_run(f"{label}: ")
+                    label_run.bold = True
+                    label_run.font.size = Pt(9.5)
+                    desc_run = comp_para.add_run(desc)
+                elif label:
+                    comp_para = doc.add_paragraph()
+                    label_run = comp_para.add_run(label)
+                    label_run.bold = True
+                    label_run.font.size = Pt(9.5)
                 desc_run.font.size = Pt(9.5)
     
     # Education
@@ -1243,9 +1254,14 @@ def generate_preview_html(data: dict, template_style: str = "professional"):
         html += '<div class="competencies-grid">'
         for comp in competencies:
             if isinstance(comp, dict):
-                label = comp.get('label', '')
+                label = comp.get('label', '') or comp.get('name', '')
                 desc = comp.get('description', '')
-                html += f'<div class="competency-item"><span class="competency-label">{label}:</span> {desc}</div>'
+                if label and desc:
+                    html += f'<div class="competency-item"><span class="competency-label">{label}:</span> {desc}</div>'
+                elif label:
+                    html += f'<div class="competency-item"><span class="competency-label">{label}</span></div>'
+                else:
+                    html += f'<div class="competency-item">{comp}</div>'
             else:
                 html += f'<div class="competency-item">{comp}</div>'
         html += '</div>'
@@ -1677,9 +1693,14 @@ def _get_minimal_css():
         html += '<div class="competencies-grid">'
         for comp in competencies:
             if isinstance(comp, dict):
-                label = comp.get('label', '')
+                label = comp.get('label', '') or comp.get('name', '')
                 desc = comp.get('description', '')
-                html += f'<div class="competency-item"><span class="competency-label">{label}:</span> {desc}</div>'
+                if label and desc:
+                    html += f'<div class="competency-item"><span class="competency-label">{label}:</span> {desc}</div>'
+                elif label:
+                    html += f'<div class="competency-item"><span class="competency-label">{label}</span></div>'
+                else:
+                    html += f'<div class="competency-item">{comp}</div>'
             else:
                 html += f'<div class="competency-item">{comp}</div>'
         html += '</div>'
@@ -2299,7 +2320,12 @@ def generate_pdf(resume_id: str, data: dict):
         story.append(Paragraph("NOTABLE COMPETENCIES", section_style))
         for comp in data["competencies"]:
             if isinstance(comp, dict):
-                story.append(Paragraph(f"<b>{comp.get('label', '')}:</b> {comp.get('description', '')}", normal_style))
+                label = comp.get('label', '') or comp.get('name', '')
+                desc = comp.get('description', '')
+                if label and desc:
+                    story.append(Paragraph(f"<b>{label}:</b> {desc}", normal_style))
+                elif label:
+                    story.append(Paragraph(f"<b>{label}</b>", normal_style))
     
     # Education
     if data.get("education"):
@@ -2899,4 +2925,4 @@ async def download_resume(resume_id: str, format: str = "docx"):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
