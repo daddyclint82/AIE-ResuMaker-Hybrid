@@ -1021,12 +1021,12 @@ def generate_docx(resume_id: str, data: dict):
                     label_run.bold = True
                     label_run.font.size = Pt(9.5)
                     desc_run = comp_para.add_run(desc)
+                    desc_run.font.size = Pt(9.5)
                 elif label:
                     comp_para = doc.add_paragraph()
                     label_run = comp_para.add_run(label)
                     label_run.bold = True
                     label_run.font.size = Pt(9.5)
-                desc_run.font.size = Pt(9.5)
     
     # Education
     if data.get("education"):
@@ -1209,15 +1209,42 @@ def generate_preview_html(data: dict, template_style: str = "professional"):
             if job.get('address'):
                 html += f'<div class="job-contact">{job["address"]}</div>'
             
-            if description:
+            # Handle bullets/description - support both list and string formats
+            bullets = job.get('bullets', [])
+            description = job.get('description', '')
+            
+            # If bullets is a list, render as bullet list
+            if bullets and isinstance(bullets, list):
+                html += '<div class="job-description"><ul>'
+                for bullet in bullets:
+                    if bullet and isinstance(bullet, str):
+                        # Strip bullet markers if present
+                        clean_bullet = bullet.strip()
+                        if clean_bullet.startswith('•') or clean_bullet.startswith('-'):
+                            clean_bullet = clean_bullet[1:].strip()
+                        html += f'<li>{clean_bullet}</li>'
+                html += '</ul></div>'
+            # If description is a list, render as bullet list
+            elif description and isinstance(description, list):
+                html += '<div class="job-description"><ul>'
+                for item in description:
+                    if item and isinstance(item, str):
+                        clean_item = item.strip()
+                        if clean_item.startswith('•') or clean_item.startswith('-'):
+                            clean_item = clean_item[1:].strip()
+                        html += f'<li>{clean_item}</li>'
+                html += '</ul></div>'
+            # If description is a string with newlines, split and render as bullets
+            elif description and isinstance(description, str):
                 if '\n' in description or '\r' in description:
                     lines = [line.strip() for line in description.replace('\r', '\n').split('\n') if line.strip()]
                     if lines:
                         html += '<div class="job-description"><ul>'
                         for line in lines:
-                            if line.startswith('•') or line.startswith('-'):
-                                line = line[1:].strip()
-                            html += f'<li>{line}</li>'
+                            clean_line = line.strip()
+                            if clean_line.startswith('•') or clean_line.startswith('-'):
+                                clean_line = clean_line[1:].strip()
+                            html += f'<li>{clean_line}</li>'
                         html += '</ul></div>'
                 else:
                     html += f'<div class="job-description">{description}</div>'
@@ -1692,6 +1719,9 @@ def _get_minimal_css():
         competencies = data["competencies"] if isinstance(data["competencies"], list) else []
         html += '<div class="competencies-grid">'
         for comp in competencies:
+            # Skip empty dicts
+            if isinstance(comp, dict) and not any(comp.values()):
+                continue
             if isinstance(comp, dict):
                 label = comp.get('label', '') or comp.get('name', '')
                 desc = comp.get('description', '')
@@ -1699,9 +1729,7 @@ def _get_minimal_css():
                     html += f'<div class="competency-item"><span class="competency-label">{label}:</span> {desc}</div>'
                 elif label:
                     html += f'<div class="competency-item"><span class="competency-label">{label}</span></div>'
-                else:
-                    html += f'<div class="competency-item">{comp}</div>'
-            else:
+            elif comp:
                 html += f'<div class="competency-item">{comp}</div>'
         html += '</div>'
     
