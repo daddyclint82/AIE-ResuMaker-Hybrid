@@ -259,7 +259,8 @@ When resuming this work:
 8. [x] Fix empty dicts in preview HTML
 9. [x] Fix bullet rendering in preview HTML
 10. [x] Re-run test until preview looks correct
-11. [ ] Commit all changes
+11. [x] Verify all optional sections (Education, Competencies, Community, Certifications) appear correctly
+12. [ ] Commit all changes
 
 ---
 

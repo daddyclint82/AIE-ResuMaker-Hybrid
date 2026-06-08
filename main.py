@@ -2326,9 +2326,40 @@ def generate_pdf(resume_id: str, data: dict):
             if loc_date_parts:
                 story.append(Paragraph("  |  ".join(loc_date_parts), ParagraphStyle('JobMeta', parent=normal_style, fontSize=9.5, textColor=colors.HexColor('#666666'))))
             
-            # Description
-            if job.get("description"):
-                story.append(Paragraph(job["description"], ParagraphStyle('JobDesc', parent=normal_style, leftIndent=14)))
+            # Description / Bullets
+            bullets = job.get('bullets', [])
+            description = job.get('description', '')
+            
+            if bullets and isinstance(bullets, list):
+                # Render bullets as a list
+                bullet_style = ParagraphStyle('JobBullet', parent=normal_style, leftIndent=14, spaceAfter=2, bulletIndent=4)
+                for bullet in bullets:
+                    if bullet and isinstance(bullet, str):
+                        clean_bullet = bullet.strip()
+                        if clean_bullet.startswith('•') or clean_bullet.startswith('-'):
+                            clean_bullet = clean_bullet[1:].strip()
+                        story.append(Paragraph(f"• {clean_bullet}", bullet_style))
+            elif description and isinstance(description, list):
+                # Render description list as bullets
+                bullet_style = ParagraphStyle('JobBullet', parent=normal_style, leftIndent=14, spaceAfter=2, bulletIndent=4)
+                for item in description:
+                    if item and isinstance(item, str):
+                        clean_item = item.strip()
+                        if clean_item.startswith('•') or clean_item.startswith('-'):
+                            clean_item = clean_item[1:].strip()
+                        story.append(Paragraph(f"• {clean_item}", bullet_style))
+            elif description and isinstance(description, str):
+                if '\n' in description or '\r' in description:
+                    # Multi-line description - render as bullets
+                    lines = [line.strip() for line in description.replace('\r', '\n').split('\n') if line.strip()]
+                    bullet_style = ParagraphStyle('JobBullet', parent=normal_style, leftIndent=14, spaceAfter=2, bulletIndent=4)
+                    for line in lines:
+                        clean_line = line.strip()
+                        if clean_line.startswith('•') or clean_line.startswith('-'):
+                            clean_line = clean_line[1:].strip()
+                        story.append(Paragraph(f"• {clean_line}", bullet_style))
+                else:
+                    story.append(Paragraph(description, ParagraphStyle('JobDesc', parent=normal_style, leftIndent=14)))
     
     # Projects
     if data.get("projects"):

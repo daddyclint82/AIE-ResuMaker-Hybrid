@@ -16,6 +16,7 @@ Usage:
 """
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -318,6 +319,39 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
                 print("  ✅ Bullets appear present in preview", flush=True)
             else:
                 print("  ⚠️ No bullets detected (may use different formatting)", flush=True)
+
+            # Check for required sections
+            required_sections = {
+                "Professional Summary": "summary" in preview_html.lower() or "professional summary" in preview_html.lower(),
+                "Technical Skills": "skills" in preview_html.lower() or "technical skills" in preview_html.lower(),
+                "Professional Experience": "experience" in preview_html.lower() or "professional experience" in preview_html.lower(),
+                "Education": "education" in preview_html.lower(),
+                "Notable Competencies": "competenc" in preview_html.lower() or "notable" in preview_html.lower(),
+                "Community Involvement": "community" in preview_html.lower(),
+                "Certifications": "certification" in preview_html.lower(),
+            }
+            
+            print("  📋 Section checklist:", flush=True)
+            for section, present in required_sections.items():
+                status = "✅" if present else "⚠️"
+                print(f"     {status} {section}", flush=True)
+
+            # Verify optional sections don't show if skipped (fixture says "skip" for all)
+            # If we skipped, these sections should NOT appear as empty
+            skipped_sections = ["competencies", "community", "certifications", "projects"]
+            for section in skipped_sections:
+                section_title = section.title()
+                if section.lower() in preview_html.lower():
+                    # Check if it's actually empty or just a title
+                    section_match = re.search(f'<div[^>]*class="section-title"[^>]*>{section_title}</div>(.*?)(?=<div[^>]*class="section-title"|$)', preview_html, re.DOTALL | re.IGNORECASE)
+                    if section_match:
+                        section_content = section_match.group(1).strip()
+                        if not section_content or section_content == "":
+                            print(f"  ⚠️ {section_title} section appears empty", flush=True)
+                        else:
+                            print(f"  ℹ️ {section_title} section has content (length: {len(section_content)})", flush=True)
+                else:
+                    print(f"  ✅ {section_title} section correctly hidden (skipped)", flush=True)
         else:
             print("  ⚠️ Could not extract preview HTML for verification", flush=True)
 
