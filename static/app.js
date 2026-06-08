@@ -410,6 +410,20 @@ function loadVoiceData() {
         const voiceData = JSON.parse(script.textContent);
         if (!voiceData || Object.keys(voiceData).length === 0) return;
         
+        // Check if user has already saved progress in localStorage
+        const savedProgress = localStorage.getItem('aie_resume_progress');
+        if (savedProgress) {
+            const savedData = JSON.parse(savedProgress);
+            const savedAt = localStorage.getItem('aie_resume_saved_at');
+            
+            // If saved data has voice session fields populated, user has already edited
+            // Prefer localStorage data over voice session data to prevent overwriting edits
+            if (savedData.full_name && savedData.full_name.trim() !== '') {
+                console.log('[AIE ResuMaker] localStorage has saved data, skipping voice data load to preserve edits');
+                return;
+            }
+        }
+        
         console.log('[AIE ResuMaker] Loading voice session data:', voiceData);
         
         // Map voice fields to form fields

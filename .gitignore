@@ -2,3 +2,10 @@ venv/
 __pycache__/
 *.pyc
 server.log
+nohup.out
+*.pid
+.env
+.env.production
+*.bak
+*.old
+.DS_Store

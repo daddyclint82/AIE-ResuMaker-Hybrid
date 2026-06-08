@@ -1,0 +1,54 @@
+{
+  "name": "TEMPLATE - Generic Resume Test",
+  "target_job": "[TARGET_JOB_TITLE_HERE]",
+  "description": "Template for creating new voice interview tests. Copy this file, rename, and fill in your answers.",
+  "answers": [
+    {"step": "1A", "phase": "simple", "field": "full_name", "value": "[YOUR_FULL_NAME]"},
+    {"step": "1B", "phase": "simple", "field": "email", "value": "[YOUR_EMAIL]"},
+    {"step": "1C", "phase": "simple", "field": "phone", "value": "[YOUR_PHONE]"},
+    {"step": "1D", "phase": "simple", "field": "city", "value": "[YOUR_CITY]"},
+    {"step": "1E", "phase": "simple", "field": "state", "value": "[YOUR_STATE]"},
+    {"step": "1F", "phase": "simple", "field": "industry", "value": "[TARGET_INDUSTRY]"},
+    {"step": "1G", "phase": "simple", "field": "job_title", "value": "[TARGET_JOB_TITLE]"},
+    {"step": "1H", "phase": "simple", "field": "experience_level", "value": "[entry/mid/senior/executive]"},
+    {"step": "1I", "phase": "simple", "field": "education_level", "value": "[high school/associate/bachelor's/master's/doctorate/certification]"},
+
+    {"step": "2A1", "phase": "experience", "field": "company", "value": "[COMPANY_NAME]"},
+    {"step": "2A2", "phase": "experience", "field": "title", "value": "[JOB_TITLE]"},
+    {"step": "2A3", "phase": "experience", "field": "dates", "value": "[DATES e.g. 2020-2022]"},
+    {"step": "2A4", "phase": "experience", "field": "_bullet", "value": "[ACHIEVEMENT_OR_RESPONSIBILITY_1]"},
+    {"step": "2A5", "phase": "experience", "field": "_more_bullets", "value": "yes"},
+    {"step": "2A6", "phase": "experience", "field": "_bullet", "value": "[ACHIEVEMENT_OR_RESPONSIBILITY_2]"},
+    {"step": "2A7", "phase": "experience", "field": "_more_bullets", "value": "yes"},
+    {"step": "2A8", "phase": "experience", "field": "_bullet", "value": "[ACHIEVEMENT_OR_RESPONSIBILITY_3]"},
+    {"step": "2A9", "phase": "experience", "field": "_more_bullets", "value": "done"},
+    {"step": "2A10", "phase": "experience", "field": "_add_job", "value": "[yes/done]"},
+
+    {"step": "3A", "phase": "summary", "field": "summary_q1", "value": "[YOUR_CORE_EDGE_WHY_HIRE_YOU]"},
+    {"step": "3B", "phase": "summary", "field": "summary_q2", "value": "[BUSINESS_PROBLEMS_YOU_SOLVE]"},
+    {"step": "3C", "phase": "summary", "field": "summary_q3", "value": "[HARD_NUMBERS_HEADCOUNT_REVENUE_UPTIME]"},
+    {"step": "3D", "phase": "summary", "field": "summary_q4", "value": "[KEYWORDS_FROM_JOB_POSTING_OR_none]"},
+
+    {"step": "4A", "phase": "skills", "field": "skills", "value": "[COMMA_SEPARATED_SKILLS]"},
+
+    {"step": "5A", "phase": "optional", "field": "_projects_decision", "value": "skip"},
+    {"step": "5B", "phase": "optional", "field": "_competencies_decision", "value": "skip"},
+    {"step": "5C", "phase": "optional", "field": "_community_decision", "value": "skip"},
+    {"step": "5D", "phase": "optional", "field": "_certifications_decision", "value": "skip"},
+    {"step": "5E", "phase": "optional", "field": "_links_decision", "value": "skip"}
+  ],
+  "expected_results": {
+    "simple_fields_count": 9,
+    "jobs": 1,
+    "bullets_per_job": 3,
+    "summary_questions": 4,
+    "skills_categorized": true,
+    "phase_final": "done",
+    "validate_skills_weights": true
+  },
+  "_instructions": {
+    "how_to_add_more_jobs": "Copy steps 2A1-2A10 and rename to 2B1-2B10, 2C1-2C10, etc. Set _add_job to 'done' on the last job.",
+    "how_to_add_optional_sections": "Change 'skip' to 'yes' and add the relevant field answers after the decision step.",
+    "how_to_customize_summary": "Replace the bracketed text in 3A-3D with your actual answers. Use 'none' for summary_q4 if no job posting."
+  }
+}
