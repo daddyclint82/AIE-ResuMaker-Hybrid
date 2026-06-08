@@ -27,6 +27,33 @@ voice_sessions: Dict[str, Any] = {}
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+SESSIONS_DIR = os.path.join(os.path.dirname(__file__), "voice_sessions")
+os.makedirs(SESSIONS_DIR, exist_ok=True)
+
+# In-memory session storage with disk persistence
+voice_sessions: Dict[str, Any] = {}
+
+# Load any existing persisted sessions on startup
+for fname in os.listdir(SESSIONS_DIR):
+    if fname.endswith(".json"):
+        sid = fname[:-5]
+        try:
+            with open(os.path.join(SESSIONS_DIR, fname), "r") as f:
+                voice_sessions[sid] = json.load(f)
+        except Exception:
+            pass
+
+def _persist_session(session_id: str):
+    """Save session to disk immediately."""
+    session = voice_sessions.get(session_id)
+    if not session:
+        return
+    try:
+        with open(os.path.join(SESSIONS_DIR, f"{session_id}.json"), "w") as f:
+            json.dump(session, f, default=str)
+    except Exception as e:
+        print(f"[Session Persist Error] {e}")
+
 # =============================================================================
 # STEP DEFINITIONS
 # =============================================================================
@@ -221,7 +248,7 @@ def get_current_state(session: dict) -> dict:
             return {
                 "type": "decision",
                 "field": "_add_job",
-                "question": "Add another job? Say 'yes', 'next', or 'done'.",
+                "question": "Add another job? Say yes or done.",
                 "context_label": f"Job {job_idx + 1}",
             }
         
@@ -230,7 +257,7 @@ def get_current_state(session: dict) -> dict:
             return {
                 "type": "decision",
                 "field": "_more_bullets",
-                "question": f"Got it. Add another bullet? Say 'yes', 'next', or 'done'.",
+                "question": f"Got it. Add another bullet? Say yes or done.",
                 "context_label": f"Job {job_idx + 1}",
                 "show_add_job": True
             }
@@ -252,7 +279,7 @@ def get_current_state(session: dict) -> dict:
         return {
             "type": "decision",
             "field": "_add_job",
-            "question": "Add another job? Say 'yes', 'next', or 'done'.",
+            "question": "Add another job? Say yes or done.",
             "context_label": f"Job {job_idx + 1}",
         }
     
@@ -359,7 +386,7 @@ def _handle_optional_section(session, section_name, fields, label):
     return {
         "type": "decision",
         "field": f"_add_{section_name}",
-        "question": f"{label} saved. Add another? Say 'yes', 'next', or 'skip'.",
+        "question": f"{label} saved. Add another? Say yes or skip.",
         "context_label": f"{label}s",
         "show_add_job": True
     }
@@ -521,7 +548,7 @@ def _process_experience(session: dict, extracted: str) -> dict:
     return {
         "type": "decision",
         "field": "_more_bullets",
-        "question": f"Bullet saved. Add another? Say 'yes', 'next', or 'done'.",
+        "question": f"Bullet saved. Add another? Say yes or done.",
         "context_label": f"Job {job_idx + 1}",
         "show_add_job": True
     }
@@ -608,15 +635,19 @@ def _process_optional(session: dict, extracted: str) -> dict:
             return get_current_state(session)
         elif lower in ["next", "n", "done", "skip", "no"]:
             # Done with this section - save data and move to next
-            if item_list and any(item for item in item_list):
-                data[section] = item_list
+            # Filter out empty dicts before saving
+            filtered_items = [item for item in item_list if item and (not isinstance(item, dict) or any(item.values()))]
+            if filtered_items:
+                data[section] = filtered_items
                 session["data"] = data
             _advance_optional_section(session)
             return get_current_state(session)
         else:
             # Unrecognized input - treat as done with section
-            if item_list and any(item for item in item_list):
-                data[section] = item_list
+            # Filter out empty dicts before saving
+            filtered_items = [item for item in item_list if item and (not isinstance(item, dict) or any(item.values()))]
+            if filtered_items:
+                data[section] = filtered_items
                 session["data"] = data
             _advance_optional_section(session)
             return get_current_state(session)
@@ -624,6 +655,11 @@ def _process_optional(session: dict, extracted: str) -> dict:
     # First field of first item - check skip
     if item_idx == 0 and field_idx == 0:
         if lower in ["skip", "none", "n/a", "no", "next"]:
+            # Skip this entire section - remove the empty item we may have created
+            if item_list and not any(item_list[-1].values() if isinstance(item_list[-1], dict) else True):
+                item_list.pop()
+            ctx[section] = item_list
+            session["context"] = ctx
             # Skip this entire section
             _advance_optional_section(session)
             return get_current_state(session)
@@ -1004,6 +1040,7 @@ async def voice_start(request: Request):
         "done": False
     }
     voice_sessions[session_id] = session
+    _persist_session(session_id)
     
     step = get_current_state(session)
     return {
@@ -1026,6 +1063,16 @@ async def voice_turn(request: Request):
         session_id = body.get("session_id", "")
         action = body.get("action", "answer")
         transcript = body.get("transcript", "").strip()
+        
+        # Try to load from memory first, then disk
+        if session_id not in voice_sessions:
+            session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+            if os.path.exists(session_path):
+                try:
+                    with open(session_path, "r") as f:
+                        voice_sessions[session_id] = json.load(f)
+                except Exception:
+                    pass
         
         if not session_id or session_id not in voice_sessions:
             return JSONResponse({"error": "Invalid session. Please try again."}, status_code=400)
@@ -1059,6 +1106,9 @@ async def voice_turn(request: Request):
                 if section in ctx:
                     data[section] = ctx[section]
             session["data"] = data
+        
+        # Persist after every turn
+        _persist_session(session_id)
         
         return {
             "session_id": session_id,
@@ -1153,6 +1203,188 @@ async def voice_load(request: Request):
         
     except Exception as e:
         print(f"[Voice Load Error] {e}")
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/preview")
+async def voice_preview(request: Request):
+    """Generate preview and download URLs from voice session data."""
+    try:
+        body = await request.json()
+        session_id = body.get("session_id", "")
+        
+        # Try to load from memory first, then disk
+        if session_id not in voice_sessions:
+            session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+            if os.path.exists(session_path):
+                try:
+                    with open(session_path, "r") as f:
+                        voice_sessions[session_id] = json.load(f)
+                except Exception:
+                    pass
+        
+        if not session_id or session_id not in voice_sessions:
+            return JSONResponse({"error": "Invalid session"}, status_code=400)
+        
+        session = voice_sessions[session_id]
+        data = session.get("data", {})
+        ctx = session.get("context", {})
+        
+        # Build resume_data from voice session
+        full_name = data.get("full_name", "")
+        resume_id = f"{full_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        # Get experience list from context first (has the full objects)
+        exp_list = ctx.get("experience", [])
+        if not exp_list and "experience" in data:
+            exp_data = data["experience"]
+            if isinstance(exp_data, str):
+                try:
+                    exp_list = json.loads(exp_data)
+                except:
+                    exp_list = []
+            elif isinstance(exp_data, list):
+                exp_list = exp_data
+        
+        # Normalize experience data for preview
+        normalized_exp = []
+        for exp in exp_list:
+            if isinstance(exp, dict):
+                # Handle both 'bullets' and 'description' fields
+                bullets = exp.get("bullets", [])
+                if not bullets and "description" in exp:
+                    desc = exp.get("description", [])
+                    if isinstance(desc, list):
+                        bullets = desc
+                    elif isinstance(desc, str):
+                        bullets = [desc] if desc else []
+                
+                normalized_exp.append({
+                    "company": exp.get("company", ""),
+                    "title": exp.get("title", ""),
+                    "dates": exp.get("dates", ""),
+                    "bullets": bullets if isinstance(bullets, list) else [bullets] if bullets else []
+                })
+        
+        exp_list = normalized_exp
+        
+        # Get education list
+        edu_list = data.get("education", [])
+        if isinstance(edu_list, str):
+            try:
+                edu_list = json.loads(edu_list)
+            except:
+                edu_list = []
+        
+        # Get skills - handle both old string format and new categorized dict format
+        skills_list = []
+        skills_categorized = data.get("skills_categorized", {})
+        if skills_categorized and isinstance(skills_categorized, dict):
+            for cat, skills in skills_categorized.items():
+                if isinstance(skills, list):
+                    for s in skills:
+                        if isinstance(s, str):
+                            skills_list.append(s)
+                        elif isinstance(s, dict) and "name" in s:
+                            skills_list.append(s["name"])
+        
+        # Normalize skills_categorized for preview (convert dict skills to strings)
+        skills_categorized_norm = {}
+        if skills_categorized and isinstance(skills_categorized, dict):
+            for cat, skills in skills_categorized.items():
+                normalized_skills = []
+                if isinstance(skills, list):
+                    for s in skills:
+                        if isinstance(s, str):
+                            normalized_skills.append(s)
+                        elif isinstance(s, dict) and "name" in s:
+                            normalized_skills.append(s["name"])
+                skills_categorized_norm[cat] = normalized_skills
+        
+        # Use normalized skills or plain list
+        final_skills = skills_list if skills_list else []
+        final_skills_categorized = skills_categorized_norm if skills_categorized_norm else {}
+        
+        # Build location from city + state if not already combined
+        location = data.get("location", "")
+        if not location:
+            city = data.get("city", "")
+            state = data.get("state", "")
+            if city and state:
+                location = f"{city}, {state}"
+            elif city:
+                location = city
+            elif state:
+                location = state
+        
+        # Helper for optional JSON fields
+        def parse_json_field(field_name):
+            val = data.get(field_name, "")
+            if not val:
+                return []
+            if isinstance(val, list):
+                # Filter out empty dicts and empty strings
+                return [item for item in val if item and not (isinstance(item, dict) and not any(item.values()))]
+            if isinstance(val, str):
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, list):
+                        # Filter out empty dicts and empty strings
+                        return [item for item in parsed if item and not (isinstance(item, dict) and not any(item.values()))]
+                    return parsed
+                except:
+                    return []
+            return []
+        
+        resume_data = {
+            "full_name": full_name,
+            "email": data.get("email", ""),
+            "phone": data.get("phone", ""),
+            "location": location,
+            "linkedin": data.get("linkedin", ""),
+            "website": data.get("website", ""),
+            "summary": data.get("summary", ""),
+            "experience": exp_list,
+            "education": edu_list,
+            "skills": final_skills,
+            "skills_categorized": final_skills_categorized,
+            "projects": parse_json_field("projects"),
+            "competencies": parse_json_field("competencies"),
+            "community": parse_json_field("community"),
+            "certifications": parse_json_field("certifications"),
+            "industry": data.get("industry", ""),
+            "template_style": data.get("template_style", "professional"),
+            "created_at": datetime.now().isoformat()
+        }
+        
+        # Store in resumes dict for download - use lazy import to avoid circular dependency
+        from main import resumes, generate_preview_html, generate_docx, generate_pdf
+        resumes[resume_id] = resume_data
+        
+        # Generate DOCX and PDF files for download
+        try:
+            docx_path = generate_docx(resume_id, resume_data)
+            pdf_path = generate_pdf(resume_id, resume_data)
+            print(f"[Voice Preview] Generated files: DOCX={docx_path}, PDF={pdf_path}")
+        except Exception as gen_err:
+            print(f"[Voice Preview] File generation warning: {gen_err}")
+        
+        # Generate preview HTML
+        preview_html = generate_preview_html(resume_data, resume_data["template_style"])
+        
+        return {
+            "success": True,
+            "resume_id": resume_id,
+            "preview_html": preview_html,
+            "download_url": f"/api/download/{resume_id}",
+            "download_url_pdf": f"/api/download/{resume_id}?format=pdf",
+            "data": resume_data
+        }
+        
+    except Exception as e:
+        print(f"[Voice Preview Error] {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
