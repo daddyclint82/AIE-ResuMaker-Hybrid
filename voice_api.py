@@ -1149,6 +1149,356 @@ Write a concise, compelling professional summary that incorporates the keywords 
 
 
 # =============================================================================
+# SANITIZATION LAYER
+# =============================================================================
+
+def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
+    """
+    Sanitize and reconstruct a clean resume payload from the raw session data.
+    
+    Fixes known upstream corruption:
+    - skills field polluted with project names / control words
+    - skills_categorized truncated or missing
+    - experience bullets lost in string/list mismatches
+    - optional sections partially stored in ctx vs data
+    
+    Returns a pristine payload ready for generate_docx / generate_pdf.
+    """
+    import re
+    
+    # ── Base identity fields ──
+    full_name = raw_data.get("full_name", "")
+    
+    # ── Location ──
+    location = raw_data.get("location", "")
+    if not location:
+        city = raw_data.get("city", "")
+        state = raw_data.get("state", "")
+        if city and state:
+            location = f"{city}, {state}"
+        elif city:
+            location = city
+        elif state:
+            location = state
+    
+    # ── Experience (primary source: ctx, fallback: raw_data) ──
+    exp_list = []
+    
+    # Try ctx first (has the full objects with bullets)
+    ctx_exp = ctx.get("experience", [])
+    if ctx_exp:
+        for exp in ctx_exp:
+            if not isinstance(exp, dict):
+                continue
+            
+            # Get bullets from multiple possible sources
+            bullets = []
+            if "bullets" in exp and isinstance(exp["bullets"], list):
+                bullets = [b for b in exp["bullets"] if b and isinstance(b, str)]
+            elif "description" in exp and isinstance(exp["description"], list):
+                bullets = [b for b in exp["description"] if b and isinstance(b, str)]
+            elif "description" in exp and isinstance(exp["description"], str):
+                desc = exp["description"].strip()
+                if desc:
+                    bullets = [desc]
+            
+            # Skip empty jobs
+            if not exp.get("company") and not exp.get("title") and not bullets:
+                continue
+            
+            exp_list.append({
+                "company": str(exp.get("company", "")),
+                "title": str(exp.get("title", "")),
+                "dates": str(exp.get("dates", "")),
+                "location": str(exp.get("location", "")),
+                "bullets": bullets,
+                "description": bullets  # backward compat
+            })
+    
+    # Fallback to raw_data experience
+    if not exp_list and "experience" in raw_data:
+        exp_data = raw_data["experience"]
+        if isinstance(exp_data, str):
+            try:
+                exp_data = json.loads(exp_data)
+            except:
+                exp_data = []
+        if isinstance(exp_data, list):
+            for exp in exp_data:
+                if isinstance(exp, dict):
+                    bullets = []
+                    if "bullets" in exp and isinstance(exp["bullets"], list):
+                        bullets = [b for b in exp["bullets"] if b and isinstance(b, str)]
+                    elif "description" in exp and isinstance(exp["description"], list):
+                        bullets = [b for b in exp["description"] if b and isinstance(b, str)]
+                    elif "description" in exp and isinstance(exp["description"], str):
+                        desc = exp["description"].strip()
+                        if desc:
+                            bullets = [desc]
+                    
+                    if exp.get("company") or exp.get("title") or bullets:
+                        exp_list.append({
+                            "company": str(exp.get("company", "")),
+                            "title": str(exp.get("title", "")),
+                            "dates": str(exp.get("dates", "")),
+                            "location": str(exp.get("location", "")),
+                            "bullets": bullets,
+                            "description": bullets
+                        })
+    
+    # ── Skills sanitization ──
+    # CORRUPTION DETECTION: skills field may contain project names, control words, or be truncated
+    # The real skills are in skills_categorized (from Groq) or must be reconstructed
+    
+    skills_categorized_raw = raw_data.get("skills_categorized", {})
+    skills_raw = raw_data.get("skills", "")
+    
+    # Known project name patterns that leaked into skills
+    PROJECT_NAME_PATTERNS = [
+        r"resume", r"forge", r"builder", r"voice", r"chat", r"bot",
+        r"discord", r"openclaw", r"ollama", r"platform", r"infrastructure",
+        r"orchestration", r"education", r"community", r"tutorial", r"documentation"
+    ]
+    
+    # Control words that should never be in skills
+    CONTROL_WORDS = {"done", "skip", "next", "yes", "no", "add", "more", "stop", "finished"}
+    
+    def _is_corrupted_skills(skills_text: str) -> bool:
+        """Detect if skills field contains project names or control words."""
+        if not skills_text or not isinstance(skills_text, str):
+            return True  # Empty/missing skills is corrupted
+        skills_lower = skills_text.lower()
+        # Check for project names
+        for pattern in PROJECT_NAME_PATTERNS:
+            if pattern in skills_lower:
+                return True
+        # Check for control words as standalone words
+        words = set(re.findall(r'\b\w+\b', skills_lower))
+        if words & CONTROL_WORDS:
+            return True
+        # If skills is very short (under 20 chars), likely corrupted/truncated
+        if len(skills_text.strip()) < 20:
+            return True
+        return False
+    
+    def _is_corrupted_categorized(categorized: dict) -> bool:
+        """Detect if skills_categorized only contains garbage like project names in 'Other Skills'."""
+        if not categorized or not isinstance(categorized, dict):
+            return True
+        # If the ONLY category is "Other Skills", it's likely Groq failed to categorize properly
+        keys = list(categorized.keys())
+        if len(keys) == 1 and keys[0].lower() in ("other skills", "other"):
+            skills = categorized.get(keys[0], [])
+            if not skills:
+                return True
+            # Check if the skills in "Other Skills" look like project names
+            for s in skills:
+                name = s.get("name", "") if isinstance(s, dict) else str(s)
+                name_lower = name.lower()
+                for pattern in PROJECT_NAME_PATTERNS:
+                    if pattern in name_lower:
+                        return True
+                # If it's a long phrase (more than 3 words), it's likely a project description
+                if len(name.split()) > 3:
+                    return True
+        return False
+    
+    def _extract_skills_from_categorized(categorized: dict) -> tuple:
+        """Extract flat skill list and normalized categorized dict."""
+        flat_skills = []
+        normalized = {}
+        if not categorized or not isinstance(categorized, dict):
+            return flat_skills, normalized
+        
+        for cat, skills in categorized.items():
+            if not skills or not isinstance(skills, list):
+                continue
+            norm_list = []
+            for s in skills:
+                if isinstance(s, str) and s.strip():
+                    norm_list.append(s.strip())
+                    flat_skills.append(s.strip())
+                elif isinstance(s, dict) and s.get("name"):
+                    name = s["name"].strip()
+                    norm_list.append(name)
+                    flat_skills.append(name)
+            if norm_list:
+                normalized[cat] = norm_list
+        
+        return flat_skills, normalized
+    
+    # ── Determine best skills source ──
+    # Priority: 1) Valid skills_categorized, 2) Valid raw skills, 3) keywords/summary_q4 fallback
+    
+    final_skills = []
+    final_skills_categorized = {}
+    
+    # Source 1: Try skills_categorized if it's not corrupted
+    if skills_categorized_raw and isinstance(skills_categorized_raw, dict) and not _is_corrupted_categorized(skills_categorized_raw):
+        cat_skills, cat_normalized = _extract_skills_from_categorized(skills_categorized_raw)
+        if cat_skills:
+            final_skills = cat_skills
+            final_skills_categorized = cat_normalized
+    
+    # Source 2: Try raw skills if categorized failed or was empty
+    if not final_skills:
+        if isinstance(skills_raw, str):
+            if not _is_corrupted_skills(skills_raw):
+                # Parse comma-separated skills
+                final_skills = [s.strip() for s in skills_raw.split(",") if s.strip()]
+        elif isinstance(skills_raw, list):
+            final_skills = [s for s in skills_raw if s and isinstance(s, str)]
+    
+    # Source 3: EMERGENCY FALLBACK — keywords from summary_q4 (most reliable when upstream is corrupted)
+    if not final_skills:
+        keywords = raw_data.get("keywords", "") or raw_data.get("summary_q4", "")
+        if keywords and isinstance(keywords, str) and not _is_corrupted_skills(keywords):
+            # Parse comma-separated technical keywords
+            final_skills = [s.strip() for s in keywords.split(",") if s.strip() and len(s.strip()) > 1]
+    
+    # Source 4: Ultimate fallback — extract individual tech keywords from summary_q4
+    if not final_skills:
+        keywords = raw_data.get("keywords", "") or raw_data.get("summary_q4", "")
+        if keywords and isinstance(keywords, str):
+            # Extract technical keywords using regex
+            tech_keywords = re.findall(r'[A-Z][a-zA-Z]*(?:\.[A-Z][a-zA-Z]*)*|[a-z]+(?:\+[a-z]+)*|\d+', keywords)
+            final_skills = [k for k in tech_keywords if len(k) > 1 and k.lower() not in CONTROL_WORDS]
+    
+    # If we had to fall back to keywords but don't have a categorized version,
+    # build a simple categorized structure using the built-in categorization logic
+    if final_skills and not final_skills_categorized:
+        from main import categorize_skills
+        try:
+            final_skills_categorized = categorize_skills(final_skills)
+        except Exception:
+            # Fallback: put all skills in "Technical Skills"
+            final_skills_categorized = {"Technical Skills": final_skills}
+    
+    # Deduplicate
+    seen = set()
+    deduped = []
+    for s in final_skills:
+        s_lower = s.lower()
+        if s_lower not in seen:
+            seen.add(s_lower)
+            deduped.append(s)
+    final_skills = deduped
+    
+    # ── Optional sections (ctx first, then raw_data) ──
+    def _get_optional_section(section_name: str) -> list:
+        """Get optional section data from ctx or raw_data."""
+        # Try ctx first
+        ctx_data = ctx.get(section_name, [])
+        if ctx_data and isinstance(ctx_data, list):
+            # Filter empty dicts
+            filtered = []
+            for item in ctx_data:
+                if item and isinstance(item, dict) and any(item.values()):
+                    filtered.append(item)
+            if filtered:
+                return filtered
+        
+        # Fallback to raw_data
+        raw_val = raw_data.get(section_name, "")
+        if isinstance(raw_val, list):
+            return [item for item in raw_val if item and isinstance(item, dict) and any(item.values())]
+        if isinstance(raw_val, str) and raw_val.strip():
+            try:
+                parsed = json.loads(raw_val)
+                if isinstance(parsed, list):
+                    return [item for item in parsed if item and isinstance(item, dict) and any(item.values())]
+                return [parsed] if parsed else []
+            except:
+                return []
+        return []
+    
+    def _strip_control_words(section_items: list, field_map: dict) -> list:
+        """Strip leaked control words from specific fields in optional sections.
+        
+        field_map: {field_name: set_of_bad_values} — any string matching a bad value
+        (case-insensitive) will be replaced with an empty string.
+        """
+        CONTROL_VALUES = {"yes", "skip", "done", "next", "no", "add", "more"}
+        cleaned = []
+        for item in section_items:
+            if not isinstance(item, dict):
+                cleaned.append(item)
+                continue
+            cleaned_item = dict(item)
+            for field in field_map.get("__all__", []):
+                if field in cleaned_item:
+                    val = str(cleaned_item[field]).strip()
+                    if val.lower() in CONTROL_VALUES:
+                        cleaned_item[field] = ""
+            cleaned.append(cleaned_item)
+        return cleaned
+    
+    projects = _get_optional_section("projects")
+    # Strip "yes" from project result fields
+    projects = _strip_control_words(projects, {"__all__": ["result"]})
+    
+    competencies = _get_optional_section("competencies")
+    community = _get_optional_section("community")
+    
+    certifications = _get_optional_section("certifications")
+    # Strip "skip" from certification date fields
+    certifications = _strip_control_words(certifications, {"__all__": ["date"]})
+    
+    # Education special handling
+    education = []
+    ctx_edu = ctx.get("education", [])
+    if ctx_edu and isinstance(ctx_edu, list):
+        for item in ctx_edu:
+            if item and isinstance(item, dict) and any(item.values()):
+                education.append(item)
+    if not education and "education" in raw_data:
+        edu_data = raw_data["education"]
+        if isinstance(edu_data, list):
+            education = [item for item in edu_data if item and isinstance(item, dict) and any(item.values())]
+        elif isinstance(edu_data, str) and edu_data.strip():
+            try:
+                parsed = json.loads(edu_data)
+                if isinstance(parsed, list):
+                    education = [item for item in parsed if item and isinstance(item, dict) and any(item.values())]
+            except:
+                pass
+    
+    # References
+    references = _get_optional_section("references")
+    
+    # ── Summary ──
+    summary = raw_data.get("summary", "")
+    
+    # ── Build clean payload ──
+    clean_data = {
+        "full_name": full_name,
+        "email": raw_data.get("email", ""),
+        "phone": raw_data.get("phone", ""),
+        "location": location,
+        "linkedin": raw_data.get("linkedin", ""),
+        "website": raw_data.get("website", ""),
+        "summary": summary,
+        "experience": exp_list,
+        "education": education,
+        "skills": final_skills,
+        "skills_categorized": final_skills_categorized,
+        "projects": projects,
+        "competencies": competencies,
+        "community": community,
+        "certifications": certifications,
+        "references": references,
+        "industry": raw_data.get("industry", ""),
+        "job_title": raw_data.get("job_title", ""),
+        "experience_level": raw_data.get("experience_level", ""),
+        "education_level": raw_data.get("education_level", ""),
+        "template_style": raw_data.get("template_style", "professional"),
+        "created_at": datetime.now().isoformat()
+    }
+    
+    return clean_data
+
+
+# =============================================================================
 # API ENDPOINTS
 # =============================================================================
 
@@ -1411,132 +1761,13 @@ async def voice_preview(request: Request):
         data = session.get("data", {})
         ctx = session.get("context", {})
         
-        # Build resume_data from voice session
-        full_name = data.get("full_name", "")
+        # ── SANITIZATION LAYER ──
+        # Reconstruct a clean payload from whatever the state machine produced
+        resume_data = sanitize_resume_data(data, ctx)
+        
+        # Build resume_id from sanitized name
+        full_name = resume_data["full_name"]
         resume_id = f"{full_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        # Get experience list from context first (has the full objects)
-        exp_list = ctx.get("experience", [])
-        if not exp_list and "experience" in data:
-            exp_data = data["experience"]
-            if isinstance(exp_data, str):
-                try:
-                    exp_list = json.loads(exp_data)
-                except:
-                    exp_list = []
-            elif isinstance(exp_data, list):
-                exp_list = exp_data
-        
-        # Normalize experience data for preview
-        normalized_exp = []
-        for exp in exp_list:
-            if isinstance(exp, dict):
-                # Handle both 'bullets' and 'description' fields
-                bullets = exp.get("bullets", [])
-                if not bullets and "description" in exp:
-                    desc = exp.get("description", [])
-                    if isinstance(desc, list):
-                        bullets = desc
-                    elif isinstance(desc, str):
-                        bullets = [desc] if desc else []
-                
-                normalized_exp.append({
-                    "company": exp.get("company", ""),
-                    "title": exp.get("title", ""),
-                    "dates": exp.get("dates", ""),
-                    "bullets": bullets if isinstance(bullets, list) else [bullets] if bullets else []
-                })
-        
-        exp_list = normalized_exp
-        
-        # Get education list
-        edu_list = data.get("education", [])
-        if isinstance(edu_list, str):
-            try:
-                edu_list = json.loads(edu_list)
-            except:
-                edu_list = []
-        
-        # Get skills - handle both old string format and new categorized dict format
-        skills_list = []
-        skills_categorized = data.get("skills_categorized", {})
-        if skills_categorized and isinstance(skills_categorized, dict):
-            for cat, skills in skills_categorized.items():
-                if isinstance(skills, list):
-                    for s in skills:
-                        if isinstance(s, str):
-                            skills_list.append(s)
-                        elif isinstance(s, dict) and "name" in s:
-                            skills_list.append(s["name"])
-        
-        # Normalize skills_categorized for preview (convert dict skills to strings)
-        skills_categorized_norm = {}
-        if skills_categorized and isinstance(skills_categorized, dict):
-            for cat, skills in skills_categorized.items():
-                normalized_skills = []
-                if isinstance(skills, list):
-                    for s in skills:
-                        if isinstance(s, str):
-                            normalized_skills.append(s)
-                        elif isinstance(s, dict) and "name" in s:
-                            normalized_skills.append(s["name"])
-                skills_categorized_norm[cat] = normalized_skills
-        
-        # Use normalized skills or plain list
-        final_skills = skills_list if skills_list else []
-        final_skills_categorized = skills_categorized_norm if skills_categorized_norm else {}
-        
-        # Build location from city + state if not already combined
-        location = data.get("location", "")
-        if not location:
-            city = data.get("city", "")
-            state = data.get("state", "")
-            if city and state:
-                location = f"{city}, {state}"
-            elif city:
-                location = city
-            elif state:
-                location = state
-        
-        # Helper for optional JSON fields
-        def parse_json_field(field_name):
-            val = data.get(field_name, "")
-            if not val:
-                return []
-            if isinstance(val, list):
-                # Filter out empty dicts and empty strings
-                return [item for item in val if item and not (isinstance(item, dict) and not any(item.values()))]
-            if isinstance(val, str):
-                try:
-                    parsed = json.loads(val)
-                    if isinstance(parsed, list):
-                        # Filter out empty dicts and empty strings
-                        return [item for item in parsed if item and not (isinstance(item, dict) and not any(item.values()))]
-                    return parsed
-                except:
-                    return []
-            return []
-        
-        resume_data = {
-            "full_name": full_name,
-            "email": data.get("email", ""),
-            "phone": data.get("phone", ""),
-            "location": location,
-            "linkedin": data.get("linkedin", ""),
-            "website": data.get("website", ""),
-            "summary": data.get("summary", ""),
-            "experience": exp_list,
-            "education": edu_list,
-            "skills": final_skills,
-            "skills_categorized": final_skills_categorized,
-            "projects": parse_json_field("projects"),
-            "competencies": parse_json_field("competencies"),
-            "community": parse_json_field("community"),
-            "certifications": parse_json_field("certifications"),
-            "industry": data.get("industry", ""),
-            "template_style": data.get("template_style", "professional"),
-            "created_at": datetime.now().isoformat()
-        }
         
         # Store in resumes dict for download - use lazy import to avoid circular dependency
         from main import resumes, generate_preview_html, generate_docx, generate_pdf
