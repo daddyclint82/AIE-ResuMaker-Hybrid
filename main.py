@@ -41,6 +41,10 @@ if os.path.exists(env_path):
 else:
     load_dotenv()
 
+# Persistent resume storage (NOT temp — survives restarts)
+RESUME_STORAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "storage", "resumes")
+os.makedirs(RESUME_STORAGE_DIR, exist_ok=True)
+
 import stripe
 
 # Stripe Configuration — loaded from environment
@@ -1239,7 +1243,7 @@ def generate_docx(resume_id: str, data: dict):
         refs.runs[0].font.size = Pt(9)
         refs.paragraph_format.space_before = Pt(16)
     
-    output_dir = os.path.join(tempfile.gettempdir(), "resumes")
+    output_dir = RESUME_STORAGE_DIR
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, f"{resume_id}.docx")
     doc.save(filepath)
@@ -1935,7 +1939,7 @@ def _get_minimal_css():
 @app.get("/api/download/{resume_id}")
 async def download_resume(resume_id: str):
     """Download resume as .docx"""
-    filepath = os.path.join(tempfile.gettempdir(), "resumes", f"{resume_id}.docx")
+    filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.docx")
     if os.path.exists(filepath):
         return FileResponse(filepath, filename=f"resume_{resume_id}.docx")
     return JSONResponse({"error": "Resume not found"}, status_code=404)
@@ -2363,7 +2367,7 @@ async def get_timed_preview(request: Request):
 
 def generate_pdf(resume_id: str, data: dict):
     """Generate PDF document"""
-    output_dir = os.path.join(tempfile.gettempdir(), "resumes")
+    output_dir = RESUME_STORAGE_DIR
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, f"{resume_id}.pdf")
     
@@ -3110,7 +3114,7 @@ async def voice_page(request: Request):
 @app.get("/api/download/{resume_id}")
 async def download_resume(resume_id: str, format: str = "docx"):
     """Download resume as .docx or .pdf"""
-    output_dir = os.path.join(tempfile.gettempdir(), "resumes")
+    output_dir = RESUME_STORAGE_DIR
     
     if format.lower() == "pdf":
         filepath = os.path.join(output_dir, f"{resume_id}.pdf")
