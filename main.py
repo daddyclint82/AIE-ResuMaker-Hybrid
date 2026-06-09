@@ -858,8 +858,10 @@ def generate_docx(resume_id: str, data: dict):
     name.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     # Contact info
+    address = data.get("address", "")
     contact_parts = []
-    if data.get("location"): contact_parts.append(data["location"])
+    if address: contact_parts.append(address)
+    elif data.get("location"): contact_parts.append(data["location"])
     if data.get("phone"): contact_parts.append(data["phone"])
     if data.get("email"): contact_parts.append(data["email"])
     if data.get("linkedin"): contact_parts.append(data["linkedin"])
@@ -886,17 +888,46 @@ def generate_docx(resume_id: str, data: dict):
         summary.runs[0].font.size = Pt(10)
     
     # Technical Skills
-    if data.get("skills"):
+    skills_categorized = data.get("skills_categorized", {})
+    skills_flat = data.get("skills", [])
+    
+    if skills_categorized or skills_flat:
         heading = doc.add_paragraph()
         heading_run = heading.add_run("TECHNICAL SKILLS")
         heading_run.bold = True
         heading_run.font.size = Pt(11)
         heading_run.font.color.rgb = RGBColor(0x2c, 0x5a, 0xa0)
         
-        skills_text = ", ".join(data["skills"]) if isinstance(data["skills"], list) else str(data["skills"])
-        skills = doc.add_paragraph(skills_text)
-        skills.paragraph_format.space_after = Pt(12)
-        skills.runs[0].font.size = Pt(10)
+        # Handle categorized skills dict
+        if skills_categorized and isinstance(skills_categorized, dict):
+            for cat, skills in skills_categorized.items():
+                if skills:
+                    cat_para = doc.add_paragraph()
+                    cat_run = cat_para.add_run(f"{cat}: ")
+                    cat_run.bold = True
+                    cat_run.font.size = Pt(10)
+                    
+                    # Extract skill names (handle both string list and dict list)
+                    skill_names = []
+                    for s in skills:
+                        if isinstance(s, str):
+                            skill_names.append(s)
+                        elif isinstance(s, dict):
+                            skill_names.append(s.get('name', ''))
+                    
+                    skills_run = cat_para.add_run(", ".join(skill_names))
+                    skills_run.font.size = Pt(10)
+        elif isinstance(skills_flat, list):
+            # Flat list of strings
+            skills_text = ", ".join(skills_flat)
+            skills = doc.add_paragraph(skills_text)
+            skills.paragraph_format.space_after = Pt(12)
+            skills.runs[0].font.size = Pt(10)
+        else:
+            # Fallback to string
+            skills = doc.add_paragraph(str(skills_flat))
+            skills.paragraph_format.space_after = Pt(12)
+            skills.runs[0].font.size = Pt(10)
     
     # Professional Experience
     if data.get("experience"):
@@ -922,8 +953,11 @@ def generate_docx(resume_id: str, data: dict):
             
             # Location and dates on next line
             location_parts = []
-            if job.get("city"): location_parts.append(job["city"])
-            if job.get("state"): location_parts.append(job["state"])
+            if job.get("location"): 
+                location_parts.append(job["location"])
+            elif job.get("city") or job.get("state"):
+                if job.get("city"): location_parts.append(job["city"])
+                if job.get("state"): location_parts.append(job["state"])
             location_str = ", ".join(location_parts)
             
             if location_str or job.get("dates") or job.get("phone") or job.get("address"):
@@ -958,12 +992,65 @@ def generate_docx(resume_id: str, data: dict):
                 addr.runs[0].font.size = Pt(9.5)
                 addr.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
             
-            # Description
-            if job.get("description"):
-                desc = doc.add_paragraph(job["description"])
-                desc.paragraph_format.space_after = Pt(8)
-                desc.paragraph_format.left_indent = Inches(0.2)
-                desc.runs[0].font.size = Pt(10)
+            # Special fields: operators_served, key_rigs
+            if job.get("operators_served") or job.get("key_rigs"):
+                special = doc.add_paragraph()
+                special.paragraph_format.space_after = Pt(4)
+                special_parts = []
+                if job.get("operators_served"):
+                    special_parts.append(f"Key Operators Served: {job['operators_served']}")
+                if job.get("key_rigs"):
+                    special_parts.append(f"Key Rigs: {job['key_rigs']}")
+                special_run = special.add_run(" | ".join(special_parts))
+                special_run.font.size = Pt(9)
+                special_run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
+            
+            # Description / Bullets
+            bullets = job.get('bullets', [])
+            description = job.get('description', '')
+            
+            if bullets and isinstance(bullets, list):
+                # Render bullets as a list
+                for bullet in bullets:
+                    if bullet and isinstance(bullet, str):
+                        clean_bullet = bullet.strip()
+                        if clean_bullet.startswith('•') or clean_bullet.startswith('-'):
+                            clean_bullet = clean_bullet[1:].strip()
+                        bullet_para = doc.add_paragraph()
+                        bullet_para.paragraph_format.left_indent = Inches(0.2)
+                        bullet_para.paragraph_format.space_after = Pt(2)
+                        bullet_run = bullet_para.add_run(f"• {clean_bullet}")
+                        bullet_run.font.size = Pt(10)
+            elif description and isinstance(description, list):
+                # Render description list as bullets
+                for item in description:
+                    if item and isinstance(item, str):
+                        clean_item = item.strip()
+                        if clean_item.startswith('•') or clean_item.startswith('-'):
+                            clean_item = clean_item[1:].strip()
+                        bullet_para = doc.add_paragraph()
+                        bullet_para.paragraph_format.left_indent = Inches(0.2)
+                        bullet_para.paragraph_format.space_after = Pt(2)
+                        bullet_run = bullet_para.add_run(f"• {clean_item}")
+                        bullet_run.font.size = Pt(10)
+            elif description and isinstance(description, str):
+                if '\n' in description or '\r' in description:
+                    # Multi-line description - render as bullets
+                    lines = [line.strip() for line in description.replace('\r', '\n').split('\n') if line.strip()]
+                    for line in lines:
+                        clean_line = line.strip()
+                        if clean_line.startswith('•') or clean_line.startswith('-'):
+                            clean_line = clean_line[1:].strip()
+                        bullet_para = doc.add_paragraph()
+                        bullet_para.paragraph_format.left_indent = Inches(0.2)
+                        bullet_para.paragraph_format.space_after = Pt(2)
+                        bullet_run = bullet_para.add_run(f"• {clean_line}")
+                        bullet_run.font.size = Pt(10)
+                else:
+                    desc = doc.add_paragraph(description)
+                    desc.paragraph_format.space_after = Pt(8)
+                    desc.paragraph_format.left_indent = Inches(0.2)
+                    desc.runs[0].font.size = Pt(10)
     
     # Projects
     if data.get("projects"):
@@ -989,11 +1076,24 @@ def generate_docx(resume_id: str, data: dict):
                     tech_run.font.size = Pt(9)
                     tech_run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
                 
-                # Description
-                if project.get("description"):
-                    desc = doc.add_paragraph(project["description"])
-                    desc.paragraph_format.space_after = Pt(4)
-                    desc.runs[0].font.size = Pt(10)
+                # Bullets
+                proj_bullets = project.get('bullets', [])
+                if proj_bullets and isinstance(proj_bullets, list):
+                    for bullet in proj_bullets:
+                        if bullet and isinstance(bullet, str):
+                            clean_bullet = bullet.strip()
+                            if clean_bullet.startswith('•') or clean_bullet.startswith('-'):
+                                clean_bullet = clean_bullet[1:].strip()
+                            bullet_para = doc.add_paragraph()
+                            bullet_para.paragraph_format.left_indent = Inches(0.2)
+                            bullet_para.paragraph_format.space_after = Pt(2)
+                            bullet_run = bullet_para.add_run(f"• {clean_bullet}")
+                            bullet_run.font.size = Pt(10)
+                elif project.get("description"):
+                    if isinstance(project["description"], str):
+                        desc = doc.add_paragraph(project["description"])
+                        desc.paragraph_format.space_after = Pt(4)
+                        desc.runs[0].font.size = Pt(10)
                 
                 # Result
                 if project.get("result"):
@@ -1078,11 +1178,19 @@ def generate_docx(resume_id: str, data: dict):
         for item in data["community"]:
             if isinstance(item, dict):
                 comm = doc.add_paragraph()
-                event_run = comm.add_run(item.get('event', ''))
-                event_run.font.size = Pt(10)
-                if item.get("organization"):
-                    org_run = comm.add_run(f" | {item['organization']}")
-                    org_run.font.size = Pt(10)
+                org = item.get('org', item.get('organization', ''))
+                event = item.get('event', '')
+                role = item.get('role', '')
+                desc = item.get('description', '')
+                
+                parts = []
+                if org: parts.append(org)
+                if event: parts.append(event)
+                if role: parts.append(f"Role: {role}")
+                if desc: parts.append(desc)
+                
+                comm_run = comm.add_run(' | '.join(parts))
+                comm_run.font.size = Pt(10)
     
     # Certifications
     if data.get("certifications"):
@@ -1097,8 +1205,9 @@ def generate_docx(resume_id: str, data: dict):
                 cert_para = doc.add_paragraph()
                 name_run = cert_para.add_run(cert.get('name', ''))
                 name_run.font.size = Pt(10)
-                if cert.get("organization"):
-                    org_run = cert_para.add_run(f" — {cert['organization']}")
+                issuer = cert.get('issuer', cert.get('organization', ''))
+                if issuer:
+                    org_run = cert_para.add_run(f" — {issuer}")
                     org_run.font.size = Pt(10)
                 if cert.get("date"):
                     date_run = cert_para.add_run(f", {cert['date']}")
@@ -1106,11 +1215,29 @@ def generate_docx(resume_id: str, data: dict):
                     date_run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
     
     # References
-    refs = doc.add_paragraph("*References available upon request*")
-    refs.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    refs.runs[0].italic = True
-    refs.runs[0].font.size = Pt(9)
-    refs.paragraph_format.space_before = Pt(16)
+    refs_data = data.get("references", [])
+    if refs_data:
+        heading = doc.add_paragraph()
+        heading_run = heading.add_run("REFERENCES")
+        heading_run.bold = True
+        heading_run.font.size = Pt(11)
+        heading_run.font.color.rgb = RGBColor(0x2c, 0x5a, 0xa0)
+        
+        for ref in refs_data:
+            if isinstance(ref, dict):
+                ref_para = doc.add_paragraph()
+                name_run = ref_para.add_run(ref.get('name', ''))
+                name_run.bold = True
+                name_run.font.size = Pt(10)
+                if ref.get("phone"):
+                    phone_run = ref_para.add_run(f" — {ref['phone']}")
+                    phone_run.font.size = Pt(10)
+    else:
+        refs = doc.add_paragraph("*References available upon request*")
+        refs.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        refs.runs[0].italic = True
+        refs.runs[0].font.size = Pt(9)
+        refs.paragraph_format.space_before = Pt(16)
     
     output_dir = os.path.join(tempfile.gettempdir(), "resumes")
     os.makedirs(output_dir, exist_ok=True)
@@ -1163,10 +1290,18 @@ def generate_preview_html(data: dict, template_style: str = "professional"):
         if isinstance(skills_data, dict):
             html += '<div class="skills-grid">'
             for category, skill_list in skills_data.items():
+                # Normalize skill_list: dict of {"name": ..., "weight": ...} → list of names
+                if skill_list and isinstance(skill_list, list) and len(skill_list) > 0:
+                    if isinstance(skill_list[0], dict):
+                        skill_names = [s["name"] for s in skill_list if isinstance(s, dict) and "name" in s]
+                    else:
+                        skill_names = [str(s) for s in skill_list]
+                else:
+                    skill_names = skill_list if isinstance(skill_list, list) else []
                 html += f'''
                 <div>
                     <div class="skill-category">{category}</div>
-                    <div class="skill-list">{", ".join(skill_list) if isinstance(skill_list, list) else skill_list}</div>
+                    <div class="skill-list">{", ".join(skill_names) if skill_names else ""}</div>
                 </div>
                 '''
             html += '</div>'
@@ -1338,9 +1473,16 @@ def generate_preview_html(data: dict, template_style: str = "professional"):
         html += '<div class="section-title">Community Involvement</div>'
         for comm in data["community"]:
             if isinstance(comm, dict):
-                event = comm.get('event', '')
-                organization = comm.get('organization', '')
-                html += f'<div class="community-item"><strong>{event}</strong>{', ' + organization if organization else ''}</div>'
+                org = comm.get('org', '') or comm.get('organization', '') or comm.get('event', '')
+                description = comm.get('description', '')
+                if org and description:
+                    html += f'<div class="community-item"><strong>{org}</strong>: {description}</div>'
+                elif org:
+                    html += f'<div class="community-item"><strong>{org}</strong></div>'
+                elif description:
+                    html += f'<div class="community-item">{description}</div>'
+            else:
+                html += f'<div class="community-item">{comm}</div>'
     
     html += "</div>"
     return html

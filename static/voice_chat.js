@@ -560,6 +560,9 @@
         } finally {
             textInput.disabled = false;
             sendBtn.disabled = false;
+            // FORCE INPUT VISIBLE: Ensure text input is always re-shown after any turn
+            textInput.style.display = 'block';
+            sendBtn.style.display = 'block';
             textInput.focus();
         }
     }
@@ -826,10 +829,15 @@
     function updateNavButtons(canBack, field, showAddJob) {
         canGoBack = canBack;
         
-        const isLoopField = field && !field.startsWith('_') && 
-            (field === 'company' || field === 'title' || field === 'school' || 
-             field === 'degree' || field === 'project_name' || field === 'competency' ||
-             field === 'community_org' || field === 'cert_name');
+        const isLoopField = field && !field.startsWith('_') && (
+            field === 'company' || field === 'title' ||
+            field === 'school' || field === 'degree' ||
+            field === 'project_name' || field === 'competency' ||
+            field === 'community_org' || field === 'community_role' ||
+            field === 'cert_name' || field === 'cert_issuer' ||
+            field === 'reference_name' || field === 'reference_phone' ||
+            field === 'website' || field === 'linkedin'
+        );
         
         const isDecisionPoint = field === '_decision';
         const isBulletField = field === '_bullet';
@@ -848,13 +856,10 @@
             saveBtn.style.display = sessionId ? 'inline-block' : 'none';
         }
         
-        if (doneJobsBtn) {
-            // ALWAYS show Done with Jobs button during experience (bullets + decision)
         const inJobEntry = isBulletField || isDecisionPoint || field === 'company' || 
                           field === 'title' || field === 'dates';
         if (doneJobsBtn) {
             doneJobsBtn.style.display = inJobEntry ? 'inline-block' : 'none';
-        }
         }
         
         if (isDecisionPoint || isLoopField || isBulletField || showAddJob) {

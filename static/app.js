@@ -458,39 +458,169 @@ function loadVoiceData() {
         
         // Set experience entries
         if (voiceData.experience && Array.isArray(voiceData.experience)) {
-            voiceData.experience.forEach((exp, i) => {
-                if (i === 0) {
-                    // First entry might already exist
-                    const firstEntry = document.querySelector('.experience-entry');
-                    if (firstEntry) {
-                        firstEntry.querySelector('[name*="title"]').value = exp.title || '';
-                        firstEntry.querySelector('[name*="company"]').value = exp.company || '';
-                        firstEntry.querySelector('[name*="dates"]').value = exp.dates || '';
-                        firstEntry.querySelector('[name*="description"]').value = exp.description || '';
+            const expList = document.getElementById('experience-list');
+            if (expList) {
+                // Clear any existing entries first
+                expList.innerHTML = '';
+                experienceCount = 0;
+                
+                voiceData.experience.forEach((exp, i) => {
+                    // Prepare data object matching addExperienceField expectations
+                    const expData = {
+                        title: exp.title || '',
+                        company: exp.company || '',
+                        city: exp.city || '',
+                        state: exp.state || '',
+                        dates: exp.dates || '',
+                        phone: exp.phone || '',
+                        address: exp.address || '',
+                        description: exp.description || ''
+                    };
+                    
+                    // Handle bullets array -> description string conversion
+                    if (exp.bullets && Array.isArray(exp.bullets)) {
+                        expData.description = exp.bullets.join('\n');
                     }
-                } else {
-                    addExperienceEntry(exp);
-                }
-            });
+                    
+                    addExperienceField(expData);
+                    console.log(`[Voice→Form] Added experience entry #${i + 1}:`, expData.title || '(no title)');
+                });
+            }
             console.log('[Voice→Form] Set experience entries:', voiceData.experience.length);
         }
         
         // Set education entries
         if (voiceData.education && Array.isArray(voiceData.education)) {
-            voiceData.education.forEach((edu, i) => {
-                if (i === 0) {
-                    const firstEntry = document.querySelector('.education-entry');
-                    if (firstEntry) {
-                        firstEntry.querySelector('[name*="school"]').value = edu.school || '';
-                        firstEntry.querySelector('[name*="degree"]').value = edu.degree || '';
-                        firstEntry.querySelector('[name*="field"]').value = edu.field || '';
-                        firstEntry.querySelector('[name*="dates"]').value = edu.dates || '';
-                    }
-                } else {
-                    addEducationEntry(edu);
-                }
-            });
+            const eduList = document.getElementById('education-list');
+            if (eduList) {
+                // Clear any existing entries first
+                eduList.innerHTML = '';
+                educationCount = 0;
+                
+                voiceData.education.forEach((edu, i) => {
+                    // Prepare data object matching addEducationField expectations
+                    const eduData = {
+                        school: edu.school || '',
+                        degree: edu.degree || '',
+                        field: edu.field || '',
+                        dates: edu.dates || ''
+                    };
+                    
+                    addEducationField(eduData);
+                    console.log(`[Voice→Form] Added education entry #${i + 1}:`, eduData.school || '(no school)');
+                });
+            }
             console.log('[Voice→Form] Set education entries:', voiceData.education.length);
+        }
+        
+        // Set optional sections
+        // Projects
+        if (voiceData.projects && Array.isArray(voiceData.projects)) {
+            const projList = document.getElementById('projects-list');
+            if (projList) {
+                projList.innerHTML = '';
+                projectCount = 0;
+                voiceData.projects.forEach((proj, i) => {
+                    addProjectField({
+                        name: proj.name || '',
+                        tech: proj.tech || '',
+                        description: proj.description || '',
+                        result: proj.result || ''
+                    });
+                });
+                console.log('[Voice→Form] Set project entries:', voiceData.projects.length);
+            }
+        }
+        
+        // Competencies
+        if (voiceData.competencies && Array.isArray(voiceData.competencies)) {
+            const compList = document.getElementById('competencies-list');
+            if (compList) {
+                compList.innerHTML = '';
+                competencyCount = 0;
+                voiceData.competencies.forEach((comp, i) => {
+                    addCompetencyField({
+                        label: comp.label || '',
+                        description: comp.description || ''
+                    });
+                });
+                console.log('[Voice→Form] Set competency entries:', voiceData.competencies.length);
+            }
+        }
+        
+        // Community Involvement
+        if (voiceData.community && Array.isArray(voiceData.community)) {
+            const commList = document.getElementById('community-list');
+            if (commList) {
+                commList.innerHTML = '';
+                communityCount = 0;
+                voiceData.community.forEach((comm, i) => {
+                    addCommunityField({
+                        event: comm.event || comm.org || '',
+                        organization: comm.organization || comm.description || ''
+                    });
+                });
+                console.log('[Voice→Form] Set community entries:', voiceData.community.length);
+            }
+        }
+        
+        // Certifications
+        if (voiceData.certifications && Array.isArray(voiceData.certifications)) {
+            const certList = document.getElementById('certifications-list');
+            if (certList) {
+                certList.innerHTML = '';
+                certificationCount = 0;
+                voiceData.certifications.forEach((cert, i) => {
+                    addCertificationField({
+                        name: cert.name || '',
+                        org: cert.issuer || cert.org || '',
+                        date: cert.date || ''
+                    });
+                });
+                console.log('[Voice→Form] Set certification entries:', voiceData.certifications.length);
+            }
+        }
+        
+        // Handle address parsing if present (voice asks for "street, city, state zip")
+        if (voiceData.address && typeof voiceData.address === 'string') {
+            const addressStr = voiceData.address;
+            // Try to parse "street, city, state zip" format
+            const parts = addressStr.split(',').map(p => p.trim());
+            if (parts.length >= 3) {
+                // Last part should be "state zip"
+                const stateZip = parts[parts.length - 1].trim();
+                const stateZipMatch = stateZip.match(/^([A-Za-z\s]+)\s*(\d{5}(-\d{4})?)?$/);
+                if (stateZipMatch) {
+                    const stateName = stateZipMatch[1].trim();
+                    // Find matching state option
+                    const stateSelect = form.querySelector('select[name="state"]');
+                    if (stateSelect) {
+                        // Try to find by text content or value
+                        const stateOption = Array.from(stateSelect.options).find(opt => 
+                            opt.text.toLowerCase().includes(stateName.toLowerCase()) || 
+                            opt.value.toLowerCase() === stateName.toLowerCase()
+                        );
+                        if (stateOption) {
+                            stateSelect.value = stateOption.value;
+                            // Trigger city input enable
+                            const cityInput = document.getElementById('city');
+                            if (cityInput) {
+                                cityInput.disabled = false;
+                                cityInput.placeholder = 'Type to search cities...';
+                            }
+                        }
+                    }
+                    // City is second-to-last part
+                    const cityInput = form.querySelector('input[name="city"]');
+                    if (cityInput) {
+                        cityInput.value = parts[parts.length - 2];
+                    }
+                }
+            }
+            // If we couldn't parse properly, just put the whole thing in city as fallback
+            if (!form.querySelector('input[name="city"]').value) {
+                form.querySelector('input[name="city"]').value = addressStr;
+            }
         }
         
         // Save to localStorage so user doesn't lose it

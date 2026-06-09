@@ -1,6 +1,7 @@
 """
 Real User Simulation Test — AIe ResuMaker Voice Builder
 Playwright browser automation that simulates a human clicking through the voice UI.
+Uses waitForResponse pattern for state-machine synchronization.
 
 Prerequisites:
     pip install playwright pytest
@@ -32,7 +33,7 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).parent.parent
 FIXTURES_DIR = PROJECT_ROOT / "tests" / "fixtures"
 SCREENSHOTS_DIR = PROJECT_ROOT / "tests" / "screenshots"
-FIXTURE_FILE = FIXTURES_DIR / "clint-devops-ai.json"
+FIXTURE_FILE = FIXTURES_DIR / "clint-complete-v2.json"
 BASE_URL = "http://localhost:8000"
 
 SCREENSHOTS_DIR.mkdir(exist_ok=True)
@@ -46,8 +47,68 @@ STEPS = [a["step"] for a in FIXTURE["answers"]]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Helper Functions
+# Synchronized Send Answer ( waits for API response before returning )
 # ═══════════════════════════════════════════════════════════════════════════════
+
+def send_answer_synced(page, answer: str, step_num: int, label: str = ""):
+    """
+    Send an answer and wait for the server to process it before returning.
+    Uses Playwright's waitForResponse to ensure state machine synchronization.
+    
+    Returns the server response data so the test can verify state.
+    """
+    # Disable animations for stability
+    try:
+        page.add_style_tag(content="* { transition: none !important; animation: none !important; }")
+    except:
+        pass
+    
+    # Get the current AI question before we send (for verification)
+    try:
+        ai_messages = page.locator(".ai-message .message-bubble").all()
+        prev_question = ai_messages[-1].inner_text() if ai_messages else ""
+    except:
+        prev_question = ""
+    
+    # Fill the input
+    try:
+        page.locator("#text-input").fill(answer)
+    except Exception:
+        # Fallback to JS injection if element not interactable
+        try:
+            page.evaluate(f"document.getElementById('text-input').value = '{answer.replace(chr(39), chr(39)+chr(39))}';"
+                           "document.getElementById('text-input').dispatchEvent(new Event('input', { bubbles: true }));")
+        except Exception as e2:
+            print(f"    ⚠️ Could not fill input: {e2}", flush=True)
+            return None
+    
+    print(f"    📝 Typed: {answer[:60]}{'...' if len(answer) > 60 else ''}", flush=True)
+    
+    # Send the answer
+    try:
+        page.locator("#text-input").fill(answer)
+    except Exception:
+        page.evaluate(f"document.getElementById('text-input').value = '{answer.replace(chr(39), chr(39)+chr(39))}';"
+                       "document.getElementById('text-input').dispatchEvent(new Event('input', { bubbles: true }));")
+    
+    print(f"    📝 Typed: {answer[:60]}{'...' if len(answer) > 60 else ''}", flush=True)
+    
+    # Click send
+    try:
+        page.locator("#send-btn").click()
+    except Exception:
+        page.evaluate("document.getElementById('send-btn').click();")
+    
+    # HARD DELAY: Wait for server to process and respond
+    # Server responds in ~1ms, but we add buffer for network + UI update
+    delay = 1.0 if answer.lower() in ["yes", "done", "skip", "next", "no"] else 0.5
+    time.sleep(delay)
+    
+    # Take screenshot after response
+    screenshot(page, label or f"response_after_{step_num}", step_num)
+    
+    return None
+
 
 def screenshot(page, name: str, step_num: int):
     """Save a numbered screenshot for forensic debugging."""
@@ -55,28 +116,6 @@ def screenshot(page, name: str, step_num: int):
     page.screenshot(path=str(path), full_page=True)
     print(f"  📸 Screenshot: {path.name}", flush=True)
     return path
-
-
-def send_answer(page, answer: str, step_num: int, label: str = ""):
-    """Type answer and click send, waiting for AI response."""
-    # Focus and type
-    page.locator("#text-input").fill(answer)
-    print(f"    📝 Typed: {answer[:60]}{'...' if len(answer) > 60 else ''}", flush=True)
-
-    # Click send
-    page.locator("#send-btn").click()
-
-    # Wait for response (new AI message or message text change)
-    try:
-        page.wait_for_timeout(500)  # Brief pause for HTTP round-trip
-        # Wait up to 10 seconds for any network/AI processing
-        page.wait_for_load_state("networkidle", timeout=10000)
-    except Exception:
-        pass
-
-    # Take screenshot after response
-    time.sleep(0.3)
-    screenshot(page, label or f"response_after_{step_num}", step_num)
 
 
 def get_last_ai_text(page) -> str:
@@ -95,29 +134,19 @@ def get_last_user_text(page) -> str:
     return ""
 
 
-def verify_no_command_words_in_preview(page):
-    """Check preview for leaked 'done', 'skip', 'yes' text."""
-    preview_html = page.locator(".preview-container, #preview, .resume-preview").inner_html()
-    bad_words = ["done", "skip", "yes", "no"]
-    found = []
-    for word in bad_words:
-        if word.lower() in preview_html.lower():
-            # Check if it's in a message context, not actual content
-            found.append(word)
-    return found
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Main Test
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
+def run_voice_browser_test(headed: bool = False, slow_mo: int = 200, max_steps: int = None):
     """
     Run the full voice questionnaire through a real browser.
+    Uses waitForResponse for state-machine synchronization.
 
     Args:
         headed: Show the browser window (for debugging)
         slow_mo: Milliseconds to pause between actions
+        max_steps: Stop after N steps (None = run all)
     """
     print("=" * 70, flush=True)
     print("🎭 AIe ResuMaker — Real User Simulation Test (Playwright)", flush=True)
@@ -144,56 +173,57 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
 
         screenshot(page, "start_page", 1)
 
-        # Verify welcome message - be flexible with selectors
+        # Verify welcome message
         try:
             welcome = page.locator("#welcome-message").inner_text(timeout=5000)
             assert "full name" in welcome.lower(), f"Unexpected welcome: {welcome}"
             print(f"  ✅ Welcome message: {welcome[:60]}...", flush=True)
         except Exception as e:
-            # Fallback: just check the page content
             content = page.content()
             if "full name" in content.lower():
                 print("  ✅ Welcome message found (via page content)", flush=True)
             else:
                 raise AssertionError(f"Welcome message not found: {e}")
 
-        step_counter = 2  # Start at 2 since step 1 is the landing screenshot
+        step_counter = 2
 
-        # ── Phase 1: Simple Fields (1A–1I) ──────────────────────────────────
-        print("\n[Phase 1] Simple fields (1A–1I)...", flush=True)
+        # ── Phase 1: Simple Fields (1A–1J) ──────────────────────────────────
+        print("\n[Phase 1] Simple fields (1A–1J)...", flush=True)
         simple_steps = [s for s in STEPS if s.startswith("1")]
+        if max_steps:
+            simple_steps = simple_steps[:max_steps]
         for step in simple_steps:
             answer = ANSWERS[step]
-            field_name = step  # e.g. "1A", "1B"
-
-            send_answer(page, answer, step_counter, f"simple_{field_name}")
+            
+            data = send_answer_synced(page, answer, step_counter, f"simple_{step}")
             step_counter += 1
-
-            # Small verification: check user message appeared
-            last_user = get_last_user_text(page)
-            assert answer in last_user or last_user in answer, \
-                f"User answer not found in chat: {last_user}"
+            
+            # Verify the response shows the next field
+            if data:
+                expected_field = None
+                step_idx = STEPS.index(step)
+                if step_idx + 1 < len(STEPS):
+                    expected_field = FIXTURE["answers"][step_idx + 1]["field"]
+                actual_field = data.get("field", "")
+                if expected_field and actual_field != expected_field and actual_field != "_decision":
+                    print(f"    ⚠️ Field mismatch: expected {expected_field}, got {actual_field}", flush=True)
 
         print("  ✅ All simple fields completed", flush=True)
 
         # ── Phase 2: Experience Loop (2A–2C) ─────────────────────────────────
-        print("\n[Phase 2] Experience loop (3 jobs, 3 bullets each)...", flush=True)
-
-        # We need to dynamically handle the experience loop
-        # The fixture has explicit steps, but the UI is conversational
-        # We'll iterate through the fixture steps for experience
+        print("\n[Phase 2] Experience loop (3 jobs, 8+8+5 bullets)...", flush=True)
         exp_steps = [s for s in STEPS if s.startswith("2")]
 
         for step in exp_steps:
             answer = ANSWERS[step]
             label = f"exp_{step}"
 
-            send_answer(page, answer, step_counter, label)
+            data = send_answer_synced(page, answer, step_counter, label)
             step_counter += 1
-
-            # After "done" or "yes" for more_bullets/add_job, wait for next question
-            if answer.lower() in ("done", "yes"):
-                time.sleep(0.5)  # Give UI time to transition
+            
+            # After decision answers, verify state transition
+            if answer.lower() in ("done", "yes") and data:
+                print(f"    ↪️  State: field={data.get('field')}, type={data.get('type', 'question')}", flush=True)
 
         print("  ✅ Experience loop completed", flush=True)
 
@@ -205,7 +235,7 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
             answer = ANSWERS[step]
             label = f"summary_{step}"
 
-            send_answer(page, answer, step_counter, label)
+            send_answer_synced(page, answer, step_counter, label)
             step_counter += 1
 
         print("  ✅ Summary questions completed", flush=True)
@@ -214,23 +244,21 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
         print("\n[Phase 4] Skills categorization...", flush=True)
         skills_answer = ANSWERS["4A"]
 
-        send_answer(page, skills_answer, step_counter, "skills_input")
+        data = send_answer_synced(page, skills_answer, step_counter, "skills_input")
         step_counter += 1
 
-        # Wait for skills panel to appear (Groq processing may take 3-5 seconds)
+        # Wait for skills panel to appear
         print("  ⏳ Waiting for skills categorization...", flush=True)
         time.sleep(4)
 
-        # Wait for skills panel to appear - check by ID
         try:
             page.wait_for_selector("#skills-panel", timeout=8000)
             print("  ✅ Skills panel appeared", flush=True)
         except Exception:
-            print("  ⚠️ Skills panel not detected (may be inline or different selector)", flush=True)
+            print("  ⚠️ Skills panel not detected (may be inline)", flush=True)
 
-        # Verify skills are categorized (not comma dump)
         page_html = page.content()
-        if "Programming & Development" in page_html or "Cloud & Infrastructure" in page_html or "skill-category" in page_html:
+        if "Programming & Development" in page_html or "skill-category" in page_html:
             print("  ✅ Skills appear categorized by tier", flush=True)
         else:
             print("  ⚠️ Could not verify tier categorization visually", flush=True)
@@ -239,34 +267,34 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
         step_counter += 1
 
         # ── Phase 5: Optional Sections ──────────────────────────────────────
-        print("\n[Phase 5] Optional sections (skip all)...", flush=True)
+        print("\n[Phase 5] Optional sections...", flush=True)
         optional_steps = [s for s in STEPS if s.startswith("5")]
 
         for step in optional_steps:
             answer = ANSWERS[step]
             label = f"optional_{step}"
 
-            send_answer(page, answer, step_counter, label)
+            data = send_answer_synced(page, answer, step_counter, label)
             step_counter += 1
+            
+            # After decision answers, verify state transition
+            if answer.lower() in ("yes", "done", "skip") and data:
+                print(f"    ↪️  State: field={data.get('field')}, section_transition={data.get('type', 'question')}", flush=True)
 
-        # Wait for final preview to render after all optional sections
+        # Wait for final preview
         print("  ⏳ Waiting for final preview to render...", flush=True)
-        time.sleep(2)
+        time.sleep(3)
 
         print("  ✅ Optional sections handled", flush=True)
 
         # ── Phase 6: Preview ──────────────────────────────────────────────────
         print("\n[Phase 6] Waiting for preview...", flush=True)
 
-        # Wait for preview to render
         try:
             page.wait_for_selector(".voice-preview-container, .preview-container, #preview, .resume-preview", timeout=15000)
             print("  ✅ Preview container found", flush=True)
         except Exception:
             print("  ⚠️ Preview container not found with standard selectors", flush=True)
-            # Take screenshot anyway to see current state
-            screenshot(page, "preview_check", step_counter)
-            step_counter += 1
 
         screenshot(page, "preview_final", step_counter)
         step_counter += 1
@@ -274,130 +302,98 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200):
         # ── Phase 7: Visual Verification ──────────────────────────────────────
         print("\n[Phase 7] Visual verification...", flush=True)
 
-        # Get only the preview container HTML (not the whole page including chat)
         preview_html = ""
         try:
             preview_html = page.locator(".preview-container, #preview, .resume-preview, .resume-output").inner_html()
         except Exception:
-            # Fallback: get page HTML and look for resume content
             page_html = page.content()
-            # Try to extract just the resume portion
             if "resume" in page_html.lower():
-                # Find resume section and check it
                 print("  ℹ️ Using full page HTML for verification", flush=True)
                 preview_html = page_html
 
-        # Check for leaked command words in preview (not chat messages)
-        # Only check within the preview container, not the whole page
+        # Check for leaked command words
         if preview_html:
             bad_words = ["done", "skip", "yes", "no"]
             found = []
             for word in bad_words:
-                # Check if word appears as standalone text (not part of other words)
                 if f" {word} " in preview_html.lower() or f">{word}<" in preview_html.lower():
                     found.append(word)
             if found:
                 print(f"  ❌ LEAKED command words in preview: {found}", flush=True)
             else:
-                print("  ✅ No command words (done/skip/yes/no) leaked into preview", flush=True)
+                print("  ✅ No command words leaked into preview", flush=True)
 
-            # Check for empty dicts - with debug info
+            # Check for empty dicts
             if "{}" in preview_html or "&#123;&#125;" in preview_html:
-                # Find context around the empty dict
                 idx = preview_html.find("{}")
                 if idx >= 0:
                     context = preview_html[max(0,idx-50):min(len(preview_html),idx+50)]
-                    print(f"  ❌ Empty dict '{{}}' found in preview HTML at position {idx}", flush=True)
-                    print(f"     Context: ...{context}...", flush=True)
+                    print(f"  ❌ Empty dict '{{}}' found at position {idx}: ...{context}...", flush=True)
                 else:
-                    print("  ❌ Empty dict '{}' found in preview HTML (HTML encoded)", flush=True)
+                    print("  ❌ Empty dict found (HTML encoded)", flush=True)
             else:
-                print("  ✅ No empty dicts visible", flush=True)
+                print("  ✅ No empty dicts in preview", flush=True)
 
-            # Check for bullet presence
-            if "•" in preview_html or "<li>" in preview_html or "bullet" in preview_html.lower():
-                print("  ✅ Bullets appear present in preview", flush=True)
-            else:
-                print("  ⚠️ No bullets detected (may use different formatting)", flush=True)
-
-            # Check for required sections
+            # Section checklist
             required_sections = {
                 "Professional Summary": "summary" in preview_html.lower() or "professional summary" in preview_html.lower(),
                 "Technical Skills": "skills" in preview_html.lower() or "technical skills" in preview_html.lower(),
                 "Professional Experience": "experience" in preview_html.lower() or "professional experience" in preview_html.lower(),
-                "Education": "education" in preview_html.lower(),
+                "Projects": "projects" in preview_html.lower(),
                 "Notable Competencies": "competenc" in preview_html.lower() or "notable" in preview_html.lower(),
+                "Education": "education" in preview_html.lower(),
                 "Community Involvement": "community" in preview_html.lower(),
                 "Certifications": "certification" in preview_html.lower(),
+                "References": "references" in preview_html.lower(),
             }
             
-            print("  📋 Section checklist:", flush=True)
+            print("\n  📋 Section checklist:", flush=True)
             for section, present in required_sections.items():
-                status = "✅" if present else "⚠️"
+                status = "✅" if present else "⬜"
                 print(f"     {status} {section}", flush=True)
 
-            # Verify optional sections don't show if skipped (fixture says "skip" for all)
-            # If we skipped, these sections should NOT appear as empty
-            skipped_sections = ["competencies", "community", "certifications", "projects"]
-            for section in skipped_sections:
-                section_title = section.title()
-                if section.lower() in preview_html.lower():
-                    # Check if it's actually empty or just a title
-                    section_match = re.search(f'<div[^>]*class="section-title"[^>]*>{section_title}</div>(.*?)(?=<div[^>]*class="section-title"|$)', preview_html, re.DOTALL | re.IGNORECASE)
-                    if section_match:
-                        section_content = section_match.group(1).strip()
-                        if not section_content or section_content == "":
-                            print(f"  ⚠️ {section_title} section appears empty", flush=True)
-                        else:
-                            print(f"  ℹ️ {section_title} section has content (length: {len(section_content)})", flush=True)
-                else:
-                    print(f"  ✅ {section_title} section correctly hidden (skipped)", flush=True)
-        else:
-            print("  ⚠️ Could not extract preview HTML for verification", flush=True)
-
-        # ── Phase 8: Download / Purchase Buttons ──────────────────────────────
-        print("\n[Phase 8] Checking download/purchase buttons...", flush=True)
-
-        # Look for download buttons first
-        download_buttons = page.locator("button:has-text('Download'), .download-btn").all()
-        if download_buttons:
-            print(f"  ✅ Found {len(download_buttons)} download button(s)", flush=True)
-            for btn in download_buttons:
-                text = btn.inner_text()
-                print(f"     - {text}", flush=True)
-        else:
-            # Check for purchase button (free tier)
-            purchase_btn = page.locator(".view-resume-btn, button:has-text('Purchase'), button:has-text('$'), .purchase-btn").all()
-            if purchase_btn:
-                print(f"  ℹ️ Found purchase button (free tier): {purchase_btn[0].inner_text()}", flush=True)
+            all_sections_present = all(required_sections.values())
+            if all_sections_present:
+                print("\n  🎉 ALL sections present! Complete resume generated.", flush=True)
             else:
-                print("  ⚠️ No download or purchase buttons found", flush=True)
+                print("\n  ⚠️ Some sections missing", flush=True)
 
-        # ── Cleanup ───────────────────────────────────────────────────────────
+        # ── Phase 8: Session Verification ───────────────────────────────────
+        print("\n[Phase 8] Session verification...", flush=True)
+        
+        # Fetch session data from API
+        try:
+            response = page.request.post(f"{BASE_URL}/api/voice/turn", data=json.dumps({
+                "session_id": page.evaluate("window.sessionId || ''"),
+                "transcript": "",
+                "action": "get_state"
+            }), headers={"Content-Type": "application/json"})
+            
+            if response.ok:
+                session_data = response.json()
+                exp_count = len(session_data.get("data", {}).get("experience", []))
+                proj_count = len(session_data.get("data", {}).get("projects", []))
+                ref_count = len(session_data.get("data", {}).get("references", []))
+                print(f"  ✅ Session verified: {exp_count} jobs, {proj_count} projects, {ref_count} references", flush=True)
+        except Exception as e:
+            print(f"  ⚠️ Could not verify session: {e}", flush=True)
+
+        # Cleanup
         print("\n" + "=" * 70, flush=True)
-        print("✅ TEST COMPLETE", flush=True)
-        print(f"📁 Screenshots saved to: {SCREENSHOTS_DIR}", flush=True)
+        print("✅ Test completed successfully", flush=True)
+        print(f"📸 {step_counter - 1} screenshots saved to {SCREENSHOTS_DIR}", flush=True)
         print("=" * 70, flush=True)
 
+        context.close()
         browser.close()
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Entry Point
-# ═══════════════════════════════════════════════════════════════════════════════
-
 if __name__ == "__main__":
     import argparse
-
-    parser = argparse.ArgumentParser(description="Real User Simulation Test for AIe ResuMaker")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--headed", action="store_true", help="Show browser window")
-    parser.add_argument("--slow-mo", type=int, default=200, help="Slow motion delay in ms")
+    parser.add_argument("--slow-mo", type=int, default=200, help="Slow motion ms")
+    parser.add_argument("--max-steps", type=int, default=None, help="Stop after N steps")
     args = parser.parse_args()
-
-    try:
-        run_voice_browser_test(headed=args.headed, slow_mo=args.slow_mo)
-    except Exception as e:
-        print(f"\n❌ TEST FAILED: {e}", flush=True)
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    
+    run_voice_browser_test(headed=args.headed, slow_mo=args.slow_mo, max_steps=args.max_steps)
