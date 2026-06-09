@@ -220,6 +220,7 @@
             }
 
             sessionId = data.session_id;
+            window.sessionId = sessionId;  // Expose for tests/automation
             currentStepIndex = data.step_index || 0;
             
             const welcome = document.getElementById('welcome-message');
@@ -475,6 +476,7 @@
             hideTyping();
 
             sessionId = data.session_id;
+            window.sessionId = sessionId;  // Expose for tests/automation
             currentStepIndex = data.step_index || 0;
             
             const welcome = document.getElementById('welcome-message');
