@@ -54,27 +54,17 @@ html, body {
     font-size: 20px;
 }
 
-.mode-toggle {
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.3);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 13px;
-    cursor: pointer;
-}
-
 /* Progress Bar */
 .progress-bar {
     height: 4px;
-    background: #e0e0e0;
+    background: #1e3a8a;
     position: relative;
     flex-shrink: 0;
 }
 
 .progress-fill {
     height: 100%;
-    background: #4CAF50;
+    background: #2563eb;
     transition: width 0.3s ease;
 }
 
@@ -90,11 +80,11 @@ html, body {
 .context-label {
     text-align: center;
     padding: 6px 16px;
-    background: #e8f0fe;
-    color: #2c5aa0;
+    background: #1e3a8a;
+    color: #2563eb;
     font-size: 13px;
     font-weight: 600;
-    border-bottom: 1px solid #d0e0f5;
+    border-bottom: 1px solid #1e40af;
     flex-shrink: 0;
 }
 
@@ -121,31 +111,32 @@ html, body {
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     border: 1px solid;
 }
 
 .back-btn-action {
-    background: white;
-    border-color: #ccc;
-    color: #666;
+    background: #2563eb;
+    border-color: #1d4ed8;
+    color: white;
 }
 
 .back-btn-action:hover {
-    background: #f5f5f5;
-    border-color: #999;
+    background: #1d4ed8;
+    border-color: #1e40af;
 }
 
 .add-btn {
-    background: #e8f5e9;
-    border-color: #4CAF50;
-    color: #2e7d32;
+    background: #2563eb;
+    border-color: #1d4ed8;
+    color: white;
 }
 
 .add-btn:hover {
-    background: #c8e6c9;
+    background: #1d4ed8;
+    border-color: #1e40af;
 }
 
 /* Chat Messages */
@@ -251,6 +242,15 @@ html, body {
     justify-content: center;
     flex-shrink: 0;
     transition: transform 0.1s;
+    padding: 0;
+    overflow: hidden;
+}
+
+.mic-btn .mic-icon-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .mic-btn:active {
@@ -260,6 +260,10 @@ html, body {
 .mic-btn.recording {
     background: #f44336;
     animation: pulse 1.5s infinite;
+}
+
+.mic-btn.recording .mic-icon-img {
+    filter: brightness(0.9);
 }
 
 @keyframes pulse {
@@ -307,7 +311,7 @@ html, body {
     height: 44px;
     border-radius: 50%;
     border: none;
-    background: #4CAF50;
+    background: #2563eb;
     color: white;
     font-size: 18px;
     cursor: pointer;
@@ -318,7 +322,7 @@ html, body {
 }
 
 .send-btn:disabled {
-    background: #ccc;
+    background: #1e3a8a;
     cursor: not-allowed;
 }
 
@@ -372,7 +376,7 @@ html, body {
 }
 
 .clear-btn:hover {
-    color: #f44336;
+    color: #2e7d32;
 }
 
 .clear-btn.hidden {
@@ -412,17 +416,17 @@ html, body {
     display: block;
     margin-top: 8px;
     padding: 6px 12px;
-    background: rgba(44, 90, 160, 0.1);
-    border: 1px solid rgba(44, 90, 160, 0.3);
+    background: #2563eb;
+    border: 1px solid #1d4ed8;
     border-radius: 12px;
-    color: #2c5aa0;
+    color: white;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
 }
 
 .add-more-btn:hover {
-    background: rgba(44, 90, 160, 0.2);
+    background: #1d4ed8;
 }
 
 /* Desktop adjustments */
@@ -442,8 +446,8 @@ html, body {
     bottom: 140px;
     left: 0;
     right: 0;
-    background: #f8fafc;
-    border-top: 2px solid #2c5aa0;
+    background: #1e3a8a;
+    border-top: 2px solid #1e40af;
     border-radius: 12px 12px 0 0;
     box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
     z-index: 100;
@@ -461,10 +465,11 @@ html, body {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    background: #2c5aa0;
+    background: #2563eb;
     color: white;
     cursor: pointer;
     user-select: none;
+    border-bottom: 1px solid #1e40af;
 }
 
 .skills-panel-title {
@@ -481,6 +486,7 @@ html, body {
     overflow-y: auto;
     max-height: calc(50vh - 50px);
     padding: 12px 16px;
+    background: #1e3a8a;
 }
 
 .skills-panel-body::-webkit-scrollbar {
@@ -531,7 +537,7 @@ html, body {
 }
 
 .save-feedback.error {
-    background: #dc2626;
+    background: #c62828;
 }
 
 @keyframes fadeInOut {
@@ -583,8 +589,8 @@ html, body {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: #dbeafe;
-    color: #1e40af;
+    background: #2563eb;
+    color: white;
     padding: 4px 10px;
     border-radius: 16px;
     font-size: 13px;
@@ -592,7 +598,7 @@ html, body {
 }
 
 .skill-tag button {
-    background: #1e40af;
+    background: #1e3a8a;
     color: white;
     border: none;
     border-radius: 50%;
@@ -607,7 +613,7 @@ html, body {
 }
 
 .skill-tag button:hover {
-    background: #dc2626;
+    background: #1e40af;
 }
 
 .skill-add-section {
@@ -615,27 +621,30 @@ html, body {
     gap: 6px;
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #1e40af;
 }
 
 .skill-add-section input {
     flex: 1;
     padding: 8px 12px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #1e40af;
     border-radius: 8px;
     font-size: 14px;
+    background: #1e3a8a;
+    color: white;
 }
 
 .skill-add-section select {
     padding: 8px;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #1e40af;
     border-radius: 8px;
     font-size: 14px;
-    background: white;
+    background: #1e3a8a;
+    color: white;
 }
 
 .skill-add-section button {
-    background: #16a34a;
+    background: #2563eb;
     color: white;
     border: none;
     border-radius: 8px;
@@ -646,16 +655,16 @@ html, body {
 }
 
 .skill-add-section button:hover {
-    background: #15803d;
+    background: #1d4ed8;
 }
 
 .skills-done-btn {
     width: 100%;
     margin-top: 12px;
     padding: 12px;
-    background: #2c5aa0;
+    background: #2563eb;
     color: white;
-    border: none;
+    border: 1px solid #1d4ed8;
     border-radius: 8px;
     font-size: 15px;
     font-weight: 600;
@@ -663,14 +672,14 @@ html, body {
 }
 
 .skills-done-btn:hover {
-    background: #1e3a8a;
+    background: #1d4ed8;
 }
 
 /* Done Jobs Button */
 #done-jobs-btn {
-    background: #16a34a;
+    background: #2563eb;
     color: white;
-    border: none;
+    border: 1px solid #1d4ed8;
     border-radius: 8px;
     padding: 8px 14px;
     font-size: 14px;
@@ -680,14 +689,14 @@ html, body {
 }
 
 #done-jobs-btn:hover {
-    background: #15803d;
+    background: #1d4ed8;
 }
 
 /* Save Button */
 #save-btn {
-    background: #7c3aed;
+    background: #2563eb;
     color: white;
-    border: none;
+    border: 1px solid #1d4ed8;
     border-radius: 8px;
     padding: 8px 14px;
     font-size: 14px;
@@ -697,7 +706,7 @@ html, body {
 }
 
 #save-btn:hover {
-    background: #6d28d9;
+    background: #1d4ed8;
 }
 
 /* Mobile Preview Container */

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIe ResuMaker — Voice Build</title>
-    <link rel="stylesheet" href="/static/voice_chat.css?v=18">
+    <link rel="stylesheet" href="/static/voice_chat.css?v=24">
 </head>
 <body>
     <div class="voice-chat-container">
@@ -12,10 +12,9 @@
         <header class="chat-header">
             <a href="/" class="back-btn">←</a>
             <div class="chat-title">
-                <span class="logo">🎓</span>
+                <img src="/static/images/aei-logo.jpg" alt="AIe" class="logo-img" style="height: 28px; width: 28px; border-radius: 6px; object-fit: cover;">
                 <span>AIe ResuMaker</span>
             </div>
-            <button class="mode-toggle" id="mode-toggle" title="Switch to form mode">✏️ Type</button>
         </header>
 
         <!-- Progress Bar -->
@@ -40,13 +39,13 @@
             <button class="nav-btn back-btn-action" id="back-btn" title="Go back and fix previous answer">← Back</button>
             <button class="nav-btn add-btn" id="add-btn" title="Add another entry">+ Add Another</button>
             <button class="nav-btn done-jobs-btn" id="done-jobs-btn" title="Done adding jobs">✅ Done with Jobs</button>
-            <button class="nav-btn save-btn" id="save-btn" title="Save progress">💾 Save</button>
+            <button class="nav-btn save-btn" id="save-btn" title="Save progress">Save</button>
         </div>
 
         <!-- Input Area -->
         <div class="chat-input-area">
             <button class="mic-btn" id="mic-btn" title="Tap to speak">
-                <span class="mic-icon">🎤</span>
+                <img src="/static/images/mic-icon.png" alt="Mic" class="mic-icon-img">
             </button>
             <div class="input-wrapper">
                 <div class="helper-text hidden" id="helper-text"></div>
@@ -69,6 +68,6 @@
         </div>
     </div>
 
-    <script src="/static/voice_chat.js?v=18"></script>
+    <script src="/static/voice_chat.js?v=24"></script>
 </body>
 </html>

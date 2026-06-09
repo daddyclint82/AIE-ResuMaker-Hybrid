@@ -22,7 +22,12 @@ else:
 
 router = APIRouter(prefix="/api/voice")
 
+import asyncio
+
 voice_sessions: Dict[str, Any] = {}
+
+# Per-session async locks to enforce strict sequential processing
+session_locks: Dict[str, asyncio.Lock] = {}
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
@@ -62,7 +67,8 @@ SIMPLE_STEPS = [
     {"field": "full_name", "question": "Hey! I'm AIe ResuMaker. Let's build your resume together. First — what's your full name?"},
     {"field": "email", "question": "What's your email address?"},
     {"field": "phone", "question": "What's your phone number?"},
-    {"field": "city", "question": "What city do you live in?"},
+    {"field": "address", "question": "What's your full address? Say 'street, city, state zip' — like '227 Crestwood, Nacogdoches, TX 75961'."},
+    {"field": "city", "question": "What city?"},
     {"field": "state", "question": "What state?"},
     {"field": "industry", "question": "What industry are you targeting?"},
     {"field": "job_title", "question": "What's your target job title?"},
@@ -122,15 +128,19 @@ EXPERIENCE_FIELDS = [
     {"field": "company", "question": "What company did you work at?"},
     {"field": "title", "question": "What was your title there?"},
     {"field": "dates", "question": "When did you work there? Say '2020 to 2022'"},
+    {"field": "location", "question": "Where was this job? City, state, or remote."},
 ]
 
 PROJECT_FIELDS = [
     {"field": "name", "question": "Project name? (e.g., 'AI Resume Builder')"},
+    {"field": "tech", "question": "Tech stack? Say 'Python, FastAPI, Stripe | 2025'"},
     {"field": "description", "question": "What did you build or accomplish?"},
+    {"field": "result", "question": "What was the outcome or result?"},
 ]
 
 COMPETENCY_FIELDS = [
-    {"field": "name", "question": "Notable competency or strength? (e.g., 'Operational Leadership')"},
+    {"field": "label", "question": "Competency name? (e.g., 'Operational Leadership')"},
+    {"field": "description", "question": "Describe this competency briefly."},
 ]
 
 SUMMARY_QUESTIONS = [
@@ -195,6 +205,13 @@ def get_current_state(session: dict) -> dict:
     data = session.get("data", {})
     
     phase = ctx.get("phase", "simple")
+    
+    # DIAGNOSTIC: Print full state when in optional/community phase
+    if phase == "optional":
+        section = ctx.get("opt_section", "unknown")
+        opt_idx = ctx.get("opt_idx", 0)
+        opt_field_idx = ctx.get("opt_field_idx", 0)
+        print(f"[STATE MACHINE FATAL] phase={phase} | section={section} | opt_idx={opt_idx} | opt_field_idx={opt_field_idx}")
     
     # Phase 1: Simple fields
     if phase == "simple":
@@ -324,15 +341,35 @@ def get_current_state(session: dict) -> dict:
     # Phase 5: Optional sections (projects, competencies, community, certs, links)
     if phase == "optional":
         section = ctx.get("opt_section", "projects")
+        print(f"[STATE MACHINE FATAL] optional section={section}, opt_idx={ctx.get('opt_idx', 0)}, opt_field_idx={ctx.get('opt_field_idx', 0)}")
         
         if section == "projects":
             return _handle_optional_section(session, "projects", PROJECT_FIELDS, "Project")
         elif section == "competencies":
             return _handle_optional_section(session, "competencies", COMPETENCY_FIELDS, "Competency")
+        elif section == "education":
+            return _handle_optional_section(session, "education", [
+                {"field": "school", "question": "School name?"},
+                {"field": "location", "question": "City and state?"},
+                {"field": "degree", "question": "Degree earned?"},
+                {"field": "honors", "question": "Honors or awards? Say skip if none."},
+            ], "Education")
         elif section == "community":
-            return _handle_optional_section(session, "community", [{"field": "org", "question": "Community group or organization?"}], "Community")
+            return _handle_optional_section(session, "community", [
+                {"field": "org", "question": "Organization or event?"},
+                {"field": "description", "question": "What was your involvement?"},
+            ], "Community")
         elif section == "certifications":
-            return _handle_optional_section(session, "certifications", [{"field": "name", "question": "Certification name?"}], "Cert")
+            return _handle_optional_section(session, "certifications", [
+                {"field": "name", "question": "Certification name?"},
+                {"field": "issuer", "question": "Issuing organization?"},
+                {"field": "date", "question": "Year earned? Say skip if none."},
+            ], "Cert")
+        elif section == "references":
+            return _handle_optional_section(session, "references", [
+                {"field": "name", "question": "Reference name?"},
+                {"field": "phone", "question": "Phone number?"},
+            ], "Reference")
         elif section == "links":
             link_idx = ctx.get("link_idx", 0)
             if link_idx == 0:
@@ -383,6 +420,8 @@ def _handle_optional_section(session, section_name, fields, label):
         return {"type": "question", **step}
     
     # Done with this item, ask to add another (decision prompt)
+    # CRITICAL: Preserve phase="optional" here — user must explicitly answer "no"
+    # to this decision prompt before _advance_optional_section() can ever be called.
     return {
         "type": "decision",
         "field": f"_add_{section_name}",
@@ -401,6 +440,21 @@ async def process_answer(session: dict, transcript: str) -> dict:
     
     # Handle skip/none for optional things
     lower = extracted.lower()
+    
+    # GLOBAL SAFETY CHECK: If user says "done" in experience phase past field collection,
+    # force bullet loop exit regardless of internal flags
+    if phase == "experience":
+        field_idx = ctx.get("exp_field_idx", 0)
+        if lower in ["done", "no", "stop", "finished"] and field_idx >= len(EXPERIENCE_FIELDS):
+            # Force exit bullet loop and mark job as done
+            ctx["in_bullet_loop"] = False
+            ctx["exp_done"] = True
+            ctx["bullet_count"] = 0
+            ctx["awaiting_more_bullets"] = False
+            session["context"] = ctx
+            _persist_session(session.get("session_id"))
+            print(f"[GLOBAL SAFETY] Forced bullet loop exit for '{lower}'")
+            return get_current_state(session)
     
     # Phase 1: Simple fields
     if phase == "simple":
@@ -464,9 +518,35 @@ def _process_experience(session: dict, extracted: str) -> dict:
     job_idx = ctx.get("exp_idx", 0)
     field_idx = ctx.get("exp_field_idx", 0)
     
+    print(f"DEBUG _process_experience: extracted='{extracted}', field_idx={field_idx}, in_bullet_loop={ctx.get('in_bullet_loop', False)}, exp_done={ctx.get('exp_done', False)}, bullet_count={ctx.get('bullet_count', 0)}")
+    
     # Ensure current job exists
     while len(exp_list) <= job_idx:
         exp_list.append({})
+    
+    # 1. Force absolute sanitation of the incoming control command
+    sanitized_text = str(extracted).strip().lower()
+    
+    # 2. Add explicit debug hooks to isolate the exact evaluation failure
+    print(f"[STATE DB DEBUG] Input: '{sanitized_text}' | field_idx: {field_idx} | in_bullet_loop: {ctx.get('in_bullet_loop', False)} | exp_done: {ctx.get('exp_done', False)}")
+    
+    # 3. Hard stop: if user sends "done" at ANY point in experience phase,
+    # force exit immediately and do NOT let it leak into field or bullet storage.
+    if sanitized_text in ["done", "no", "stop", "finished"]:
+        print(f"[STATE DB DEBUG] MATCHED BREAK LOOP COMMAND. Forcing state mutation and early return.")
+        # If still collecting fields, fast-forward past them
+        if field_idx < len(EXPERIENCE_FIELDS):
+            print(f"[STATE DB DEBUG] Fast-forwarding fields from {field_idx} to {len(EXPERIENCE_FIELDS)}")
+            ctx["exp_field_idx"] = len(EXPERIENCE_FIELDS)
+        ctx["in_bullet_loop"] = False
+        ctx["exp_done"] = True
+        ctx["bullet_count"] = 0
+        ctx["awaiting_more_bullets"] = False
+        session["context"] = ctx
+        # Commit changes to disk/session cache immediately
+        _persist_session(session.get("session_id"))
+        # EARLY RETURN: Stop processing to prevent "done" from leaking into field values!
+        return get_current_state(session)
     
     # Still collecting standard fields
     if field_idx < len(EXPERIENCE_FIELDS):
@@ -475,27 +555,38 @@ def _process_experience(session: dict, extracted: str) -> dict:
         ctx["exp_field_idx"] = field_idx + 1
         ctx["experience"] = exp_list
         session["context"] = ctx
+        print(f"DEBUG: Stored field {field_name}={extracted}, new field_idx={field_idx+1}")
         return get_current_state(session)
     
     # In bullet collection mode
+    print(f"DEBUG: Checking first bullet branch: not in_bullet_loop={not ctx.get('in_bullet_loop', False)}, not exp_done={not ctx.get('exp_done', False)}")
     if not ctx.get("in_bullet_loop", False) and not ctx.get("exp_done", False):
-        # First bullet - collect it and then ask if they want more
+        # First bullet - initialize bullet loop state properly
         ctx["in_bullet_loop"] = True
-        ctx["bullet_count"] = 0  # Will be incremented after first bullet
+        ctx["bullet_count"] = 0
+        ctx["exp_done"] = False  # Ensure exp_done is reset for this job
         if not exp_list[job_idx].get("description"):
             exp_list[job_idx]["description"] = []
+        if not exp_list[job_idx].get("bullets"):
+            exp_list[job_idx]["bullets"] = []
+        # Store the first bullet
         if isinstance(exp_list[job_idx]["description"], list):
             exp_list[job_idx]["description"].append(extracted)
         else:
             exp_list[job_idx]["description"] = [exp_list[job_idx]["description"], extracted]
+        exp_list[job_idx]["bullets"].append(extracted)
+        ctx["bullet_count"] = 1
         ctx["experience"] = exp_list
         session["context"] = ctx
+        print(f"DEBUG: First bullet stored, bullet_count=1")
         return get_current_state(session)
     
     bullet_count = ctx.get("bullet_count", 0)
     
     # Handle "Add another job?" decision
+    print(f"DEBUG: Checking exp_done branch: exp_done={ctx.get('exp_done', False)}")
     if ctx.get("exp_done", False):
+        print(f"DEBUG: In exp_done branch, lower='{lower}'")
         if lower in ["yes", "y", "add", "more"]:
             # Start new job
             ctx["exp_done"] = False
@@ -512,10 +603,16 @@ def _process_experience(session: dict, extracted: str) -> dict:
             session["data"] = data
             ctx["phase"] = "summary"
             ctx["summary_idx"] = 0
+            # CRITICAL FIX: Clear all experience flags to prevent state leakage into summary
+            ctx["exp_done"] = False
+            ctx["in_bullet_loop"] = False
+            ctx["bullet_count"] = 0
+            ctx["awaiting_more_bullets"] = False
             session["context"] = ctx
             return get_current_state(session)
     
     # Check if user wants more bullets (after decision prompt)
+    print(f"DEBUG: Checking 'yes' branch: lower='{lower}'")
     if lower in ["yes", "y", "add", "more"]:
         # User wants to add another bullet - set flag and return bullet prompt
         ctx["awaiting_more_bullets"] = True
@@ -523,6 +620,7 @@ def _process_experience(session: dict, extracted: str) -> dict:
         return get_current_state(session)
     
     # Check if user is done with bullets
+    print(f"DEBUG: Checking 'done' branch: lower='{lower}', in list={lower in ['done', 'no', 'n', 'finished', 'next', 'skip']}")
     if lower in ["done", "no", "n", "finished", "next", "skip"]:
         # Move to "add another job?" decision
         ctx["in_bullet_loop"] = False
@@ -530,20 +628,26 @@ def _process_experience(session: dict, extracted: str) -> dict:
         ctx["awaiting_more_bullets"] = False
         ctx["exp_done"] = True  # Mark that we're done with this job's bullets
         session["context"] = ctx
+        print(f"DEBUG: Set exp_done=True, in_bullet_loop=False")
         return get_current_state(session)
     
     # User provided another bullet
+    print(f"DEBUG: Storing as bullet")
     if "description" not in exp_list[job_idx]:
         exp_list[job_idx]["description"] = []
+    if "bullets" not in exp_list[job_idx]:
+        exp_list[job_idx]["bullets"] = []
     if isinstance(exp_list[job_idx]["description"], list):
         exp_list[job_idx]["description"].append(extracted)
     else:
         exp_list[job_idx]["description"] = [exp_list[job_idx]["description"], extracted]
+    exp_list[job_idx]["bullets"].append(extracted)
     
     ctx["bullet_count"] = bullet_count + 1
     ctx["experience"] = exp_list
     session["context"] = ctx
     
+    print(f"DEBUG: Bullet stored, bullet_count={bullet_count+1}")
     # After collecting a bullet, ask if they want more
     return {
         "type": "decision",
@@ -614,6 +718,9 @@ def _process_optional(session: dict, extracted: str) -> dict:
     item_idx = ctx.get("opt_idx", 0)
     field_idx = ctx.get("opt_field_idx", 0)
     
+    print(f"[OPTIONAL DEBUG] section={section}, item_idx={item_idx}, field_idx={field_idx}, extracted='{extracted}'")
+    print(f"[OPTIONAL DEBUG] BEFORE: opt_idx={ctx.get('opt_idx')}, opt_field_idx={ctx.get('opt_field_idx')}")
+    
     item_list = ctx.get(section, [])
     while len(item_list) <= item_idx:
         item_list.append({})
@@ -621,20 +728,40 @@ def _process_optional(session: dict, extracted: str) -> dict:
     fields = {
         "projects": PROJECT_FIELDS,
         "competencies": COMPETENCY_FIELDS,
-        "community": [{"field": "org", "question": "Community group or organization?"}],
-        "certifications": [{"field": "name", "question": "Certification name?"}],
+        "education": [
+            {"field": "school", "question": "School name?"},
+            {"field": "location", "question": "City and state?"},
+            {"field": "degree", "question": "Degree earned?"},
+            {"field": "honors", "question": "Honors or awards? Say skip if none."},
+        ],
+        "community": [
+            {"field": "org", "question": "Organization or event?"},
+            {"field": "description", "question": "What was your involvement?"},
+        ],
+        "certifications": [
+            {"field": "name", "question": "Certification name?"},
+            {"field": "issuer", "question": "Issuing organization?"},
+            {"field": "date", "question": "Year earned? Say skip if none."},
+        ],
+        "references": [
+            {"field": "name", "question": "Reference name?"},
+            {"field": "phone", "question": "Phone number?"},
+        ],
     }.get(section, [])
     
     # Decision to add more items (field_idx >= len(fields) means we're at decision point)
     if field_idx >= len(fields):
+        print(f"[OPTIONAL DEBUG] DECISION POINT: lower='{lower}', item_idx={item_idx}")
         if lower in ["yes", "y", "add", "more"]:
             # Add another item - reset field index for new item
+            print(f"[OPTIONAL DEBUG] Adding another item: opt_idx={item_idx + 1}, opt_field_idx=0")
             ctx["opt_idx"] = item_idx + 1
             ctx["opt_field_idx"] = 0
             session["context"] = ctx
             return get_current_state(session)
-        elif lower in ["next", "n", "done", "skip", "no"]:
+        elif lower in ["next", "done", "skip", "no"]:
             # Done with this section - save data and move to next
+            print(f"[OPTIONAL DEBUG] Done with section {section}, advancing to next")
             # Filter out empty dicts before saving
             filtered_items = [item for item in item_list if item and (not isinstance(item, dict) or any(item.values()))]
             if filtered_items:
@@ -643,13 +770,11 @@ def _process_optional(session: dict, extracted: str) -> dict:
             _advance_optional_section(session)
             return get_current_state(session)
         else:
-            # Unrecognized input - treat as done with section
-            # Filter out empty dicts before saving
-            filtered_items = [item for item in item_list if item and (not isinstance(item, dict) or any(item.values()))]
-            if filtered_items:
-                data[section] = filtered_items
-                session["data"] = data
-            _advance_optional_section(session)
+            # Unrecognized input - REPEAT the decision prompt (stay in phase="optional")
+            print(f"[OPTIONAL DEBUG] Unrecognized '{lower}', staying in section {section}")
+            # Do NOT advance section; re-ask the same decision
+            ctx["opt_field_idx"] = field_idx  # stay at decision boundary
+            session["context"] = ctx
             return get_current_state(session)
     
     # First field of first item - check skip
@@ -670,13 +795,14 @@ def _process_optional(session: dict, extracted: str) -> dict:
     ctx[section] = item_list
     ctx["opt_field_idx"] = field_idx + 1
     session["context"] = ctx
+    print(f"[OPTIONAL DEBUG] AFTER STORE: opt_idx={ctx.get('opt_idx')}, opt_field_idx={ctx.get('opt_field_idx')}, field={field_name}")
     return get_current_state(session)
 
 
 def _advance_optional_section(session: dict):
     """Move to next optional section."""
     ctx = session.get("context", {})
-    sections = ["projects", "competencies", "community", "certifications", "links", "done"]
+    sections = ["projects", "competencies", "education", "community", "certifications", "references", "links", "done"]
     current = ctx.get("opt_section", "projects")
     
     try:
@@ -691,7 +817,6 @@ def _advance_optional_section(session: dict):
     # Clear any leftover flags from previous sections
     for flag in ["awaiting_more_bullets", "exp_done", "in_bullet_loop"]:
         ctx.pop(flag, None)
-    session["context"] = ctx
     session["context"] = ctx
 
 
@@ -855,7 +980,7 @@ def _go_back_optional(session: dict) -> dict:
         return get_current_state(session)
     
     # At first item of a section - go back to previous section
-    sections = ["projects", "competencies", "community", "certifications", "links"]
+    sections = ["projects", "competencies", "education", "community", "certifications", "references"]
     try:
         idx = sections.index(section)
         if idx > 0:
@@ -1042,6 +1167,14 @@ async def voice_start(request: Request):
     voice_sessions[session_id] = session
     _persist_session(session_id)
     
+    # Defensive: ensure all context flags are initialized for new sessions
+    ctx = session.get("context", {})
+    for flag in ["exp_field_idx", "in_bullet_loop", "bullet_count", "exp_done", "awaiting_more_bullets", "exp_idx", "summary_idx", "opt_idx", "opt_field_idx"]:
+        if flag not in ctx:
+            ctx[flag] = 0 if "idx" in flag or "count" in flag else False
+    session["context"] = ctx
+    _persist_session(session_id)
+    
     step = get_current_state(session)
     return {
         "session_id": session_id,
@@ -1064,69 +1197,105 @@ async def voice_turn(request: Request):
         action = body.get("action", "answer")
         transcript = body.get("transcript", "").strip()
         
-        # Try to load from memory first, then disk
-        if session_id not in voice_sessions:
-            session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
-            if os.path.exists(session_path):
-                try:
-                    with open(session_path, "r") as f:
-                        voice_sessions[session_id] = json.load(f)
-                except Exception:
-                    pass
+        print(f"[HTTP REQUEST] session_id={session_id[:8] if session_id else 'NONE'} | action={action} | transcript='{transcript}'")
         
-        if not session_id or session_id not in voice_sessions:
-            return JSONResponse({"error": "Invalid session. Please try again."}, status_code=400)
+        # Acquire per-session lock to enforce strict sequential processing
+        if session_id not in session_locks:
+            session_locks[session_id] = asyncio.Lock()
         
-        session = voice_sessions[session_id]
-        
-        if action == "back":
-            step = go_back(session)
-        else:
-            step = await process_answer(session, transcript)
-        
-        # Build response
-        ctx = session.get("context", {})
-        phase = ctx.get("phase", "simple")
-        
-        can_go_back = True
-        if phase == "simple" and session.get("step_index", 0) == 0:
-            can_go_back = False
-        
-        show_add_job = step.get("show_add_job", False)
-        
-        # If we're done, copy data to top level
-        if step.get("done"):
-            session["done"] = True
-            # Flatten experience for compatibility
-            data = session.get("data", {})
-            exp_list = ctx.get("experience", [])
-            if exp_list:
-                data["experience"] = json.dumps(exp_list)
-            for section in ["projects", "competencies", "community", "certifications"]:
-                if section in ctx:
-                    data[section] = ctx[section]
-            session["data"] = data
-        
-        # Persist after every turn
-        _persist_session(session_id)
-        
-        return {
-            "session_id": session_id,
-            "question": step["question"],
-            "field": step["field"],
-            "context_label": step.get("context_label", ""),
-            "step_index": session.get("step_index", 0),
-            "done": step.get("done", False),
-            "can_go_back": can_go_back,
-            "show_add_job": show_add_job,
-            "data_preview": session.get("data", {})
-        }
-        
+        async with session_locks[session_id]:
+            return await _voice_turn_locked(session_id, action, transcript)
+    
     except Exception as e:
-        print(f"[Voice Turn Error] {e}")
         import traceback
         traceback.print_exc()
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
+
+async def _voice_turn_locked(session_id: str, action: str, transcript: str):
+    """Actual voice turn processing - called inside the session lock."""
+    
+    # Try to load from memory first, then disk
+    if session_id not in voice_sessions:
+        session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+        if os.path.exists(session_path):
+            try:
+                with open(session_path, "r") as f:
+                    loaded_session = json.load(f)
+                    # DEFENSIVE: Ensure all volatile state machine flags are present and typed correctly
+                    ctx = loaded_session.get("context", {})
+                    ctx.setdefault("exp_field_idx", 0)
+                    ctx.setdefault("in_bullet_loop", False)
+                    ctx.setdefault("bullet_count", 0)
+                    ctx.setdefault("exp_done", False)
+                    ctx.setdefault("awaiting_more_bullets", False)
+                    ctx.setdefault("exp_idx", 0)
+                    ctx.setdefault("summary_idx", 0)
+                    ctx.setdefault("opt_idx", 0)
+                    ctx.setdefault("opt_field_idx", 0)
+                    loaded_session["context"] = ctx
+                    voice_sessions[session_id] = loaded_session
+                    print(f"[Session Load] Hydrated session {session_id[:8]}... with flags: exp_field_idx={ctx['exp_field_idx']}, in_bullet_loop={ctx['in_bullet_loop']}, bullet_count={ctx['bullet_count']}, exp_done={ctx['exp_done']}")
+            except Exception as e:
+                print(f"[Session Load Error] {e}")
+                pass
+    
+    if not session_id or session_id not in voice_sessions:
+        return JSONResponse({"error": "Invalid session. Please try again."}, status_code=400)
+    
+    session = voice_sessions[session_id]
+    
+    # Extra defensive: ensure flags exist even for in-memory sessions
+    ctx = session.get("context", {})
+    for flag in ["exp_field_idx", "in_bullet_loop", "bullet_count", "exp_done", "awaiting_more_bullets", "exp_idx", "summary_idx", "opt_idx", "opt_field_idx"]:
+        if flag not in ctx:
+            ctx[flag] = 0 if "idx" in flag or "count" in flag else False
+    session["context"] = ctx
+    
+    if action == "back":
+        step = go_back(session)
+    elif action in ["add", "add_job"]:
+        # Handle "add another" action from frontend
+        step = await process_answer(session, "yes")
+    else:
+        step = await process_answer(session, transcript)
+    
+    # Build response
+    ctx = session.get("context", {})
+    phase = ctx.get("phase", "simple")
+    
+    can_go_back = True
+    if phase == "simple" and session.get("step_index", 0) == 0:
+        can_go_back = False
+    
+    show_add_job = step.get("show_add_job", False)
+    
+    # If we're done, copy data to top level
+    if step.get("done"):
+        session["done"] = True
+        # Flatten experience for compatibility
+        data = session.get("data", {})
+        exp_list = ctx.get("experience", [])
+        if exp_list:
+            data["experience"] = exp_list  # Store as Python list, not JSON string
+        for section in ["projects", "competencies", "community", "certifications", "education", "references"]:
+            if section in ctx:
+                data[section] = ctx[section]
+        session["data"] = data
+    
+    # Persist after every turn
+    _persist_session(session_id)
+    
+    return {
+        "session_id": session_id,
+        "question": step["question"],
+        "field": step["field"],
+        "context_label": step.get("context_label", ""),
+        "step_index": session.get("step_index", 0),
+        "done": step.get("done", False),
+        "can_go_back": can_go_back,
+        "show_add_job": show_add_job,
+        "data_preview": session.get("data", {})
+    }
 
 
 @router.post("/save")
@@ -1139,20 +1308,25 @@ async def voice_save(request: Request):
         if not session_id or session_id not in voice_sessions:
             return JSONResponse({"error": "No session"}, status_code=400)
         
-        session = voice_sessions[session_id]
+        # Acquire lock to ensure consistent read
+        if session_id not in session_locks:
+            session_locks[session_id] = asyncio.Lock()
         
-        return {
-            "success": True,
-            "session_id": session_id,
-            "state": {
+        async with session_locks[session_id]:
+            session = voice_sessions[session_id]
+            
+            return {
+                "success": True,
                 "session_id": session_id,
-                "step_index": session.get("step_index", 0),
-                "data": session.get("data", {}),
-                "context": session.get("context", {}),
-                "history": session.get("history", []),
-                "done": session.get("done", False)
+                "state": {
+                    "session_id": session_id,
+                    "step_index": session.get("step_index", 0),
+                    "data": session.get("data", {}),
+                    "context": session.get("context", {}),
+                    "history": session.get("history", []),
+                    "done": session.get("done", False)
+                }
             }
-        }
         
     except Exception as e:
         print(f"[Voice Save Error] {e}")
@@ -1172,34 +1346,39 @@ async def voice_load(request: Request):
         if not session_id:
             return JSONResponse({"error": "No session ID"}, status_code=400)
         
-        voice_sessions[session_id] = {
-            "session_id": session_id,
-            "step_index": state.get("step_index", 0),
-            "data": state.get("data", {}),
-            "context": state.get("context", {}),
-            "history": state.get("history", []),
-            "done": state.get("done", False)
-        }
+        # Acquire lock for write
+        if session_id not in session_locks:
+            session_locks[session_id] = asyncio.Lock()
         
-        session = voice_sessions[session_id]
-        step = get_current_state(session)
-        
-        ctx = session.get("context", {})
-        phase = ctx.get("phase", "simple")
-        can_go_back = not (phase == "simple" and session.get("step_index", 0) == 0)
-        
-        return {
-            "success": True,
-            "session_id": session_id,
-            "question": step["question"],
-            "field": step["field"],
-            "context_label": step.get("context_label", ""),
-            "step_index": session.get("step_index", 0),
-            "done": step.get("done", False),
-            "can_go_back": can_go_back,
-            "show_add_job": step.get("show_add_job", False),
-            "data_preview": session.get("data", {})
-        }
+        async with session_locks[session_id]:
+            voice_sessions[session_id] = {
+                "session_id": session_id,
+                "step_index": state.get("step_index", 0),
+                "data": state.get("data", {}),
+                "context": state.get("context", {}),
+                "history": state.get("history", []),
+                "done": state.get("done", False)
+            }
+            
+            session = voice_sessions[session_id]
+            step = get_current_state(session)
+            
+            ctx = session.get("context", {})
+            phase = ctx.get("phase", "simple")
+            can_go_back = not (phase == "simple" and session.get("step_index", 0) == 0)
+            
+            return {
+                "success": True,
+                "session_id": session_id,
+                "question": step["question"],
+                "field": step["field"],
+                "context_label": step.get("context_label", ""),
+                "step_index": session.get("step_index", 0),
+                "done": step.get("done", False),
+                "can_go_back": can_go_back,
+                "show_add_job": step.get("show_add_job", False),
+                "data_preview": session.get("data", {})
+            }
         
     except Exception as e:
         print(f"[Voice Load Error] {e}")

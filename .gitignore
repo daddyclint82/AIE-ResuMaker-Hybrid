@@ -9,3 +9,27 @@ nohup.out
 *.bak
 *.old
 .DS_Store
+
+# Generated files
+*.docx
+*.pdf
+*.html
+clint_resume*
+resume_*
+test_*
+AEI.jpg
+Mic Button.jpg
+
+# Zone identifiers (WSL Windows metadata)
+*.jpg:Zone.Identifier
+*.html:Zone.Identifier
+
+# Test outputs
+tests/output_test/
+tests/screenshots/
+test_output.log
+test_preview.html
+voice_sessions/
+
+# Voice session data
+voice-questionnaire.json

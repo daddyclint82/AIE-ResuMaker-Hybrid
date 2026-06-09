@@ -3,61 +3,300 @@
   "target_job": "Junior DevOps Engineer or AI Infrastructure Engineer",
   "description": "Full voice interview test with 3 jobs, 3 bullets each, custom summary answers, and AI Infrastructure targeting",
   "answers": [
-    {"step": "1A", "phase": "simple", "field": "full_name", "value": "Clint Singleton"},
-    {"step": "1B", "phase": "simple", "field": "email", "value": "clints8282@gmail.com"},
-    {"step": "1C", "phase": "simple", "field": "phone", "value": "936-800-7626"},
-    {"step": "1D", "phase": "simple", "field": "city", "value": "Nacogdoches"},
-    {"step": "1E", "phase": "simple", "field": "state", "value": "Texas"},
-    {"step": "1F", "phase": "simple", "field": "industry", "value": "AI Infrastructure / DevOps"},
-    {"step": "1G", "phase": "simple", "field": "job_title", "value": "Junior DevOps Engineer or AI Infrastructure Engineer"},
-    {"step": "1H", "phase": "simple", "field": "experience_level", "value": "senior"},
-    {"step": "1I", "phase": "simple", "field": "education_level", "value": "bachelor's"},
-
-    {"step": "2A1", "phase": "experience", "field": "company", "value": "Self-Employed / Independent"},
-    {"step": "2A2", "phase": "experience", "field": "title", "value": "AI Infrastructure Engineer"},
-    {"step": "2A3", "phase": "experience", "field": "dates", "value": "2025"},
-    {"step": "2A4", "phase": "experience", "field": "_bullet", "value": "Designed, deployed, and maintained full-stack AI infrastructure — OpenClaw orchestration, Ollama LLM serving, llama.cpp inference, Whisper STT, Piper TTS across WSL2/Windows/Linux"},
-    {"step": "2A5", "phase": "experience", "field": "_more_bullets", "value": "yes"},
-    {"step": "2A6", "phase": "experience", "field": "_bullet", "value": "Built and operated DaddyClintBot — production Discord bot with systemd-managed 24/7 uptime, SQLite persistence, and multi-channel integration"},
-    {"step": "2A7", "phase": "experience", "field": "_more_bullets", "value": "yes"},
-    {"step": "2A8", "phase": "experience", "field": "_bullet", "value": "Architected ResumeForge — FastAPI-based resume builder with auto-skill categorization, O*NET API integration, Stripe monetization, and DOCX export pipeline"},
-    {"step": "2A9", "phase": "experience", "field": "_more_bullets", "value": "done"},
-    {"step": "2A10", "phase": "experience", "field": "_add_job", "value": "yes"},
-
-    {"step": "2B1", "phase": "experience", "field": "company", "value": "AES / Halliburton / Baroid"},
-    {"step": "2B2", "phase": "experience", "field": "title", "value": "Mud Engineer / Drilling Fluids Specialist"},
-    {"step": "2B3", "phase": "experience", "field": "dates", "value": "2011 to 2015, 2018 to 2020, 2021 to 2023"},
-    {"step": "2B4", "phase": "experience", "field": "_bullet", "value": "Ran advanced drilling fluid systems optimized for Eagle Ford, Delaware Basin, and Permian Basin formations"},
-    {"step": "2B5", "phase": "experience", "field": "_more_bullets", "value": "yes"},
-    {"step": "2B6", "phase": "experience", "field": "_bullet", "value": "Managed application and logistics of diverse product portfolios on-site, ensuring efficient and effective utilization"},
-    {"step": "2B7", "phase": "experience", "field": "_more_bullets", "value": "yes"},
-    {"step": "2B8", "phase": "experience", "field": "_bullet", "value": "Monitored downhole conditions including ECDs, hole volumes, stroke counts, and gas detection during critical operations"},
-    {"step": "2B9", "phase": "experience", "field": "_more_bullets", "value": "done"},
-    {"step": "2B10", "phase": "experience", "field": "_add_job", "value": "yes"},
-
-    {"step": "2C1", "phase": "experience", "field": "company", "value": "AT&T Authorized Retailer (Allcom)"},
-    {"step": "2C2", "phase": "experience", "field": "title", "value": "Store Manager"},
-    {"step": "2C3", "phase": "experience", "field": "dates", "value": "2015 to 2018, 2020"},
-    {"step": "2C4", "phase": "experience", "field": "_bullet", "value": "Led sales floor operations and coached sales associates to maximize customer value and revenue per transaction"},
-    {"step": "2C5", "phase": "experience", "field": "_more_bullets", "value": "yes"},
-    {"step": "2C6", "phase": "experience", "field": "_bullet", "value": "Delivered premium digital solutions for customers at the highest service level"},
-    {"step": "2C7", "phase": "experience", "field": "_more_bullets", "value": "yes"},
-    {"step": "2C8", "phase": "experience", "field": "_bullet", "value": "Achieved #1 ranking among all authorized retail stores in the county"},
-    {"step": "2C9", "phase": "experience", "field": "_more_bullets", "value": "done"},
-    {"step": "2C10", "phase": "experience", "field": "_add_job", "value": "done"},
-
-    {"step": "3A", "phase": "summary", "field": "summary_q1", "value": "Hands-on technologist with 15+ years of experience spanning oilfield engineering operations, retail technology management, and modern AI infrastructure development. Proven ability to lead teams, manage complex technical operations, and rapidly iterate from prototype to deployed solution across disparate domains — from drilling mud systems in the Eagle Ford shale to self-hosted AI orchestration platforms."},
-    {"step": "3B", "phase": "summary", "field": "summary_q2", "value": "Strong foundation in backend API development, service orchestration, DevOps automation, cross-platform infrastructure, and community-driven technical education."},
-    {"step": "3C", "phase": "summary", "field": "summary_q3", "value": "Achieved #1 ranking among all authorized retail stores in the county and Delivered cost reduction through active operational planning, logistics optimization, and waste minimization"},
-    {"step": "3D", "phase": "summary", "field": "summary_q4", "value": "Kubernetes, Docker, AWS, Azure, Terraform, CI/CD, Python, Node.js, FastAPI, Flask, REST API, microservices, systemd, Linux, Bash, Git, Tailscale, WSL2, infrastructure automation, orchestration, LLM deployment, Ollama, DevOps, SRE, monitoring, logging"},
-
-    {"step": "4A", "phase": "skills", "field": "skills", "value": "Python, Java, Go, Kubernetes, Docker, AWS, Linux, Bash, Git, microservices, Node.js, FastAPI, Flask, REST API, SQLite, HTML5, CSS3, JavaScript, Web Audio API, WebSocket, systemd, Tailscale, WSL2, LLM Inference, Speech-to-Text, Text-to-Speech"},
-
-    {"step": "5A", "phase": "optional", "field": "_projects_decision", "value": "skip"},
-    {"step": "5B", "phase": "optional", "field": "_competencies_decision", "value": "skip"},
-    {"step": "5C", "phase": "optional", "field": "_community_decision", "value": "skip"},
-    {"step": "5D", "phase": "optional", "field": "_certifications_decision", "value": "skip"},
-    {"step": "5E", "phase": "optional", "field": "_links_decision", "value": "skip"}
+    {
+      "step": "1A",
+      "phase": "simple",
+      "field": "full_name",
+      "value": "Clint Singleton"
+    },
+    {
+      "step": "1B",
+      "phase": "simple",
+      "field": "email",
+      "value": "clints8282@gmail.com"
+    },
+    {
+      "step": "1C",
+      "phase": "simple",
+      "field": "phone",
+      "value": "936-800-7626"
+    },
+    {
+      "step": "1D",
+      "phase": "simple",
+      "field": "city",
+      "value": "Nacogdoches"
+    },
+    {
+      "step": "1E",
+      "phase": "simple",
+      "field": "state",
+      "value": "Texas"
+    },
+    {
+      "step": "1F",
+      "phase": "simple",
+      "field": "industry",
+      "value": "AI Infrastructure / DevOps"
+    },
+    {
+      "step": "1G",
+      "phase": "simple",
+      "field": "job_title",
+      "value": "Junior DevOps Engineer or AI Infrastructure Engineer"
+    },
+    {
+      "step": "1H",
+      "phase": "simple",
+      "field": "experience_level",
+      "value": "senior"
+    },
+    {
+      "step": "1I",
+      "phase": "simple",
+      "field": "education_level",
+      "value": "bachelor's"
+    },
+    {
+      "step": "2A1",
+      "phase": "experience",
+      "field": "company",
+      "value": "Self-Employed / Independent"
+    },
+    {
+      "step": "2A2",
+      "phase": "experience",
+      "field": "title",
+      "value": "AI Infrastructure Engineer"
+    },
+    {
+      "step": "2A3",
+      "phase": "experience",
+      "field": "dates",
+      "value": "2025"
+    },
+    {
+      "step": "2A4",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Designed, deployed, and maintained full-stack AI infrastructure \u2014 OpenClaw orchestration, Ollama LLM serving, llama.cpp inference, Whisper STT, Piper TTS across WSL2/Windows/Linux"
+    },
+    {
+      "step": "2A5",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "yes"
+    },
+    {
+      "step": "2A6",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Built and operated DaddyClintBot \u2014 production Discord bot with systemd-managed 24/7 uptime, SQLite persistence, and multi-channel integration"
+    },
+    {
+      "step": "2A7",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "yes"
+    },
+    {
+      "step": "2A8",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Architected ResumeForge \u2014 FastAPI-based resume builder with auto-skill categorization, O*NET API integration, Stripe monetization, and DOCX export pipeline"
+    },
+    {
+      "step": "2A9",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "done"
+    },
+    {
+      "step": "2A10",
+      "phase": "experience",
+      "field": "_add_job",
+      "value": "yes"
+    },
+    {
+      "step": "2B1",
+      "phase": "experience",
+      "field": "company",
+      "value": "AES / Halliburton / Baroid"
+    },
+    {
+      "step": "2B2",
+      "phase": "experience",
+      "field": "title",
+      "value": "Mud Engineer / Drilling Fluids Specialist"
+    },
+    {
+      "step": "2B3",
+      "phase": "experience",
+      "field": "dates",
+      "value": "2011 to 2015, 2018 to 2020, 2021 to 2023"
+    },
+    {
+      "step": "2B4",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Ran advanced drilling fluid systems optimized for Eagle Ford, Delaware Basin, and Permian Basin formations"
+    },
+    {
+      "step": "2B5",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "yes"
+    },
+    {
+      "step": "2B6",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Managed application and logistics of diverse product portfolios on-site, ensuring efficient and effective utilization"
+    },
+    {
+      "step": "2B7",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "yes"
+    },
+    {
+      "step": "2B8",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Monitored downhole conditions including ECDs, hole volumes, stroke counts, and gas detection during critical operations"
+    },
+    {
+      "step": "2B9",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "done"
+    },
+    {
+      "step": "2B10",
+      "phase": "experience",
+      "field": "_add_job",
+      "value": "yes"
+    },
+    {
+      "step": "2C1",
+      "phase": "experience",
+      "field": "company",
+      "value": "AT&T Authorized Retailer (Allcom)"
+    },
+    {
+      "step": "2C2",
+      "phase": "experience",
+      "field": "title",
+      "value": "Store Manager"
+    },
+    {
+      "step": "2C3",
+      "phase": "experience",
+      "field": "dates",
+      "value": "2015 to 2018, 2020"
+    },
+    {
+      "step": "2C4",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Led sales floor operations and coached sales associates to maximize customer value and revenue per transaction"
+    },
+    {
+      "step": "2C5",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "yes"
+    },
+    {
+      "step": "2C6",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Delivered premium digital solutions for customers at the highest service level"
+    },
+    {
+      "step": "2C7",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "yes"
+    },
+    {
+      "step": "2C8",
+      "phase": "experience",
+      "field": "_bullet",
+      "value": "Achieved #1 ranking among all authorized retail stores in the county"
+    },
+    {
+      "step": "2C9",
+      "phase": "experience",
+      "field": "_more_bullets",
+      "value": "done"
+    },
+    {
+      "step": "2C10",
+      "phase": "experience",
+      "field": "_add_job",
+      "value": "done"
+    },
+    {
+      "step": "3A",
+      "phase": "summary",
+      "field": "summary_q1",
+      "value": "Hands-on technologist with 15+ years of experience spanning oilfield engineering operations, retail technology management, and modern AI infrastructure development. Proven ability to lead teams, manage complex technical operations, and rapidly iterate from prototype to deployed solution across disparate domains \u2014 from drilling mud systems in the Eagle Ford shale to self-hosted AI orchestration platforms."
+    },
+    {
+      "step": "3B",
+      "phase": "summary",
+      "field": "summary_q2",
+      "value": "Strong foundation in backend API development, service orchestration, DevOps automation, cross-platform infrastructure, and community-driven technical education."
+    },
+    {
+      "step": "3C",
+      "phase": "summary",
+      "field": "summary_q3",
+      "value": "Achieved #1 ranking among all authorized retail stores in the county and Delivered cost reduction through active operational planning, logistics optimization, and waste minimization"
+    },
+    {
+      "step": "3D",
+      "phase": "summary",
+      "field": "summary_q4",
+      "value": "Kubernetes, Docker, AWS, Azure, Terraform, CI/CD, Python, Node.js, FastAPI, Flask, REST API, microservices, systemd, Linux, Bash, Git, Tailscale, WSL2, infrastructure automation, orchestration, LLM deployment, Ollama, DevOps, SRE, monitoring, logging"
+    },
+    {
+      "step": "4A",
+      "phase": "skills",
+      "field": "skills",
+      "value": "Python, Java, Go, Kubernetes, Docker, AWS, Linux, Bash, Git, microservices, Node.js, FastAPI, Flask, REST API, SQLite, HTML5, CSS3, JavaScript, Web Audio API, WebSocket, systemd, Tailscale, WSL2, LLM Inference, Speech-to-Text, Text-to-Speech"
+    },
+    {
+      "step": "5A",
+      "phase": "optional",
+      "field": "_projects_decision",
+      "value": "skip"
+    },
+    {
+      "step": "5B",
+      "phase": "optional",
+      "field": "_competencies_decision",
+      "value": "Python scripting and automation, Kubernetes cluster management, Docker container orchestration, Linux system administration, API development with FastAPI"
+    },
+    {
+      "step": "5C",
+      "phase": "optional",
+      "field": "_community_decision",
+      "value": "skip"
+    },
+    {
+      "step": "5D",
+      "phase": "optional",
+      "field": "_certifications_decision",
+      "value": "Halliburton Mud Engineering Certification, AWS Certified Solutions Architect (in progress)"
+    },
+    {
+      "step": "5E",
+      "phase": "optional",
+      "field": "_links_decision",
+      "value": "skip"
+    }
   ],
   "expected_results": {
     "simple_fields_count": 9,
