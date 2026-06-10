@@ -590,6 +590,24 @@
 
                     if (data.done) {
                         showViewResumeButton();
+                        
+                        // HARDCODED PREVIEW BUTTON: Guarantee visible CTA regardless of sub-function state
+                        const forcePreviewBtn = document.createElement('button');
+                        forcePreviewBtn.textContent = 'PREVIEW MY RESUME';
+                        forcePreviewBtn.className = 'primary-cta-btn';
+                        forcePreviewBtn.style.cssText = 'display:block!important;visibility:visible!important;width:100%;padding:16px;margin:20px 0;background:#0066FF;color:#FFFFFF;border:none;border-radius:12px;font-size:18px;font-weight:700;cursor:pointer;z-index:9999;';
+
+                        forcePreviewBtn.addEventListener('click', () => {
+                            window.location.href = `/build?mode=form&voice_session=${window.sessionId || ''}`;
+                        });
+
+                        // Inject into chat container — guaranteed visible
+                        const mainChatContainer = document.getElementById('chat-messages') || document.querySelector('.voice-preview-container');
+                        if (mainChatContainer) {
+                            mainChatContainer.appendChild(forcePreviewBtn);
+                        } else {
+                            document.body.appendChild(forcePreviewBtn); // Absolute emergency fallback
+                        }
                     }
                 } catch (renderError) {
                     console.warn("Caught a layout rendering exception, bypassing to prevent conversation crash:", renderError);

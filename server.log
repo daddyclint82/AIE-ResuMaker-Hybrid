@@ -1,354 +1,379 @@
 INFO:     Will watch for changes in these directories: ['/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [11045] using StatReload
+INFO:     Started reloader process [11807] using StatReload
 [AIE ResuMaker] Environment: development
 [AIE ResuMaker] Stripe key prefix: sk_test...
-INFO:     Started server process [11048]
+INFO:     Started server process [11810]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 [AIE ResuMaker] Environment: development
 [AIE ResuMaker] Stripe key prefix: sk_test...
-INFO:     127.0.0.1:56066 - "GET /healthz HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36312 - "GET /build?mode=voice HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36312 - "GET /static/voice_chat.css?v=24 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36296 - "GET /static/images/aei-logo.jpg HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36296 - "GET /static/images/mic-icon.png HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36312 - "GET /static/voice_chat.js?v=24 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36312 - "POST /api/voice/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36296 - "POST /api/voice/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:36296 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Clinton Singleton'
-INFO:     127.0.0.1:53168 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Clints8282@gmail.com'
-INFO:     127.0.0.1:53170 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='936-800-7626'
-INFO:     127.0.0.1:33792 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='227 Crestwood, Nacogdoches, TX 75961'
-INFO:     127.0.0.1:33794 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Nacogdoches'
-INFO:     127.0.0.1:33794 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Texas'
-INFO:     127.0.0.1:33794 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='AI infrastructural engineering'
-INFO:     127.0.0.1:33794 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=back | transcript=''
-INFO:     127.0.0.1:49050 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='technology'
-INFO:     127.0.0.1:49050 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='AI infrastructural engineering'
-INFO:     127.0.0.1:49058 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='entry level'
-INFO:     127.0.0.1:46234 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='bachelors'
-INFO:     127.0.0.1:46240 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Self-Employed / Independent'
-DEBUG _process_experience: extracted='Self-Employed / Independent', field_idx=0, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'self-employed / independent' | field_idx: 0 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field company=Self-Employed / Independent, new field_idx=1
-INFO:     127.0.0.1:36004 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='AI Infrastructure Engineer'
-DEBUG _process_experience: extracted='AI Infrastructure Engineer', field_idx=1, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'ai infrastructure engineer' | field_idx: 1 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field title=AI Infrastructure Engineer, new field_idx=2
-INFO:     127.0.0.1:36014 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='November 2025 to present'
-DEBUG _process_experience: extracted='November 2025 to present', field_idx=2, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'november 2025 to present' | field_idx: 2 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field dates=November 2025 to present, new field_idx=3
-INFO:     127.0.0.1:57478 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Nacogdoches Texas'
-DEBUG _process_experience: extracted='Nacogdoches Texas', field_idx=3, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'nacogdoches texas' | field_idx: 3 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field location=Nacogdoches Texas, new field_idx=4
-INFO:     127.0.0.1:57494 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='• Designed, deployed, and maintained full-stack AI infrastructure — OpenClaw orchestration, Ollama LLM serving, llama.cpp inference, Whisper STT, Piper TTS across WSL2/Windows/Linux'
-DEBUG _process_experience: extracted='• Designed, deployed, and maintained full-stack AI infrastructure — OpenClaw orchestration, Ollama LLM serving, llama.cpp inference, Whisper STT, Piper TTS across WSL2/Windows/Linux', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: '• designed, deployed, and maintained full-stack ai infrastructure — openclaw orchestration, ollama llm serving, llama.cpp inference, whisper stt, piper tts across wsl2/windows/linux' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+INFO:     127.0.0.1:45948 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52398 - "GET /build?mode=voice HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52398 - "GET /static/voice_chat.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52402 - "GET /static/images/aei-logo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52402 - "GET /static/images/mic-icon.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52398 - "GET /static/voice_chat.js?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52398 - "POST /api/voice/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52402 - "POST /api/voice/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52402 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=0, in_bullet_loop=False, exp_done=False, bullet_count=0
+[STATE DB DEBUG] Input: 'd' | field_idx: 0 | in_bullet_loop: False | exp_done: False
+DEBUG: Stored field company=d, new field_idx=1
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=1, in_bullet_loop=False, exp_done=False, bullet_count=0
+[STATE DB DEBUG] Input: 'd' | field_idx: 1 | in_bullet_loop: False | exp_done: False
+DEBUG: Stored field title=d, new field_idx=2
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=2, in_bullet_loop=False, exp_done=False, bullet_count=0
+[STATE DB DEBUG] Input: 'd' | field_idx: 2 | in_bullet_loop: False | exp_done: False
+DEBUG: Stored field dates=d, new field_idx=3
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=3, in_bullet_loop=False, exp_done=False, bullet_count=0
+[STATE DB DEBUG] Input: 'd' | field_idx: 3 | in_bullet_loop: False | exp_done: False
+DEBUG: Stored field location=d, new field_idx=4
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='• dd'
+DEBUG _process_experience: extracted='• dd', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=0
+[STATE DB DEBUG] Input: '• dd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
 DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
 DEBUG: Checking exp_done branch: exp_done=False
-DEBUG: Checking 'yes' branch: lower='• designed, deployed, and maintained full-stack ai infrastructure — openclaw orchestration, ollama llm serving, llama.cpp inference, whisper stt, piper tts across wsl2/windows/linux'
-DEBUG: Checking 'done' branch: lower='• designed, deployed, and maintained full-stack ai infrastructure — openclaw orchestration, ollama llm serving, llama.cpp inference, whisper stt, piper tts across wsl2/windows/linux', in list=False
+DEBUG: Checking 'yes' branch: lower='• dd'
+DEBUG: Checking 'done' branch: lower='• dd', in list=False
 DEBUG: Storing as bullet
 DEBUG: Bullet stored, bullet_count=1
-INFO:     127.0.0.1:45794 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='done'
-[GLOBAL SAFETY] Forced bullet loop exit for 'done'
-INFO:     127.0.0.1:45804 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='yes'
-DEBUG _process_experience: extracted='yes', field_idx=4, in_bullet_loop=False, exp_done=True, bullet_count=0
-[STATE DB DEBUG] Input: 'yes' | field_idx: 4 | in_bullet_loop: False | exp_done: True
-DEBUG: Checking first bullet branch: not in_bullet_loop=True, not exp_done=False
-DEBUG: Checking exp_done branch: exp_done=True
-DEBUG: In exp_done branch, lower='yes'
-INFO:     127.0.0.1:47346 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='AES / Halliburton / Baroid'
-DEBUG _process_experience: extracted='AES / Halliburton / Baroid', field_idx=0, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'aes / halliburton / baroid' | field_idx: 0 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field company=AES / Halliburton / Baroid, new field_idx=1
-INFO:     127.0.0.1:47358 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Mud Engineer / Drilling Fluids Specialist'
-DEBUG _process_experience: extracted='Mud Engineer / Drilling Fluids Specialist', field_idx=1, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'mud engineer / drilling fluids specialist' | field_idx: 1 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field title=Mud Engineer / Drilling Fluids Specialist, new field_idx=2
-INFO:     127.0.0.1:38352 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='2011–2015, 2018–2020, 2021–2023'
-DEBUG _process_experience: extracted='2011–2015, 2018–2020, 2021–2023', field_idx=2, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: '2011–2015, 2018–2020, 2021–2023' | field_idx: 2 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field dates=2011–2015, 2018–2020, 2021–2023, new field_idx=3
-INFO:     127.0.0.1:38362 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Eagle Ford, Delaware Basin, Permian Basin | South & West Texas'
-DEBUG _process_experience: extracted='Eagle Ford, Delaware Basin, Permian Basin | South & West Texas', field_idx=3, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'eagle ford, delaware basin, permian basin | south & west texas' | field_idx: 3 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field location=Eagle Ford, Delaware Basin, Permian Basin | South & West Texas, new field_idx=4
-INFO:     127.0.0.1:35076 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='• Ran advanced drilling fluid systems optimized for Eagle Ford, Delaware Basin, and Permian Basin formations'
-DEBUG _process_experience: extracted='• Ran advanced drilling fluid systems optimized for Eagle Ford, Delaware Basin, and Permian Basin formations', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: '• ran advanced drilling fluid systems optimized for eagle ford, delaware basin, and permian basin formations' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=1
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
 DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
 DEBUG: Checking exp_done branch: exp_done=False
-DEBUG: Checking 'yes' branch: lower='• ran advanced drilling fluid systems optimized for eagle ford, delaware basin, and permian basin formations'
-DEBUG: Checking 'done' branch: lower='• ran advanced drilling fluid systems optimized for eagle ford, delaware basin, and permian basin formations', in list=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
 DEBUG: Storing as bullet
-DEBUG: Bullet stored, bullet_count=1
-INFO:     127.0.0.1:35082 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='done'
-[GLOBAL SAFETY] Forced bullet loop exit for 'done'
-INFO:     127.0.0.1:52150 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='yes'
-DEBUG _process_experience: extracted='yes', field_idx=4, in_bullet_loop=False, exp_done=True, bullet_count=0
-[STATE DB DEBUG] Input: 'yes' | field_idx: 4 | in_bullet_loop: False | exp_done: True
-DEBUG: Checking first bullet branch: not in_bullet_loop=True, not exp_done=False
-DEBUG: Checking exp_done branch: exp_done=True
-DEBUG: In exp_done branch, lower='yes'
-INFO:     127.0.0.1:52150 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='AT&T Authorized Retailer (Allcom)'
-DEBUG _process_experience: extracted='AT&T Authorized Retailer (Allcom)', field_idx=0, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'at&t authorized retailer (allcom)' | field_idx: 0 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field company=AT&T Authorized Retailer (Allcom), new field_idx=1
-INFO:     127.0.0.1:52166 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Store Manager'
-DEBUG _process_experience: extracted='Store Manager', field_idx=1, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'store manager' | field_idx: 1 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field title=Store Manager, new field_idx=2
-INFO:     127.0.0.1:34152 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='2015–2018, 2020'
-DEBUG _process_experience: extracted='2015–2018, 2020', field_idx=2, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: '2015–2018, 2020' | field_idx: 2 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field dates=2015–2018, 2020, new field_idx=3
-INFO:     127.0.0.1:34160 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Nacogdoches Texas'
-DEBUG _process_experience: extracted='Nacogdoches Texas', field_idx=3, in_bullet_loop=False, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: 'nacogdoches texas' | field_idx: 3 | in_bullet_loop: False | exp_done: False
-DEBUG: Stored field location=Nacogdoches Texas, new field_idx=4
-INFO:     127.0.0.1:55950 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='• Led sales floor operations and coached sales associates to maximize customer value and revenue per transaction'
-DEBUG _process_experience: extracted='• Led sales floor operations and coached sales associates to maximize customer value and revenue per transaction', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=0
-[STATE DB DEBUG] Input: '• led sales floor operations and coached sales associates to maximize customer value and revenue per transaction' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Bullet stored, bullet_count=2
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=2
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
 DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
 DEBUG: Checking exp_done branch: exp_done=False
-DEBUG: Checking 'yes' branch: lower='• led sales floor operations and coached sales associates to maximize customer value and revenue per transaction'
-DEBUG: Checking 'done' branch: lower='• led sales floor operations and coached sales associates to maximize customer value and revenue per transaction', in list=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
 DEBUG: Storing as bullet
-DEBUG: Bullet stored, bullet_count=1
-INFO:     127.0.0.1:55966 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='done'
+DEBUG: Bullet stored, bullet_count=3
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=3
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
+DEBUG: Checking exp_done branch: exp_done=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
+DEBUG: Storing as bullet
+DEBUG: Bullet stored, bullet_count=4
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=4
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
+DEBUG: Checking exp_done branch: exp_done=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
+DEBUG: Storing as bullet
+DEBUG: Bullet stored, bullet_count=5
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=5
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
+DEBUG: Checking exp_done branch: exp_done=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
+DEBUG: Storing as bullet
+DEBUG: Bullet stored, bullet_count=6
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=6
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
+DEBUG: Checking exp_done branch: exp_done=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
+DEBUG: Storing as bullet
+DEBUG: Bullet stored, bullet_count=7
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=7
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
+DEBUG: Checking exp_done branch: exp_done=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
+DEBUG: Storing as bullet
+DEBUG: Bullet stored, bullet_count=8
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='d'
+DEBUG _process_experience: extracted='d', field_idx=4, in_bullet_loop=True, exp_done=False, bullet_count=8
+[STATE DB DEBUG] Input: 'd' | field_idx: 4 | in_bullet_loop: True | exp_done: False
+DEBUG: Checking first bullet branch: not in_bullet_loop=False, not exp_done=True
+DEBUG: Checking exp_done branch: exp_done=False
+DEBUG: Checking 'yes' branch: lower='d'
+DEBUG: Checking 'done' branch: lower='d', in list=False
+DEBUG: Storing as bullet
+DEBUG: Bullet stored, bullet_count=9
+INFO:     127.0.0.1:52414 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='done'
 [GLOBAL SAFETY] Forced bullet loop exit for 'done'
-INFO:     127.0.0.1:55966 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=force_done_jobs | transcript=''
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='done'
+[GLOBAL SAFETY] Forced bullet loop exit for 'done'
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='done'
+[GLOBAL SAFETY] Forced bullet loop exit for 'done'
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='done'
+[GLOBAL SAFETY] Forced bullet loop exit for 'done'
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='done'
+[GLOBAL SAFETY] Forced bullet loop exit for 'done'
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='done'
+[GLOBAL SAFETY] Forced bullet loop exit for 'done'
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=force_done_jobs | transcript=''
 [ESCAPE HATCH] Forced experience loop exit to summary phase.
-INFO:     127.0.0.1:45936 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Hands-on technologist with 15+ years of experience spanning oilfield engineering operations, retail technology management, and modern AI infrastructure development. Proven ability to lead teams, manage complex technical operations, and rapidly iterate from prototype to deployed solution across disparate domains — from drilling mud systems in the Eagle Ford shale to self-hosted AI orchestration platforms'
-INFO:     127.0.0.1:45950 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Delivered cost reduction through active operational planning, logistics optimization, and waste minimization. Built strong problem-solving and communication relationships with rig personnel across multiple operators.'
-INFO:     127.0.0.1:56736 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Achieved #1 ranking among all authorized retail stores in the county. Built and maintained production Discord bot with systemd-managed 24/7 operation, SQLite persistence'
-INFO:     127.0.0.1:60546 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='LLM Inference & Deployment, HTML5, CSS3, JavaScript (ES6+), Web Audio API, WebSocket, Responsive Design, Microservices Orchestration, API Gateway Patterns, Self-Contained Deployment,'
-INFO:     127.0.0.1:60550 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='LLM Inference & Deployment (Ollama, llama.cpp), Speech-to-Text (Whisper), Text-to-Speech (Piper, Google Cloud TTS), Context Engineering, AI Protocol Architecture (MCP), Cloud Models (Kimi, Qwen, Gemma), HTML5, CSS3, JavaScript (ES6+), Web Audio API, WebSocket, Responsive Design, Microservices Orchestration, API Gateway Patterns, Self-Contained Deployment, Legal Document Automation, Node.js, Python (Flask/FastAPI), REST API Design, SQLite, Discord Bot Development (discord.js, discord.py) inux System Administration, systemd, Bash Scripting, Git, Tailscale, WSL2/Windows Bridging, Docker (learning), Technical Tutorial Development, Reddit Community Building, Technical Documentation, Voice Interface Design'
+INFO:     127.0.0.1:52428 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
 [STATE MACHINE FATAL] phase=optional | section=projects | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=projects, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:49714 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='AI Orchestration & Community Education Platform'
-[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=0, extracted='AI Orchestration & Community Education Platform'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=0, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=1, field=name
 [STATE MACHINE FATAL] phase=optional | section=projects | opt_idx=0 | opt_field_idx=1
 [STATE MACHINE FATAL] optional section=projects, opt_idx=0, opt_field_idx=1
-INFO:     127.0.0.1:41230 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='OpenClaw, Node.js, WSL2, Ollama, Tailscale | 2025–2026'
-[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=1, extracted='OpenClaw, Node.js, WSL2, Ollama, Tailscale | 2025–2026'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=1, extracted='I'm badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=1
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=2, field=tech
 [STATE MACHINE FATAL] phase=optional | section=projects | opt_idx=0 | opt_field_idx=2
 [STATE MACHINE FATAL] optional section=projects, opt_idx=0, opt_field_idx=2
-INFO:     127.0.0.1:35146 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Architected complete OpenClaw-based AI assistant infrastructure with persistent memory, agent orchestration, multi-channel integration Built and maintain DaddyClintBot — production Discord bot with systemd-managed 24/7 operation, SQLite persistence Created comprehensive tutorial series for Reddit community (r/clawddys_and_mmas) covering OpenClaw, WSL2, Ollama, local LLM deployment Designed voice chat web application with real-time browser-based AI interaction'
-[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=2, extracted='Architected complete OpenClaw-based AI assistant infrastructure with persistent memory, agent orchestration, multi-channel integration Built and maintain DaddyClintBot — production Discord bot with systemd-managed 24/7 operation, SQLite persistence Created comprehensive tutorial series for Reddit community (r/clawddys_and_mmas) covering OpenClaw, WSL2, Ollama, local LLM deployment Designed voice chat web application with real-time browser-based AI interaction'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=2, extracted='I'm badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=2
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=3, field=description
 [STATE MACHINE FATAL] phase=optional | section=projects | opt_idx=0 | opt_field_idx=3
 [STATE MACHINE FATAL] optional section=projects, opt_idx=0, opt_field_idx=3
-INFO:     127.0.0.1:35148 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Active community educator and go-to resource for local AI infrastructure setup'
-[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=3, extracted='Active community educator and go-to resource for local AI infrastructure setup'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=3, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=3
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=4, field=result
 [STATE MACHINE FATAL] phase=optional | section=projects | opt_idx=0 | opt_field_idx=4
 [STATE MACHINE FATAL] optional section=projects, opt_idx=0, opt_field_idx=4
-INFO:     127.0.0.1:53858 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:49790 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=projects, item_idx=0, field_idx=4, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=4
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section projects, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=competencies | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=competencies, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:48030 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Operational Leadership'
-[OPTIONAL DEBUG] section=competencies, item_idx=0, field_idx=0, extracted='Operational Leadership'
+INFO:     127.0.0.1:49796 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='a badass'
+[OPTIONAL DEBUG] section=competencies, item_idx=0, field_idx=0, extracted='a badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=1, field=label
 [STATE MACHINE FATAL] phase=optional | section=competencies | opt_idx=0 | opt_field_idx=1
 [STATE MACHINE FATAL] optional section=competencies, opt_idx=0, opt_field_idx=1
-INFO:     127.0.0.1:57660 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='5+ years managing complex field operations, retail teams, safety-critical environments'
-[OPTIONAL DEBUG] section=competencies, item_idx=0, field_idx=1, extracted='5+ years managing complex field operations, retail teams, safety-critical environments'
+INFO:     127.0.0.1:40766 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='I'm badass'
+[OPTIONAL DEBUG] section=competencies, item_idx=0, field_idx=1, extracted='I'm badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=1
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=2, field=description
 [STATE MACHINE FATAL] phase=optional | section=competencies | opt_idx=0 | opt_field_idx=2
 [STATE MACHINE FATAL] optional section=competencies, opt_idx=0, opt_field_idx=2
-INFO:     127.0.0.1:57676 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:40766 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=competencies, item_idx=0, field_idx=2, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=2
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section competencies, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=education | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=education, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:42816 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Stephen F. Austin State University'
-[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=0, extracted='Stephen F. Austin State University'
+INFO:     127.0.0.1:40772 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=0, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=1, field=school
 [STATE MACHINE FATAL] phase=optional | section=education | opt_idx=0 | opt_field_idx=1
 [STATE MACHINE FATAL] optional section=education, opt_idx=0, opt_field_idx=1
-INFO:     127.0.0.1:42828 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Nacogdoches, TX'
-[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=1, extracted='Nacogdoches, TX'
+INFO:     127.0.0.1:39194 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=1, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=1
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=2, field=location
 [STATE MACHINE FATAL] phase=optional | section=education | opt_idx=0 | opt_field_idx=2
 [STATE MACHINE FATAL] optional section=education, opt_idx=0, opt_field_idx=2
-INFO:     127.0.0.1:40772 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Bachelor of Science, Kinesiology with Art Minor; Physics Major Work'
-[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=2, extracted='Bachelor of Science, Kinesiology with Art Minor; Physics Major Work'
+INFO:     127.0.0.1:39194 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass diploma'
+[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=2, extracted='badass diploma'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=2
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=3, field=degree
 [STATE MACHINE FATAL] phase=optional | section=education | opt_idx=0 | opt_field_idx=3
 [STATE MACHINE FATAL] optional section=education, opt_idx=0, opt_field_idx=3
-INFO:     127.0.0.1:40788 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Dean's List | National Honor Society'
-[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=3, extracted='Dean's List | National Honor Society'
+INFO:     127.0.0.1:39198 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
+[OPTIONAL DEBUG] section=education, item_idx=0, field_idx=3, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=3
+[SANITIZE] Stripped control word 'skip' from education.honors
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=4, field=honors
 [STATE MACHINE FATAL] phase=optional | section=education | opt_idx=0 | opt_field_idx=4
 [STATE MACHINE FATAL] optional section=education, opt_idx=0, opt_field_idx=4
-INFO:     127.0.0.1:36832 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:39198 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=education, item_idx=0, field_idx=4, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=4
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section education, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=community | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=community, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:36838 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Nacogdoches 1st Annual Jaycees Mud Run'
-[OPTIONAL DEBUG] section=community, item_idx=0, field_idx=0, extracted='Nacogdoches 1st Annual Jaycees Mud Run'
+INFO:     127.0.0.1:38536 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=community, item_idx=0, field_idx=0, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=1, field=org
 [STATE MACHINE FATAL] phase=optional | section=community | opt_idx=0 | opt_field_idx=1
 [STATE MACHINE FATAL] optional section=community, opt_idx=0, opt_field_idx=1
-INFO:     127.0.0.1:43528 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Help set up and participated in the MUD Run to promote community development'
-[OPTIONAL DEBUG] section=community, item_idx=0, field_idx=1, extracted='Help set up and participated in the MUD Run to promote community development'
+INFO:     127.0.0.1:38546 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=community, item_idx=0, field_idx=1, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=1
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=2, field=description
 [STATE MACHINE FATAL] phase=optional | section=community | opt_idx=0 | opt_field_idx=2
 [STATE MACHINE FATAL] optional section=community, opt_idx=0, opt_field_idx=2
-INFO:     127.0.0.1:43540 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:38546 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=community, item_idx=0, field_idx=2, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=2
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section community, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=certifications | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=certifications, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:43540 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Mud Engineer's Certificate'
-[OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=0, extracted='Mud Engineer's Certificate'
+INFO:     127.0.0.1:49582 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass certified'
+[OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=0, extracted='badass certified'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=1, field=name
 [STATE MACHINE FATAL] phase=optional | section=certifications | opt_idx=0 | opt_field_idx=1
 [STATE MACHINE FATAL] optional section=certifications, opt_idx=0, opt_field_idx=1
-INFO:     127.0.0.1:55882 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Halliburton'
-[OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=1, extracted='Halliburton'
+INFO:     127.0.0.1:49594 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='organization badass'
+[OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=1, extracted='organization badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=1
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=2, field=issuer
 [STATE MACHINE FATAL] phase=optional | section=certifications | opt_idx=0 | opt_field_idx=2
 [STATE MACHINE FATAL] optional section=certifications, opt_idx=0, opt_field_idx=2
-INFO:     127.0.0.1:55886 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='2011'
-[OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=2, extracted='2011'
+INFO:     127.0.0.1:44342 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
+[OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=2, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=2
+[SANITIZE] Stripped control word 'skip' from certifications.date
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=3, field=date
 [STATE MACHINE FATAL] phase=optional | section=certifications | opt_idx=0 | opt_field_idx=3
 [STATE MACHINE FATAL] optional section=certifications, opt_idx=0, opt_field_idx=3
-INFO:     127.0.0.1:57478 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:44342 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=certifications, item_idx=0, field_idx=3, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=3
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section certifications, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=references | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=references, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:57490 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Billy Bobo'
-[OPTIONAL DEBUG] section=references, item_idx=0, field_idx=0, extracted='Billy Bobo'
+INFO:     127.0.0.1:44342 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=references, item_idx=0, field_idx=0, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=1, field=name
 [STATE MACHINE FATAL] phase=optional | section=references | opt_idx=0 | opt_field_idx=1
 [STATE MACHINE FATAL] optional section=references, opt_idx=0, opt_field_idx=1
-INFO:     127.0.0.1:35576 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='936-615-1617'
-[OPTIONAL DEBUG] section=references, item_idx=0, field_idx=1, extracted='936-615-1617'
+INFO:     127.0.0.1:44350 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='badass'
+[OPTIONAL DEBUG] section=references, item_idx=0, field_idx=1, extracted='badass'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=1
 [OPTIONAL DEBUG] AFTER STORE: opt_idx=0, opt_field_idx=2, field=phone
 [STATE MACHINE FATAL] phase=optional | section=references | opt_idx=0 | opt_field_idx=2
 [STATE MACHINE FATAL] optional section=references, opt_idx=0, opt_field_idx=2
-INFO:     127.0.0.1:35588 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:44350 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=references, item_idx=0, field_idx=2, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=2
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section references, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=links | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=links, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:35588 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='Linkedin'
-[OPTIONAL DEBUG] section=links, item_idx=0, field_idx=0, extracted='Linkedin'
-[OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
-[OPTIONAL DEBUG] DECISION POINT: lower='linkedin', item_idx=0
-[OPTIONAL DEBUG] Unrecognized 'linkedin', staying in section links
-[STATE MACHINE FATAL] phase=optional | section=links | opt_idx=0 | opt_field_idx=0
-[STATE MACHINE FATAL] optional section=links, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:46214 - "POST /api/voice/turn HTTP/1.1" 200 OK
-[HTTP REQUEST] session_id=r6jEQHnz | action=answer | transcript='skip'
+INFO:     127.0.0.1:44350 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=JMJkgIr3 | action=answer | transcript='skip'
 [OPTIONAL DEBUG] section=links, item_idx=0, field_idx=0, extracted='skip'
 [OPTIONAL DEBUG] BEFORE: opt_idx=0, opt_field_idx=0
 [OPTIONAL DEBUG] DECISION POINT: lower='skip', item_idx=0
 [OPTIONAL DEBUG] Done with section links, advancing to next
 [STATE MACHINE FATAL] phase=optional | section=done | opt_idx=0 | opt_field_idx=0
 [STATE MACHINE FATAL] optional section=done, opt_idx=0, opt_field_idx=0
-INFO:     127.0.0.1:46222 - "POST /api/voice/turn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44350 - "POST /api/voice/turn HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56470 - "POST /api/voice/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53516 - "POST /api/voice/start HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='Test User'
+INFO:     127.0.0.1:53528 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='test@test.com'
+INFO:     127.0.0.1:53540 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='555-1234'
+INFO:     127.0.0.1:53542 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='Developer'
+INFO:     127.0.0.1:53554 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='Austin, TX'
+INFO:     127.0.0.1:53570 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='TX'
+INFO:     127.0.0.1:53572 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='skip'
+INFO:     127.0.0.1:53578 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='skip'
+INFO:     127.0.0.1:53584 - "POST /api/voice/turn HTTP/1.1" 200 OK
+[HTTP REQUEST] session_id=Te0rFUL6 | action=answer | transcript='skip'
+INFO:     127.0.0.1:53588 - "POST /api/voice/turn HTTP/1.1" 200 OK
