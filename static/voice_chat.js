@@ -89,23 +89,29 @@
         if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
             setupSpeechRecognition();
         } else {
-            micBtn.style.display = 'none';
+            if (micBtn) micBtn.style.display = 'none';
         }
 
         // Bind events
-        sendBtn.addEventListener('click', sendMessage);
-        textInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-        micBtn.addEventListener('click', toggleRecording);
+        if (sendBtn) {
+            sendBtn.addEventListener('click', sendMessage);
+        }
+        if (textInput) {
+            textInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+        }
+        if (micBtn) {
+            micBtn.addEventListener('click', toggleRecording);
+        }
         
         // Clear button
         const clearBtn = document.getElementById('clear-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
-                textInput.value = '';
+                if (textInput) textInput.value = '';
                 accumulatedFinal = '';
-                textInput.focus();
+                if (textInput) textInput.focus();
             });
         }
 
@@ -155,7 +161,11 @@
             }
         }
         // Start fresh
-        startSession();
+        try {
+            startSession();
+        } catch (e) {
+            console.error('Start session failed:', e);
+        }
     }
 
     async function saveProgress() {
@@ -215,7 +225,7 @@
 
             if (data.error) {
                 // Fall back to new session
-                startSession();
+                try { startSession(); } catch (e) { console.error(e); }
                 return;
             }
 
@@ -247,7 +257,7 @@
         } catch (e) {
             hideTyping();
             console.error('Load session error:', e);
-            startSession();
+            try { startSession(); } catch (e2) { console.error(e2); }
         }
     }
 
@@ -335,8 +345,8 @@
     async function goBack() {
         if (!sessionId || !canGoBack) return;
         
-        textInput.disabled = true;
-        sendBtn.disabled = true;
+        if (textInput) textInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
         showTyping();
 
         try {
@@ -367,17 +377,19 @@
             hideTyping();
             console.error('Back error:', e);
         } finally {
-            textInput.disabled = false;
-            sendBtn.disabled = false;
-            textInput.focus();
+            if (textInput) {
+                textInput.disabled = false;
+                textInput.focus();
+            }
+            if (sendBtn) sendBtn.disabled = false;
         }
     }
 
     async function finishJobs() {
         if (!sessionId) return;
         
-        textInput.disabled = true;
-        sendBtn.disabled = true;
+        if (textInput) textInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
         showTyping();
 
         try {
@@ -416,19 +428,23 @@
             hideTyping();
             console.error('Finish jobs error:', e);
         } finally {
-            textInput.disabled = false;
-            sendBtn.disabled = false;
-            textInput.style.display = 'block';
-            sendBtn.style.display = 'block';
-            textInput.focus();
+            if (textInput) {
+                textInput.disabled = false;
+                textInput.style.display = 'block';
+                textInput.focus();
+            }
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.style.display = 'block';
+            }
         }
     }
 
     async function addAnother() {
         if (!sessionId) return;
         
-        textInput.disabled = true;
-        sendBtn.disabled = true;
+        if (textInput) textInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
         showTyping();
 
         try {
@@ -461,9 +477,11 @@
             hideTyping();
             console.error('Add error:', e);
         } finally {
-            textInput.disabled = false;
-            sendBtn.disabled = false;
-            textInput.focus();
+            if (textInput) {
+                textInput.disabled = false;
+                textInput.focus();
+            }
+            if (sendBtn) sendBtn.disabled = false;
         }
     }
 
@@ -493,17 +511,23 @@
             const welcome = document.getElementById('welcome-message');
             if (welcome) welcome.remove();
             
-            const displayQuestion = data.context_label 
-                ? `[${data.context_label}] ${data.question}` 
-                : data.question;
-            
-            addMessage('ai', displayQuestion, false);
-            clearInput(data.field === '_bullet');
-            currentField = data.field;
-            updateProgress(currentStepIndex);
-            updateContextLabel(data.context_label);
-            updateNavButtons(data.can_go_back, data.field, data.show_add_job);
-            updateBulletUI(data);
+            // GLOBAL CIRCUIT BREAKER: Wrap ALL UI rendering to prevent crash loops
+            try {
+                const displayQuestion = data.context_label 
+                    ? `[${data.context_label}] ${data.question}` 
+                    : data.question;
+                
+                addMessage('ai', displayQuestion, false);
+                clearInput(data.field === '_bullet');
+                currentField = data.field;
+                updateProgress(currentStepIndex);
+                updateContextLabel(data.context_label);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateBulletUI(data);
+            } catch (renderError) {
+                console.warn("Caught a layout rendering exception in startSession, bypassing:", renderError);
+                // DO NOT re-add message here — it causes duplicates if the message already rendered above
+            }
         } catch (e) {
             hideTyping();
             addMessage('ai', 'Sorry, something went wrong. Please refresh and try again.', false);
@@ -512,17 +536,17 @@
     }
 
     async function sendMessage() {
-        const text = textInput.value.trim();
+        const text = textInput ? textInput.value.trim() : '';
         if (!text || !sessionId) return;
 
         if (isRecording) stopRecording();
 
         lastUserMessage = text;
         addMessage('user', text, true);
-        textInput.value = '';
+        if (textInput) textInput.value = '';
         accumulatedFinal = '';
-        textInput.disabled = true;
-        sendBtn.disabled = true;
+        if (textInput) textInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
 
         showTyping();
 
@@ -539,31 +563,37 @@
                 addMessage('ai', 'Sorry: ' + data.error + '. Please try again.', false);
             } else {
                 lastQuestion = data.question;
-                // Don't show skills review message in chat — panel shows it visually
-                if (data.field !== 'skills_review') {
-                    const displayQuestion = data.context_label 
-                        ? `[${data.context_label}] ${data.question}` 
-                        : data.question;
-                    addMessage('ai', displayQuestion, false);
-                }
-                clearInput(data.field === '_bullet');
-                currentField = data.field;
-                updateProgress(data.step_index);
-                updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
-                updateBulletUI(data);
+                // GLOBAL CIRCUIT BREAKER: Wrap ALL UI rendering to prevent crash loops
+                try {
+                    // Don't show skills review message in chat — panel shows it visually
+                    if (data.field !== 'skills_review') {
+                        const displayQuestion = data.context_label 
+                            ? `[${data.context_label}] ${data.question}` 
+                            : data.question;
+                        addMessage('ai', displayQuestion, false);
+                    }
+                    clearInput(data.field === '_bullet');
+                    currentField = data.field;
+                    updateProgress(data.step_index);
+                    updateContextLabel(data.context_label);
+                    updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                    updateBulletUI(data);
 
-                // Handle skills review phase
-                if (data.field === 'skills_review' && data.skills_categorized) {
-                    currentSkillsCategorized = data.skills_categorized;
-                    renderSkillsPanel(data.skills_categorized);
-                } else {
-                    // Hide skills panel if not in skills review
-                    hideSkillsPanel();
-                }
+                    // Handle skills review phase
+                    if (data.field === 'skills_review' && data.skills_categorized) {
+                        currentSkillsCategorized = data.skills_categorized;
+                        renderSkillsPanel(data.skills_categorized);
+                    } else {
+                        // Hide skills panel if not in skills review
+                        hideSkillsPanel();
+                    }
 
-                if (data.done) {
-                    showViewResumeButton();
+                    if (data.done) {
+                        showViewResumeButton();
+                    }
+                } catch (renderError) {
+                    console.warn("Caught a layout rendering exception, bypassing to prevent conversation crash:", renderError);
+                    // DO NOT re-add message here — it causes duplicates if the message already rendered above
                 }
             }
         } catch (e) {
@@ -571,12 +601,15 @@
             addMessage('ai', 'Sorry, I had trouble with that. Please try again.', false);
             console.error('Turn error:', e);
         } finally {
-            textInput.disabled = false;
-            sendBtn.disabled = false;
-            // FORCE INPUT VISIBLE: Ensure text input is always re-shown after any turn
-            textInput.style.display = 'block';
-            sendBtn.style.display = 'block';
-            textInput.focus();
+            if (textInput) {
+                textInput.disabled = false;
+                textInput.style.display = 'block';
+                textInput.focus();
+            }
+            if (sendBtn) {
+                sendBtn.disabled = false;
+                sendBtn.style.display = 'block';
+            }
         }
     }
 
@@ -638,7 +671,8 @@
         </div>`;
 
         panel.innerHTML = html;
-        document.querySelector('.voice-chat-container').appendChild(panel);
+        const container = document.querySelector('.voice-chat-container');
+        if (container) container.appendChild(panel);
 
         // Bind toggle
         const header = document.getElementById('skills-panel-header');
@@ -764,7 +798,7 @@
     // ===== UI HELPERS =====
 
     function clearInput(addBulletPrefix) {
-        textInput.value = addBulletPrefix ? '• ' : '';
+        if (textInput) textInput.value = addBulletPrefix ? '• ' : '';
         accumulatedFinal = '';
     }
 
@@ -801,7 +835,7 @@
             <div class="message-bubble">${escapeHtml(text)}</div>
             <div class="message-time">${formatTime()}</div>
         `;
-        chatMessages.appendChild(div);
+        if (chatMessages) chatMessages.appendChild(div);
         scrollToBottom();
     }
 
@@ -814,7 +848,7 @@
                 <span></span><span></span><span></span>
             </div>
         `;
-        chatMessages.appendChild(div);
+        if (chatMessages) chatMessages.appendChild(div);
         scrollToBottom();
     }
 
@@ -826,11 +860,12 @@
     function updateProgress(stepIndex) {
         currentStepIndex = stepIndex;
         const pct = Math.min(Math.round((stepIndex / totalSteps) * 100), 100);
-        progressFill.style.width = pct + '%';
-        progressText.textContent = pct + '%';
+        if (progressFill) progressFill.style.width = pct + '%';
+        if (progressText) progressText.textContent = pct + '%';
     }
 
     function updateContextLabel(label) {
+        if (!contextLabel) return;
         if (!label) {
             contextLabel.classList.add('hidden');
             return;
@@ -869,7 +904,7 @@
             }
         }
         
-        backBtn.style.display = canBack ? 'inline-block' : 'none';
+        if (backBtn) backBtn.style.display = canBack ? 'inline-block' : 'none';
         
         // Show save button always when we have a session
         if (saveBtn) {
@@ -881,23 +916,25 @@
             doneJobsBtn.style.display = inExperiencePhase ? 'inline-block' : 'none';
         }
         
-        if (isDecisionPoint || isLoopField || isBulletField || isMoreBullets || isAddJob || showAddJob) {
-            addBtn.style.display = 'inline-block';
-            if (isDecisionPoint) {
-                addBtn.textContent = '+ Add Another';
-            } else if (inExperiencePhase) {
-                addBtn.textContent = '+ Add Job';
+        if (addBtn) {
+            if (isDecisionPoint || isLoopField || isBulletField || isMoreBullets || isAddJob || showAddJob) {
+                addBtn.style.display = 'inline-block';
+                if (isDecisionPoint) {
+                    addBtn.textContent = '+ Add Another';
+                } else if (inExperiencePhase) {
+                    addBtn.textContent = '+ Add Job';
+                }
+            } else {
+                addBtn.style.display = 'none';
             }
-        } else {
-            addBtn.style.display = 'none';
         }
     }
 
     function showViewResumeButton() {
         console.log('[DEBUG] showViewResumeButton called');
-        micBtn.style.display = 'none';
-        textInput.style.display = 'none';
-        sendBtn.style.display = 'none';
+        if (micBtn) micBtn.style.display = 'none';
+        if (textInput) textInput.style.display = 'none';
+        if (sendBtn) sendBtn.style.display = 'none';
         if (navButtons) navButtons.style.display = 'none';
         hideSkillsPanel();
 
@@ -930,7 +967,7 @@
                 const previewDiv = document.createElement('div');
                 previewDiv.className = 'voice-preview-container';
                 previewDiv.innerHTML = data.preview_html;
-                chatMessages.appendChild(previewDiv);
+                if (chatMessages) chatMessages.appendChild(previewDiv);
                 console.log('[DEBUG] Preview container appended to chat');
                 
                 // Add purchase button
@@ -938,7 +975,7 @@
                 buyBtn.href = `/build?mode=form&voice_session=${sessionId}`;
                 buyBtn.className = 'view-resume-btn';
                 buyBtn.textContent = '💳 Purchase Resume ($9.99)';
-                chatMessages.appendChild(buyBtn);
+                if (chatMessages) chatMessages.appendChild(buyBtn);
                 
                 scrollToBottom();
             } else {
@@ -948,7 +985,7 @@
                 btn.href = `/build?mode=form&voice_session=${sessionId}`;
                 btn.className = 'view-resume-btn';
                 btn.textContent = '👁️ View Your Resume';
-                chatMessages.appendChild(btn);
+                if (chatMessages) chatMessages.appendChild(btn);
                 addMessage('ai', 'Great! Your resume is ready. Click below to preview and purchase.', false);
             }
         } catch (e) {
@@ -959,14 +996,14 @@
             btn.href = `/build?mode=form&voice_session=${sessionId}`;
             btn.className = 'view-resume-btn';
             btn.textContent = '👁️ View Your Resume';
-            chatMessages.appendChild(btn);
+            if (chatMessages) chatMessages.appendChild(btn);
             addMessage('ai', 'Great! Your resume is ready. Click below to preview and purchase.', false);
         }
         console.log('[DEBUG] fetchPreviewAndDisplay completed');
     }
 
     function scrollToBottom() {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     function escapeHtml(text) {
@@ -978,5 +1015,12 @@
     function formatTime() {
         const now = new Date();
         return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+
+    // Initialize safely
+    try {
+        init();
+    } catch (e) {
+        console.error('Init failed:', e);
     }
 })();
