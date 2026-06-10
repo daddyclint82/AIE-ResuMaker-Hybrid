@@ -442,13 +442,15 @@ async def process_answer(session: dict, transcript: str) -> dict:
     lower = extracted.lower()
     
     # === INTERCEPT: Global decision-word sanitization ===
-    # If user sends a control word at ANY decision point, do NOT store it as data.
-    # Decision fields start with underscore: _more_bullets, _add_job, _add_projects, etc.
+    # If user sends a control word at standard decision points, do NOT store it as data.
+    # But ALLOW structural transition fields (_add_job, _decision, _add_references) to
+    # pass through so the state machine can execute phase transitions naturally.
     current_field = ctx.get("field", "")
-    if isinstance(current_field, str) and current_field.startswith("_") and lower in ("yes", "done", "no", "skip", "next"):
-        print(f"[INTERCEPT] Blocked control word '{lower}' from being stored at decision field '{current_field}'")
-        # Return next state WITHOUT storing the control word as data
-        return get_current_state(session)
+    if isinstance(current_field, str) and current_field.startswith("_") and current_field not in ("_add_job", "_decision", "_add_references"):
+        if lower in ("yes", "done", "no", "skip", "next"):
+            print(f"[INTERCEPT] Safely blocked text leak '{lower}' for standard field '{current_field}'")
+            # Return next state WITHOUT storing the control word as data
+            return get_current_state(session)
     # === END INTERCEPT ===
     
     # GLOBAL SAFETY CHECK: If user says "done" in experience phase past field collection,
