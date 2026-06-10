@@ -1645,6 +1645,18 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         return get_current_state(session)
     # === END ESCAPE HATCH ===
     
+    # === UNIVERSAL OVERRIDE: Force complete session compilation ===
+    if action == "universal_force_compile":
+        ctx = session.get("context", {})
+        ctx["phase"] = "done"
+        ctx["current_field"] = "complete"
+        session["context"] = ctx
+        session["done"] = True
+        _persist_session(session_id)
+        print("[UNIVERSAL OVERRIDE] Bypassed all optional sections. Forced session compilation.")
+        return get_current_state(session)
+    # === END UNIVERSAL OVERRIDE ===
+    
     # Extra defensive: ensure flags exist even for in-memory sessions
     ctx = session.get("context", {})
     for flag in ["exp_field_idx", "in_bullet_loop", "bullet_count", "exp_done", "awaiting_more_bullets", "exp_idx", "summary_idx", "opt_idx", "opt_field_idx"]:

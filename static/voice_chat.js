@@ -140,6 +140,59 @@
         if (saveBtn) {
             saveBtn.addEventListener('click', saveProgress);
         }
+
+        // UNIVERSAL OVERRIDE: Container-anchored "COMPILE RESUME NOW" button in header
+        const compileBtn = document.createElement('button');
+        compileBtn.id = 'universal-compile-btn';
+        compileBtn.textContent = '⚙️ COMPILE RESUME NOW';
+        compileBtn.style.cssText = 'position:absolute!important;top:12px!important;right:16px!important;padding:6px 14px!important;background:#FF4D4D!important;color:#FFFFFF!important;border:none!important;border-radius:20px!important;font-size:13px!important;font-weight:700!important;cursor:pointer!important;z-index:999!important;box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;';
+        
+        compileBtn.addEventListener('click', async () => {
+            if (!sessionId) {
+                alert('Please wait for the session to start.');
+                return;
+            }
+            compileBtn.textContent = '⏳ Compiling...';
+            compileBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/voice/turn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId, transcript: '', action: 'universal_force_compile' })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    compileBtn.textContent = '⚙️ COMPILE RESUME NOW';
+                    compileBtn.disabled = false;
+                } else {
+                    window.location.href = `/build?mode=form&voice_session=${window.sessionId || ''}`;
+                }
+            } catch (e) {
+                console.error('Compile error:', e);
+                compileBtn.textContent = '⚙️ COMPILE RESUME NOW';
+                compileBtn.disabled = false;
+            }
+        });
+        
+        // Mount into chat header container instead of body
+        const chatHeader = document.querySelector('.voice-chat-header') || document.querySelector('.chat-header') || document.getElementById('chat-header');
+        if (chatHeader) {
+            chatHeader.style.position = 'relative';
+            chatHeader.appendChild(compileBtn);
+        } else {
+            // Fallback: mount into main chat container with relative positioning
+            const chatContainer = document.querySelector('.voice-chat-container') || document.querySelector('.chat-container');
+            if (chatContainer) {
+                chatContainer.style.position = 'relative';
+                chatContainer.appendChild(compileBtn);
+            } else {
+                // Emergency fallback to body with fixed positioning
+                compileBtn.style.cssText = 'position:fixed!important;top:20px!important;right:20px!important;padding:6px 14px!important;background:#FF4D4D!important;color:#FFFFFF!important;border:none!important;border-radius:20px!important;font-size:13px!important;font-weight:700!important;cursor:pointer!important;z-index:999!important;box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;';
+                document.body.appendChild(compileBtn);
+            }
+        }
     }
 
     // ===== SAVE / LOAD =====
