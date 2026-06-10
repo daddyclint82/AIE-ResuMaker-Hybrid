@@ -1,25 +1,18 @@
-INFO:     Started server process [11699]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Will watch for changes in these directories: ['/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [8601] using StatReload
 [AIE ResuMaker] Environment: development
 [AIE ResuMaker] Stripe key prefix: sk_test...
-INFO:     127.0.0.1:41150 - "GET /healthz HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57058 - "GET /build HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57052 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57052 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:57066 - "GET /terms HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "GET /build HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "GET /static/app.js?v=4 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "GET /api/states HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49744 - "GET /api/degrees HTTP/1.1" 200 OK
-INFO:     127.0.0.1:57066 - "GET /api/states HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49744 - "GET /api/degrees HTTP/1.1" 200 OK
-INFO:     127.0.0.1:49744 - "GET /api/states HTTP/1.1" 200 OK
-INFO:     127.0.0.1:46248 - "POST /api/build HTTP/1.1" 200 OK
-INFO:     127.0.0.1:46248 - "POST /api/create-checkout-session HTTP/1.1" 200 OK
-INFO:     127.0.0.1:46262 - "POST /api/create-checkout-session HTTP/1.1" 200 OK
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [11699]
+INFO:     Started server process [8604]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[AIE ResuMaker] Environment: development
+[AIE ResuMaker] Stripe key prefix: sk_test...
+INFO:     127.0.0.1:60572 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55888 - "GET /build?mode=voice HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55888 - "GET /static/voice_chat.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55902 - "GET /static/images/aei-logo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55902 - "GET /static/images/mic-icon.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55888 - "GET /static/voice_chat.js?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55888 - "POST /api/voice/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55902 - "GET /favicon.ico HTTP/1.1" 404 Not Found
