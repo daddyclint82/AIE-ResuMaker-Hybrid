@@ -323,7 +323,8 @@
                 if (termsCheckbox.checked && ageCheckbox.checked) {
                     localStorage.setItem('aie_terms_accepted', 'true');
                     localStorage.setItem('aie_terms_accepted_date', new Date().toISOString());
-                    window.location.href = '/build';
+                    const ret = new URLSearchParams(window.location.search).get('return');
+                    window.location.href = ret || '/build';
                 }
             });
         </script>

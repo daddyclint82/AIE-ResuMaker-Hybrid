@@ -178,8 +178,9 @@ function checkTermsAcceptance() {
     const accepted = localStorage.getItem('aie_terms_accepted');
     
     if (!accepted) {
-        // Redirect to terms page if not accepted
-        window.location.href = '/terms';
+        // Preserve voice_session/mode so we return to the right build after accepting
+        const params = window.location.search; // e.g. ?mode=form&voice_session=abc
+        window.location.href = '/terms' + (params ? '?return=' + encodeURIComponent('/build' + params) : '');
     }
 }
 
@@ -410,9 +411,14 @@ function loadVoiceData() {
         const voiceData = JSON.parse(script.textContent);
         if (!voiceData || Object.keys(voiceData).length === 0) return;
         
+        // Detect whether THIS load came from a fresh voice session (URL param).
+        // If so, the server session is authoritative — do NOT let stale
+        // localStorage shadow it (that caused prompt-text/partial-resume bugs).
+        const hasVoiceSession = new URLSearchParams(window.location.search).has('voice_session');
+        
         // Check if user has already saved progress in localStorage
         const savedProgress = localStorage.getItem('aie_resume_progress');
-        if (savedProgress) {
+        if (savedProgress && !hasVoiceSession) {
             const savedData = JSON.parse(savedProgress);
             const savedAt = localStorage.getItem('aie_resume_saved_at');
             
@@ -422,6 +428,13 @@ function loadVoiceData() {
                 console.log('[AIE ResuMaker] localStorage has saved data, skipping voice data load to preserve edits');
                 return;
             }
+        }
+        if (hasVoiceSession) {
+            // Fresh voice session is authoritative — drop stale saved progress
+            // so a later reload without the param can't resurrect old data.
+            localStorage.removeItem('aie_resume_progress');
+            localStorage.removeItem('aie_resume_saved_at');
+            console.log('[AIE ResuMaker] Fresh voice session present — using server data, cleared stale localStorage');
         }
         
         console.log('[AIE ResuMaker] Loading voice session data:', voiceData);
@@ -1288,6 +1301,9 @@ async function handleFormSubmit(e) {
     formData.set('competencies', JSON.stringify(competencies));
     formData.set('community', JSON.stringify(community));
     formData.set('certifications', JSON.stringify(certifications));
+    // Pass voice session so the server builds authoritatively from stored data
+    const _vsBuild = new URLSearchParams(window.location.search).get('voice_session');
+    if (_vsBuild) formData.set('voice_session', _vsBuild);
     
     try {
         showLoading('Building your resume...');
@@ -1418,6 +1434,9 @@ async function generatePreview() {
     formData.set('competencies', JSON.stringify(competencies));
     formData.set('community', JSON.stringify(community));
     formData.set('certifications', JSON.stringify(certifications));
+    // Pass voice session so the server builds authoritatively from stored data
+    const _vsPreview = new URLSearchParams(window.location.search).get('voice_session');
+    if (_vsPreview) formData.set('voice_session', _vsPreview);
     
     try {
         showLoading('Building preview...');
