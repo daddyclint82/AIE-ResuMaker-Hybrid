@@ -861,10 +861,12 @@
                                    field === 'company' || field === 'title' || 
                                    field === 'dates' || field === 'location';
         
-        if (canBack || isLoopField || isDecisionPoint || isBulletField || isMoreBullets || isAddJob || showAddJob) {
-            navButtons.classList.remove('hidden');
-        } else {
-            navButtons.classList.add('hidden');
+        if (navButtons) {
+            if (canBack || isLoopField || isDecisionPoint || isBulletField || isMoreBullets || isAddJob || showAddJob) {
+                navButtons.classList.remove('hidden');
+            } else {
+                navButtons.classList.add('hidden');
+            }
         }
         
         backBtn.style.display = canBack ? 'inline-block' : 'none';
@@ -896,7 +898,7 @@
         micBtn.style.display = 'none';
         textInput.style.display = 'none';
         sendBtn.style.display = 'none';
-        navButtons.style.display = 'none';
+        if (navButtons) navButtons.style.display = 'none';
         hideSkillsPanel();
 
         // Fetch and display inline preview

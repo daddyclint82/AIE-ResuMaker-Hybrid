@@ -1,18 +1,27 @@
 INFO:     Will watch for changes in these directories: ['/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid']
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [8601] using StatReload
+INFO:     Started reloader process [8702] using StatReload
 [AIE ResuMaker] Environment: development
 [AIE ResuMaker] Stripe key prefix: sk_test...
-INFO:     Started server process [8604]
+INFO:     Started server process [8705]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 [AIE ResuMaker] Environment: development
 [AIE ResuMaker] Stripe key prefix: sk_test...
-INFO:     127.0.0.1:60572 - "GET /healthz HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55888 - "GET /build?mode=voice HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55888 - "GET /static/voice_chat.css?v=24 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55902 - "GET /static/images/aei-logo.jpg HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55902 - "GET /static/images/mic-icon.png HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55888 - "GET /static/voice_chat.js?v=24 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55888 - "POST /api/voice/start HTTP/1.1" 200 OK
-INFO:     127.0.0.1:55902 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:33052 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54126 - "GET /build?mode=voice HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54126 - "GET /static/voice_chat.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54110 - "GET /static/images/aei-logo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54110 - "GET /static/voice_chat.js?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54126 - "GET /static/images/mic-icon.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54126 - "POST /api/voice/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54110 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54110 - "GET /build?mode=voice HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54126 - "GET /static/images/aei-logo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54142 - "GET /static/voice_chat.js?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54140 - "GET /static/images/mic-icon.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54110 - "GET /static/voice_chat.css?v=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54110 - "POST /api/voice/start HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54140 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+[HTTP REQUEST] session_id=v-IGy7Bb | action=answer | transcript='Clinton Singleton'
+INFO:     127.0.0.1:48286 - "POST /api/voice/turn HTTP/1.1" 200 OK
