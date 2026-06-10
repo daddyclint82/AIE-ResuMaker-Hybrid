@@ -441,6 +441,16 @@ async def process_answer(session: dict, transcript: str) -> dict:
     # Handle skip/none for optional things
     lower = extracted.lower()
     
+    # === INTERCEPT: Global decision-word sanitization ===
+    # If user sends a control word at ANY decision point, do NOT store it as data.
+    # Decision fields start with underscore: _more_bullets, _add_job, _add_projects, etc.
+    current_field = ctx.get("field", "")
+    if isinstance(current_field, str) and current_field.startswith("_") and lower in ("yes", "done", "no", "skip", "next"):
+        print(f"[INTERCEPT] Blocked control word '{lower}' from being stored at decision field '{current_field}'")
+        # Return next state WITHOUT storing the control word as data
+        return get_current_state(session)
+    # === END INTERCEPT ===
+    
     # GLOBAL SAFETY CHECK: If user says "done" in experience phase past field collection,
     # force bullet loop exit regardless of internal flags
     if phase == "experience":
@@ -762,8 +772,24 @@ def _process_optional(session: dict, extracted: str) -> dict:
         elif lower in ["next", "done", "skip", "no"]:
             # Done with this section - save data and move to next
             print(f"[OPTIONAL DEBUG] Done with section {section}, advancing to next")
-            # Filter out empty dicts before saving
-            filtered_items = [item for item in item_list if item and (not isinstance(item, dict) or any(item.values()))]
+            # Filter out empty dicts before saving AND strip control words
+            CONTROL_WORDS = {"yes", "skip", "done", "next", "no", "add", "more", "stop", "finished"}
+            filtered_items = []
+            for item in item_list:
+                if not item or not isinstance(item, dict):
+                    continue
+                # Strip control words from all fields
+                cleaned_item = {}
+                has_real_data = False
+                for k, v in item.items():
+                    if isinstance(v, str) and v.strip().lower() in CONTROL_WORDS:
+                        cleaned_item[k] = ""
+                    else:
+                        cleaned_item[k] = v
+                        if v:  # truthy non-empty value
+                            has_real_data = True
+                if has_real_data:
+                    filtered_items.append(cleaned_item)
             if filtered_items:
                 data[section] = filtered_items
                 session["data"] = data
@@ -791,7 +817,14 @@ def _process_optional(session: dict, extracted: str) -> dict:
     
     # Collecting field data
     field_name = fields[field_idx]["field"]
-    item_list[item_idx][field_name] = extracted
+    # SANITIZE: strip control words from non-decision fields
+    CONTROL_WORDS = {"yes", "done", "no", "skip", "next", "add", "more", "stop", "finished"}
+    if lower in CONTROL_WORDS:
+        stored_value = ""
+        print(f"[SANITIZE] Stripped control word '{lower}' from {section}.{field_name}")
+    else:
+        stored_value = extracted
+    item_list[item_idx][field_name] = stored_value
     ctx[section] = item_list
     ctx["opt_field_idx"] = field_idx + 1
     session["context"] = ctx
@@ -1425,7 +1458,7 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
                 cleaned.append(item)
                 continue
             cleaned_item = dict(item)
-            for field in field_map.get("__all__", []):
+            for field in cleaned_item.keys():
                 if field in cleaned_item:
                     val = str(cleaned_item[field]).strip()
                     if val.lower() in CONTROL_VALUES:
