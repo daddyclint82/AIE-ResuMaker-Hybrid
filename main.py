@@ -2311,12 +2311,15 @@ async def check_payment(resume_id: str):
 
 
 # Anti-Piracy: Preview Rendering with Watermark
-from playwright.async_api import async_playwright
 from PIL import Image, ImageDraw, ImageFont
 
 async def render_preview_to_image(html_content: str, resume_id: str) -> bytes:
-    """Render preview HTML to watermarked PNG image"""
+    """Render preview HTML to watermarked PNG image.
+    Playwright/Chromium is imported lazily so the app still boots in
+    environments where the browser isn't installed (e.g. minimal Render build).
+    """
     try:
+        from playwright.async_api import async_playwright
         async with async_playwright() as p:
             browser = await p.chromium.launch()
             page = await browser.new_page(viewport={"width": 816, "height": 1056})
@@ -3188,4 +3191,8 @@ async def download_resume(resume_id: str, format: str = "docx"):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Respect Render's dynamic $PORT in production; default 8000 locally.
+    # reload=True only when APP_ENV is not production.
+    _port = int(os.getenv("PORT", "8000"))
+    _reload = os.getenv("APP_ENV", "development") != "production"
+    uvicorn.run("main:app", host="0.0.0.0", port=_port, reload=_reload)

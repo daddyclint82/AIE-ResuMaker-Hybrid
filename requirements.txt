@@ -1,0 +1,24 @@
+# AIe ResuMaker Hybrid — production dependencies
+# Web framework
+fastapi==0.136.3
+uvicorn==0.49.0
+starlette==1.2.1
+pydantic==2.13.4
+python-multipart==0.0.32
+
+# Templating + config
+jinja2==3.1.2
+python-dotenv==1.2.2
+
+# HTTP + integrations
+httpx==0.28.1
+groq==1.4.0
+stripe==15.2.0
+
+# Document generation
+reportlab==4.5.1
+python-docx==1.2.0
+Pillow==12.2.0
+
+# Watermarked preview rendering (optional; requires `playwright install chromium`)
+playwright==1.60.0
