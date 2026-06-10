@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import json
 import os
+import re
 import httpx
 from datetime import datetime
 from docx import Document
@@ -769,6 +770,23 @@ async def get_job_summary(job_code: str):
     except Exception as e:
         return {"error": str(e)}
 
+def _load_voice_session_data(session_id: str):
+    """Return a voice session's stored 'data' dict, from memory or disk. None if missing."""
+    if not session_id:
+        return None
+    sess = voice_session_store.get(session_id)
+    if sess is None:
+        path = os.path.join(os.path.dirname(__file__), "voice_sessions", f"{session_id}.json")
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, "r") as f:
+                sess = json.load(f)
+        except Exception:
+            return None
+    return sess.get("data", {}) if isinstance(sess, dict) else None
+
+
 @app.post("/api/build")
 async def build_resume(
     full_name: str = Form(...),
@@ -787,17 +805,59 @@ async def build_resume(
     community: str = Form(""),
     certifications: str = Form(""),
     industry: str = Form(""),
-    template_style: str = Form("professional")
+    template_style: str = Form("professional"),
+    voice_session: str = Form("")
 ):
     """Build resume and return download URLs"""
     
-    exp_list = json.loads(experience) if experience else []
-    edu_list = json.loads(education) if education else []
-    skills_list = [s.strip() for s in skills.split("|") if s.strip()]
-    proj_list = json.loads(projects) if projects else []
-    comp_list = json.loads(competencies) if competencies else []
-    comm_list = json.loads(community) if community else []
-    cert_list = json.loads(certifications) if certifications else []
+    # === SESSION-AUTHORITATIVE BUILD (voice/mobile path) ===
+    # When a voice_session is present, the stored session data is the source of
+    # truth for the rich repeating sections (experience/education/projects/etc.),
+    # bypassing the lossy form-DOM round-trip. Desktop form users (no voice_session)
+    # keep the original form-DOM path unchanged.
+    session_data = _load_voice_session_data(voice_session)
+    session_address = ""
+    if session_data:
+        def _as_list(v):
+            if isinstance(v, list):
+                return v
+            if isinstance(v, str) and v.strip():
+                try:
+                    return json.loads(v)
+                except Exception:
+                    return []
+            return []
+        exp_list  = _as_list(session_data.get("experience"))
+        edu_list  = _as_list(session_data.get("education"))
+        proj_list = _as_list(session_data.get("projects"))
+        comp_list = _as_list(session_data.get("competencies"))
+        comm_list = _as_list(session_data.get("community"))
+        cert_list = _as_list(session_data.get("certifications"))
+        # Prefer an edited form summary if provided, else the session summary
+        summary = summary.strip() or session_data.get("summary", "")
+        sk = session_data.get("skills")
+        if isinstance(sk, list):
+            skills_list = [s for s in sk if s]
+        elif isinstance(sk, str) and sk.strip():
+            skills_list = [s.strip() for s in re.split(r"[|,]", sk) if s.strip()]
+        else:
+            skills_list = [s.strip() for s in skills.split("|") if s.strip()]
+        skills_categorized = session_data.get("skills_categorized") or categorize_skills(skills_list)
+        session_address = session_data.get("address", "")
+        print(f"[BUILD] Session-authoritative build from {voice_session}: "
+              f"exp={len(exp_list)} edu={len(edu_list)} proj={len(proj_list)} "
+              f"comp={len(comp_list)} comm={len(comm_list)} cert={len(cert_list)}")
+    else:
+        # Original form-DOM path (desktop form users)
+        exp_list = json.loads(experience) if experience else []
+        edu_list = json.loads(education) if education else []
+        skills_list = [s.strip() for s in skills.split("|") if s.strip()]
+        proj_list = json.loads(projects) if projects else []
+        comp_list = json.loads(competencies) if competencies else []
+        comm_list = json.loads(community) if community else []
+        cert_list = json.loads(certifications) if certifications else []
+        skills_categorized = categorize_skills(skills_list)
+    # === END SESSION-AUTHORITATIVE BUILD ===
     
     # Build location string from state and city
     location_parts = []
@@ -805,14 +865,12 @@ async def build_resume(
     if state: location_parts.append(state)
     location = ", ".join(location_parts) if location_parts else ""
     
-    # Auto-categorize skills for grouped preview display
-    skills_categorized = categorize_skills(skills_list)
-    
     resume_data = {
         "full_name": full_name,
         "email": email,
         "phone": phone,
         "location": location,
+        "address": session_address,
         "linkedin": linkedin,
         "website": website,
         "summary": summary,

@@ -1561,6 +1561,13 @@ async def voice_start(request: Request):
     _persist_session(session_id)
     
     step = get_current_state(session)
+    # Record opening AI question for transcript rehydration
+    _opening_label = step.get("context_label", "")
+    session.setdefault("history", []).append({
+        "role": "ai",
+        "text": f"[{_opening_label}] {step['question']}".strip() if _opening_label else step["question"]
+    })
+    _persist_session(session_id)
     return {
         "session_id": session_id,
         "question": step["question"],
@@ -1648,6 +1655,10 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
     # === UNIVERSAL OVERRIDE: Force complete session compilation ===
     if action == "universal_force_compile":
         ctx = session.get("context", {})
+        # Stamp where we were so un-done recovery can resume precisely
+        if ctx.get("phase") and ctx.get("phase") != "done":
+            ctx["_resume_phase"] = ctx.get("phase")
+            ctx["_resume_step_index"] = session.get("step_index", 0)
         ctx["phase"] = "done"
         ctx["current_field"] = "complete"
         session["context"] = ctx
@@ -1663,6 +1674,48 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         if flag not in ctx:
             ctx[flag] = 0 if "idx" in flag or "count" in flag else False
     session["context"] = ctx
+    
+    # === UN-DONE RECOVERY ===
+    # If the user submits a real answer after the session was marked done
+    # (premature force-compile, or returning to edit), re-open the flow
+    # instead of replying "resume is ready".
+    if action not in ("back", "universal_force_compile") and transcript.strip():
+        if session.get("done") or ctx.get("phase") == "done":
+            session["done"] = False
+            data = session.get("data", {})
+            simple_fields = [s["field"] for s in SIMPLE_STEPS]
+            answered = [f for f in simple_fields if data.get(f)]
+            if len(answered) < len(simple_fields):
+                # Still in the simple phase: land exactly on next unanswered field
+                ctx["phase"] = "simple"
+                session["step_index"] = len(answered)
+                ctx["current_field"] = simple_fields[len(answered)]
+            else:
+                # Past simple phase: resume precisely via the stamp if present
+                ctx["phase"] = ctx.get("_resume_phase", "experience")
+                if "_resume_step_index" in ctx:
+                    session["step_index"] = ctx["_resume_step_index"]
+            ctx.pop("_resume_phase", None)
+            ctx.pop("_resume_step_index", None)
+            session["context"] = ctx
+            print(f"[UN-DONE RECOVERY] Re-opened session at phase={ctx.get('phase')} step_index={session.get('step_index')}")
+            # Do NOT consume the triggering word as an answer — just reopen and
+            # re-ask the current question so the user can respond fresh.
+            _persist_session(session_id)
+            step = get_current_state(session)
+            _label = step.get("context_label", "")
+            return {
+                "session_id": session_id,
+                "question": step["question"],
+                "field": step["field"],
+                "context_label": _label,
+                "step_index": session.get("step_index", 0),
+                "done": step.get("done", False),
+                "can_go_back": True,
+                "show_add_job": step.get("show_add_job", False),
+                "data_preview": session.get("data", {})
+            }
+    # === END UN-DONE RECOVERY ===
     
     if action == "back":
         step = go_back(session)
@@ -1695,6 +1748,25 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
                 data[section] = ctx[section]
         session["data"] = data
     
+    # === TRANSCRIPT RECORDING (rehydration support) ===
+    # Append-only log of visible turns. Keep stored history aligned with the
+    # on-screen DOM (back button removes a bubble pair).
+    if action != "back":
+        hist = session.setdefault("history", [])
+        if transcript and transcript not in ("__ADD_JOB__",):
+            hist.append({"role": "user", "text": transcript})
+        ai_q = step.get("question", "")
+        if ai_q:
+            _label = step.get("context_label", "")
+            hist.append({"role": "ai", "text": f"[{_label}] {ai_q}" if _label else ai_q})
+    else:
+        hist = session.setdefault("history", [])
+        if hist and hist[-1].get("role") == "ai":
+            hist.pop()
+        if hist and hist[-1].get("role") == "user":
+            hist.pop()
+    # === END TRANSCRIPT RECORDING ===
+    
     # Persist after every turn
     _persist_session(session_id)
     
@@ -1709,6 +1781,24 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         "show_add_job": show_add_job,
         "data_preview": session.get("data", {})
     }
+
+
+@router.get("/session-history")
+async def voice_session_history(sessionId: str = ""):
+    """Return stored transcript turns for a session (rehydration support)."""
+    if not sessionId:
+        return JSONResponse({"error": "sessionId required", "history": []}, status_code=400)
+    session = voice_sessions.get(sessionId)
+    if session is None:
+        path = os.path.join(SESSIONS_DIR, f"{sessionId}.json")
+        if not os.path.exists(path):
+            return JSONResponse({"history": []}, status_code=404)
+        try:
+            with open(path, "r") as f:
+                session = json.load(f)
+        except Exception as e:
+            return JSONResponse({"error": str(e), "history": []}, status_code=500)
+    return {"session_id": sessionId, "history": session.get("history", [])}
 
 
 @router.post("/save")

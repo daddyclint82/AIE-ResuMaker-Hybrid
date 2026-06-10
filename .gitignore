@@ -33,3 +33,6 @@ voice_sessions/
 
 # Voice session data
 voice-questionnaire.json
+
+# Archived voice session snapshots (created by manual cleanups)
+voice_sessions_archive_*/

@@ -146,15 +146,19 @@
         compileBtn.id = 'universal-compile-btn';
         compileBtn.textContent = '⚙️ COMPILE RESUME NOW';
         compileBtn.style.cssText = 'position:absolute!important;top:12px!important;right:16px!important;padding:6px 14px!important;background:#FF4D4D!important;color:#FFFFFF!important;border:none!important;border-radius:20px!important;font-size:13px!important;font-weight:700!important;cursor:pointer!important;z-index:999!important;box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;';
-        
+
         compileBtn.addEventListener('click', async () => {
             if (!sessionId) {
                 alert('Please wait for the session to start.');
                 return;
             }
+            // GUARD: confirm before finalizing — prevents stray taps from ending the session early
+            if (!confirm('Compile your resume now? This finalizes your answers and ends the questionnaire. You can keep editing in the form afterward.')) {
+                return;
+            }
             compileBtn.textContent = '⏳ Compiling...';
             compileBtn.disabled = true;
-            
+
             try {
                 const response = await fetch('/api/voice/turn', {
                     method: 'POST',
@@ -175,15 +179,15 @@
                 compileBtn.disabled = false;
             }
         });
-        
-        // Mount into chat header container instead of body
-        const chatHeader = document.querySelector('.voice-chat-header') || document.querySelector('.chat-header') || document.getElementById('chat-header');
+
+        // Mount into .chat-header with relative positioning context
+        const chatHeader = document.querySelector('.chat-header');
         if (chatHeader) {
             chatHeader.style.position = 'relative';
             chatHeader.appendChild(compileBtn);
         } else {
-            // Fallback: mount into main chat container with relative positioning
-            const chatContainer = document.querySelector('.voice-chat-container') || document.querySelector('.chat-container');
+            // Fallback: mount into .voice-chat-container with relative positioning
+            const chatContainer = document.querySelector('.voice-chat-container');
             if (chatContainer) {
                 chatContainer.style.position = 'relative';
                 chatContainer.appendChild(compileBtn);
@@ -198,6 +202,28 @@
     // ===== SAVE / LOAD =====
 
     async function checkForSavedSession() {
+        // Attempt transcript rehydration from server before starting fresh
+        const priorSid = localStorage.getItem('aie_voice_sid');
+        if (priorSid) {
+            try {
+                const r = await fetch(`/api/voice/session-history?sessionId=${encodeURIComponent(priorSid)}`);
+                if (r.ok) {
+                    const payload = await r.json();
+                    const hist = Array.isArray(payload.history) ? payload.history : [];
+                    if (hist.length > 0) {
+                        sessionId = priorSid;
+                        window.sessionId = priorSid;
+                        const welcome = document.getElementById('welcome-message');
+                        if (welcome) welcome.remove();
+                        hist.forEach(m => addMessage(m.role === 'user' ? 'user' : 'ai', m.text, m.role === 'user'));
+                        scrollToBottom();
+                        return; // rehydrated — do not start a new session
+                    }
+                }
+            } catch (e) {
+                console.warn('[Rehydrate] failed, starting fresh:', e);
+            }
+        }
         const saved = localStorage.getItem('aie_voice_session');
         if (saved) {
             try {
@@ -284,6 +310,7 @@
 
             sessionId = data.session_id;
             window.sessionId = sessionId;  // Expose for tests/automation
+            try { localStorage.setItem('aie_voice_sid', sessionId); } catch (e) {}
             currentStepIndex = data.step_index || 0;
             
             const welcome = document.getElementById('welcome-message');
@@ -559,6 +586,7 @@
 
             sessionId = data.session_id;
             window.sessionId = sessionId;  // Expose for tests/automation
+            try { localStorage.setItem('aie_voice_sid', sessionId); } catch (e) {}
             currentStepIndex = data.step_index || 0;
             
             const welcome = document.getElementById('welcome-message');
@@ -961,6 +989,7 @@
         const isBulletField = field === '_bullet';
         const isMoreBullets = field === '_more_bullets';
         const isAddJob = field === '_add_job';
+        const isDecisionPoint = field === '_decision' || field === '_add_references';
         
         // Show Done with Jobs button during entire experience phase
         const inExperiencePhase = isBulletField || isMoreBullets || isAddJob || 

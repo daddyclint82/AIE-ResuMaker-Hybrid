@@ -32,13 +32,39 @@ This is a **separate project** from the live [AIE ResuMaker](https://aie-resumak
 - **Manual switch** — User can toggle between modes anytime
 
 ### Backend
-- **3 voice endpoints:**
+- **Voice endpoints:**
   - `POST /api/voice/start` — Creates session, returns first question
   - `POST /api/voice/turn` — Accepts transcript, returns next question + extracted data
-  - `POST /api/voice/finish` — Returns all collected data
-- **Groq integration** — `llama-3.1-8b-instant` for per-field extraction
+  - `POST /api/voice/save` / `POST /api/voice/load` — Persist / restore session state
+  - `GET  /api/voice/session-history?sessionId=...` — Returns stored transcript turns (transcript rehydration)
+- **Groq integration** — `llama-3.1-8b-instant` for extraction, `llama-3.3-70b` for summary
 - **Fallback** — If no Groq key or API error, uses raw transcript
-- **Simple dict sessions** — No classes, no persistence, in-memory only
+- **Disk-persisted sessions** — Each turn is written to `voice_sessions/<session_id>.json`
+  (loaded from memory first, then disk). Sessions survive restarts; transcripts can be rehydrated.
+
+### Server-Authoritative Build (CRITICAL ARCHITECTURE)
+- `POST /api/build` accepts an optional `voice_session` field.
+- **When `voice_session` is present (voice/mobile path):** the rich repeating sections
+  (experience/education/projects/competencies/community/certifications) are pulled
+  **directly from `voice_sessions/*.json`**, bypassing the lossy form-DOM round-trip.
+  The stored session `data` is the source of truth.
+- **When absent (desktop/form path):** the original form-DOM build runs unchanged.
+- ⚠️ Treating the frontend form DOM as the source of truth for voice builds is a fatal
+  structural violation — it reintroduces the "partial/anemic resume" data-loss bug.
+
+### Resilience / Recovery Features (added 2026-06-10)
+- **Transcript rehydration** — `voice_chat.js` fetches `/api/voice/session-history` on load
+  (keyed by `localStorage['aie_voice_sid']`) and repaints prior chat bubbles after reload/back-nav.
+- **`universal_force_compile`** — "⚙️ COMPILE RESUME NOW" action finalizes the session
+  (`done=True`, `phase=done`) and redirects to the build page. Guarded by a `confirm()` dialog.
+- **Un-done recovery** — submitting a real answer to a `done` session auto-reopens the flow
+  at the correct field; the triggering control word (e.g. "skip") is NOT stored as data.
+- **`_resume_phase` bookmarking** — force-compile stamps the phase/step before finalizing so
+  un-done recovery can resume deep flows (experience/optional) precisely.
+- **localStorage precedence** — when a `voice_session` is in the URL, fresh server data wins
+  over stale `aie_resume_progress`; the form build POST forwards `voice_session` to the server.
+- **Terms-gate session preservation** — `/terms` carries a `return` param so accepting terms
+  routes back to `/build?...voice_session=X` without dropping the session.
 
 ---
 
@@ -474,5 +500,5 @@ Collect Fields → "Add another? Say 'yes', 'next', or 'skip'."
 ---
 
 *Project started: 2026-06-04*
-*Last updated: 2026-06-08 03:17 CDT*
-*Next focus: Full end-to-end test with 3 bullets, skills categorization, optional sections*
+*Last updated: 2026-06-10 08:10 CDT*
+*Next focus: Terms-gate UX (accept up front), form-edit write-back to session, README/test sync*
