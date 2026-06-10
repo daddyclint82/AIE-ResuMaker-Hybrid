@@ -938,9 +938,25 @@
         if (navButtons) navButtons.style.display = 'none';
         hideSkillsPanel();
 
-        // Fetch and display inline preview
-        console.log('[DEBUG] Calling fetchPreviewAndDisplay');
-        fetchPreviewAndDisplay();
+        // ABANDONED: Broken inline preview — replaced with direct redirect button
+        // fetchPreviewAndDisplay();
+
+        // Create visible "Preview Resume" CTA button
+        const previewBtn = document.createElement('button');
+        previewBtn.textContent = 'Preview Resume';
+        previewBtn.className = 'preview-resume-btn';
+        previewBtn.style.cssText = 'display:block;width:100%;padding:14px 24px;margin-top:16px;background:#0066FF;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;';
+        
+        // Bind redirect to working form builder
+        previewBtn.addEventListener('click', () => {
+            window.location.href = `/build?mode=form&voice_session=${window.sessionId || ''}`;
+        });
+        
+        // Mount into chat area where user can see it
+        if (chatMessages) {
+            chatMessages.appendChild(previewBtn);
+            scrollToBottom();
+        }
     }
 
     async function fetchPreviewAndDisplay() {
