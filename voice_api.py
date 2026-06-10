@@ -1629,6 +1629,22 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
     
     session = voice_sessions[session_id]
     
+    # === ESCAPE HATCH: Force exit from experience phase ===
+    if action == "force_done_jobs":
+        ctx = session.get("context", {})
+        ctx["phase"] = "summary"
+        ctx["exp_done"] = False
+        ctx["in_bullet_loop"] = False
+        ctx["bullet_count"] = 0
+        ctx["awaiting_more_bullets"] = False
+        ctx["exp_field_idx"] = 0
+        ctx["exp_idx"] = 0
+        session["context"] = ctx
+        _persist_session(session_id)
+        print("[ESCAPE HATCH] Forced experience loop exit to summary phase.")
+        return get_current_state(session)
+    # === END ESCAPE HATCH ===
+    
     # Extra defensive: ensure flags exist even for in-memory sessions
     ctx = session.get("context", {})
     for flag in ["exp_field_idx", "in_bullet_loop", "bullet_count", "exp_done", "awaiting_more_bullets", "exp_idx", "summary_idx", "opt_idx", "opt_field_idx"]:

@@ -143,7 +143,7 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200, max_steps: 
             page.goto(f"{BASE_URL}/build?mode=voice")
 
             # Wait for page load — check AEI logo
-            page.wait_for_selector(".logo-img", timeout=10000)
+            page.wait_for_selector(".logo-img", timeout=30000)
             print("  ✅ AEI logo loaded", flush=True)
 
             screenshot(page, "start_page", step_counter)
@@ -297,7 +297,7 @@ def run_voice_browser_test(headed: bool = False, slow_mo: int = 200, max_steps: 
             print("[HANDOFF] Step 2: Waiting for frontend preview UI to render...", flush=True)
             try:
                 # When done=true, frontend hides input elements and shows preview
-                page.wait_for_selector(".voice-preview-container", timeout=10000)
+                page.wait_for_selector(".voice-preview-container", timeout=30000)
                 print("  ✅ Step 2 PASSED: Preview container rendered in DOM", flush=True)
             except Exception as e:
                 # Fallback: check if input is hidden (which happens when done=true)

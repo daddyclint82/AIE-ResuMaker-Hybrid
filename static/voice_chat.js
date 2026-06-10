@@ -381,10 +381,15 @@
         showTyping();
 
         try {
+            // ESCAPE HATCH: Use force_done_jobs action to bypass state machine loops
             const response = await fetch('/api/voice/turn', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sessionId, transcript: '__DONE_WITH_JOBS__', action: 'finish_jobs' })
+                body: JSON.stringify({ 
+                    session_id: sessionId, 
+                    transcript: '', 
+                    action: 'force_done_jobs' 
+                })
             });
             const data = await response.json();
             hideTyping();
@@ -392,6 +397,11 @@
             if (data.error) {
                 addMessage('ai', 'Sorry: ' + data.error, false);
             } else {
+                // Hide experience-phase UI elements
+                if (navButtons) navButtons.style.display = 'none';
+                if (doneJobsBtn) doneJobsBtn.style.display = 'none';
+                if (addBtn) addBtn.style.display = 'none';
+                
                 const displayQuestion = data.context_label 
                     ? `[${data.context_label}] ${data.question}` 
                     : data.question;
@@ -401,7 +411,6 @@
                 updateProgress(data.step_index);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
-                if (doneJobsBtn) doneJobsBtn.style.display = 'none';
             }
         } catch (e) {
             hideTyping();
@@ -409,6 +418,8 @@
         } finally {
             textInput.disabled = false;
             sendBtn.disabled = false;
+            textInput.style.display = 'block';
+            sendBtn.style.display = 'block';
             textInput.focus();
         }
     }
@@ -841,11 +852,16 @@
             field === 'website' || field === 'linkedin'
         );
         
-        const isDecisionPoint = field === '_decision';
         const isBulletField = field === '_bullet';
-        const inExperience = isDecisionPoint; // Only show Done with Jobs at decision points
+        const isMoreBullets = field === '_more_bullets';
+        const isAddJob = field === '_add_job';
         
-        if (canBack || isLoopField || isDecisionPoint || isBulletField || showAddJob) {
+        // Show Done with Jobs button during entire experience phase
+        const inExperiencePhase = isBulletField || isMoreBullets || isAddJob || 
+                                   field === 'company' || field === 'title' || 
+                                   field === 'dates' || field === 'location';
+        
+        if (canBack || isLoopField || isDecisionPoint || isBulletField || isMoreBullets || isAddJob || showAddJob) {
             navButtons.classList.remove('hidden');
         } else {
             navButtons.classList.add('hidden');
@@ -858,17 +874,16 @@
             saveBtn.style.display = sessionId ? 'inline-block' : 'none';
         }
         
-        const inJobEntry = isBulletField || isDecisionPoint || field === 'company' || 
-                          field === 'title' || field === 'dates';
+        // ESCAPE HATCH: Show Done with Jobs button during entire experience phase
         if (doneJobsBtn) {
-            doneJobsBtn.style.display = inJobEntry ? 'inline-block' : 'none';
+            doneJobsBtn.style.display = inExperiencePhase ? 'inline-block' : 'none';
         }
         
-        if (isDecisionPoint || isLoopField || isBulletField || showAddJob) {
+        if (isDecisionPoint || isLoopField || isBulletField || isMoreBullets || isAddJob || showAddJob) {
             addBtn.style.display = 'inline-block';
             if (isDecisionPoint) {
                 addBtn.textContent = '+ Add Another';
-            } else if (inExperience) {
+            } else if (inExperiencePhase) {
                 addBtn.textContent = '+ Add Job';
             }
         } else {
@@ -877,6 +892,7 @@
     }
 
     function showViewResumeButton() {
+        console.log('[DEBUG] showViewResumeButton called');
         micBtn.style.display = 'none';
         textInput.style.display = 'none';
         sendBtn.style.display = 'none';
@@ -884,21 +900,27 @@
         hideSkillsPanel();
 
         // Fetch and display inline preview
+        console.log('[DEBUG] Calling fetchPreviewAndDisplay');
         fetchPreviewAndDisplay();
     }
 
     async function fetchPreviewAndDisplay() {
+        console.log('[DEBUG] fetchPreviewAndDisplay started');
         showTyping();
         try {
+            console.log('[DEBUG] Making fetch to /api/voice/preview with sessionId:', sessionId);
             const response = await fetch('/api/voice/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, template_style: 'professional' })
             });
+            console.log('[DEBUG] Fetch response status:', response.status);
             const data = await response.json();
+            console.log('[DEBUG] Fetch response data:', { success: data.success, has_preview: !!data.preview_html });
             hideTyping();
 
             if (data.success && data.preview_html) {
+                console.log('[DEBUG] Preview HTML received, creating container');
                 // Add preview message
                 addMessage('ai', '📄 Here is your resume preview:', false);
                 
@@ -907,6 +929,7 @@
                 previewDiv.className = 'voice-preview-container';
                 previewDiv.innerHTML = data.preview_html;
                 chatMessages.appendChild(previewDiv);
+                console.log('[DEBUG] Preview container appended to chat');
                 
                 // Add purchase button
                 const buyBtn = document.createElement('a');
@@ -917,6 +940,7 @@
                 
                 scrollToBottom();
             } else {
+                console.log('[DEBUG] No preview HTML, using fallback');
                 // Fallback to old link
                 const btn = document.createElement('a');
                 btn.href = `/build?mode=form&voice_session=${sessionId}`;
@@ -927,7 +951,7 @@
             }
         } catch (e) {
             hideTyping();
-            console.error('Preview fetch error:', e);
+            console.error('[DEBUG] Preview fetch error:', e);
             // Fallback
             const btn = document.createElement('a');
             btn.href = `/build?mode=form&voice_session=${sessionId}`;
@@ -936,6 +960,7 @@
             chatMessages.appendChild(btn);
             addMessage('ai', 'Great! Your resume is ready. Click below to preview and purchase.', false);
         }
+        console.log('[DEBUG] fetchPreviewAndDisplay completed');
     }
 
     function scrollToBottom() {
