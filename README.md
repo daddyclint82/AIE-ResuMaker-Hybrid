@@ -41,6 +41,8 @@ This is a **separate project** from the live [AIE ResuMaker](https://aie-resumak
 - **Fallback** — If no Groq key or API error, uses raw transcript
 - **Disk-persisted sessions** — Each turn is written to `voice_sessions/<session_id>.json`
   (loaded from memory first, then disk). Sessions survive restarts; transcripts can be rehydrated.
+- **`progress_pct`** — Server now returns `progress_pct` (0–100) instead of raw `step_index`.
+  Frontend `updateProgress()` uses this directly, eliminating manual step counting.
 
 ### Server-Authoritative Build (CRITICAL ARCHITECTURE)
 - `POST /api/build` accepts an optional `voice_session` field.
@@ -52,15 +54,22 @@ This is a **separate project** from the live [AIE ResuMaker](https://aie-resumak
 - ⚠️ Treating the frontend form DOM as the source of truth for voice builds is a fatal
   structural violation — it reintroduces the "partial/anemic resume" data-loss bug.
 
-### Resilience / Recovery Features (added 2026-06-10)
+### Resilience / Recovery Features (added 2026-06-10, hardened 2026-06-11)
 - **Transcript rehydration** — `voice_chat.js` fetches `/api/voice/session-history` on load
   (keyed by `localStorage['aie_voice_sid']`) and repaints prior chat bubbles after reload/back-nav.
+- **Anti-duplicate greeting guard** — `addMessage()` deduplication: if an AI message with
+  identical text already exists in the DOM, the duplicate is silently skipped. Prevents
+  double-rendering of the first question after race conditions between `/start` responses
+  and `addMessage` calls.
 - **`universal_force_compile`** — "⚙️ COMPILE RESUME NOW" action finalizes the session
   (`done=True`, `phase=done`) and redirects to the build page. Guarded by a `confirm()` dialog.
+  Stamps `_resume_phase` before finalizing so un-done recovery resumes at the right phase.
 - **Un-done recovery** — submitting a real answer to a `done` session auto-reopens the flow
   at the correct field; the triggering control word (e.g. "skip") is NOT stored as data.
 - **`_resume_phase` bookmarking** — force-compile stamps the phase/step before finalizing so
   un-done recovery can resume deep flows (experience/optional) precisely.
+- **`progress_pct`** — Server computes `progress_pct` (0–100) per turn instead of exposing raw
+  `step_index`. Frontend uses `progress_pct` directly, eliminating step-count drift.
 - **localStorage precedence** — when a `voice_session` is in the URL, fresh server data wins
   over stale `aie_resume_progress`; the form build POST forwards `voice_session` to the server.
 - **Terms-gate session preservation** — `/terms` carries a `return` param so accepting terms
@@ -186,6 +195,11 @@ kill $(cat /tmp/hybrid.pid)
 | `a09d05d` | Add clear button |
 | `8d836ee` | Add "I had more to say" button |
 | `a8593be` | Add README and PROJECT_LOG |
+| `3f9e50f` | feat: patch double-render race condition via addMessage text-dedup guard [2026.06.11 - Sequence v2] |
+| `8dc5e57` | feat: clickable action buttons + sanitize_resume_data for clean resume output |
+| `5f2ee99` | chore: add Render deploy artifacts, session-authoritative build polish, and engineering docs |
+| `e25138f` | feat: fix voice data loss by making server session authoritative and adding recovery loops |
+| `6d9369b` | feat: complete universal override compiler, save button layout handoff.md |
 | `TBD` | **Fix 4 critical voice state machine bugs** (see below) |
 
 ---
@@ -500,5 +514,5 @@ Collect Fields → "Add another? Say 'yes', 'next', or 'skip'."
 ---
 
 *Project started: 2026-06-04*
-*Last updated: 2026-06-10 08:10 CDT*
+*Last updated: 2026-06-11 02:56 CDT*
 *Next focus: Terms-gate UX (accept up front), form-edit write-back to session, README/test sync*
