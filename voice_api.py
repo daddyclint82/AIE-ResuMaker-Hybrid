@@ -1406,29 +1406,41 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
         return False
     
     def _is_corrupted_categorized(categorized: dict) -> bool:
-        """Detect if skills_categorized only contains garbage like project names in 'Other Skills'."""
+        """Detect if skills_categorized only contains garbage like project names."""
         if not categorized or not isinstance(categorized, dict):
             return True
-        # If the ONLY category is "Other Skills", it's likely Groq failed to categorize properly
-        keys = list(categorized.keys())
-        if len(keys) == 1 and keys[0].lower() in ("other skills", "other"):
-            skills = categorized.get(keys[0], [])
-            if not skills:
-                return True
-            # Check if the skills in "Other Skills" look like project names
+        # Check ALL categories (not just "Other Skills") for project name contamination
+        for cat_name, skills in categorized.items():
+            if not skills or not isinstance(skills, list):
+                continue
             for s in skills:
                 name = s.get("name", "") if isinstance(s, dict) else str(s)
                 name_lower = name.lower()
                 for pattern in PROJECT_NAME_PATTERNS:
                     if pattern in name_lower:
                         return True
-                # If it's a long phrase (more than 3 words), it's likely a project description
+                # Control words are corruption regardless of category
+                if name_lower in CONTROL_WORDS:
+                    return True
+        # If the ONLY category is "Other Skills", it's likely Groq failed to categorize properly
+        keys = list(categorized.keys())
+        if len(keys) == 1 and keys[0].lower() in ("other skills", "other"):
+            skills = categorized.get(keys[0], [])
+            if not skills:
+                return True
+            # Check if the skills in "Other Skills" look like project names or are overly long
+            for s in skills:
+                name = s.get("name", "") if isinstance(s, dict) else str(s)
+                name_lower = name.lower()
+                for pattern in PROJECT_NAME_PATTERNS:
+                    if pattern in name_lower:
+                        return True
                 if len(name.split()) > 3:
                     return True
         return False
     
     def _extract_skills_from_categorized(categorized: dict) -> tuple:
-        """Extract flat skill list and normalized categorized dict."""
+        """Extract flat skill list and normalized categorized dict, filtering out corrupted entries."""
         flat_skills = []
         normalized = {}
         if not categorized or not isinstance(categorized, dict):
@@ -1439,13 +1451,32 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
                 continue
             norm_list = []
             for s in skills:
+                name = ""
                 if isinstance(s, str) and s.strip():
-                    norm_list.append(s.strip())
-                    flat_skills.append(s.strip())
+                    name = s.strip()
                 elif isinstance(s, dict) and s.get("name"):
                     name = s["name"].strip()
-                    norm_list.append(name)
-                    flat_skills.append(name)
+                
+                if not name:
+                    continue
+                
+                # Filter out project names, control words, and overly long phrases
+                name_lower = name.lower()
+                is_corrupted = False
+                for pattern in PROJECT_NAME_PATTERNS:
+                    if pattern in name_lower:
+                        is_corrupted = True
+                        break
+                if name_lower in CONTROL_WORDS:
+                    is_corrupted = True
+                if len(name.split()) > 3:
+                    is_corrupted = True
+                
+                if is_corrupted:
+                    continue
+                
+                norm_list.append(name)
+                flat_skills.append(name)
             if norm_list:
                 normalized[cat] = norm_list
         

@@ -83,11 +83,21 @@ body {
 }
 
 /* Save Progress Button */
-.save-progress-container {
+.section-header-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin: 0 auto;
+    justify-content: space-between;
+}
+
+.section-header-row h2 {
+    margin: 0;
+}
+
+.save-progress-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
 }
 
 .btn-save {
@@ -121,6 +131,8 @@ body {
     font-weight: 500;
     opacity: 0;
     transition: opacity 0.3s;
+    margin-top: 2px;
+    text-align: right;
 }
 
 .save-status.visible {
@@ -778,8 +790,9 @@ input.city-input:disabled {
 
 /* Edit Counter */
 .edit-counter-container {
-    text-align: center;
-    margin: 0 auto;
+    text-align: left;
+    margin-bottom: 6px;
+    padding: 20px 20px 0 20px;
 }
 
 .edit-counter {

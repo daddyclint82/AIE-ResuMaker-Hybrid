@@ -14,20 +14,13 @@
                 <img src="/static/images/logo.png" alt="AIe ResuMaker Logo" class="app-logo" onerror="this.style.display='none'; this.nextElementSibling.style.marginLeft='0';">
                 <h1>AIE ResuMaker</h1>
             </div>
-            <div class="save-progress-container">
-                <button id="save-progress-btn" class="btn-save" title="Save your progress">
-                    💾 Save Progress
-                </button>
-                <span id="save-status" class="save-status"></span>
-            </div>
+
             <div class="mode-switch-container">
                 <button id="mode-switch-btn" class="btn-mode-switch" title="Switch to voice mode">
                     🎤 Voice
                 </button>
             </div>
-            <div class="edit-counter-container">
-                <span id="edit-counter" class="edit-counter">✏️ AFTER PURCHASE <strong>5</strong> EDITS REMAINING</span>
-            </div>
+
             <div class="theme-controls">
                 <label>Theme:</label>
                 <select id="theme-select" name="template_style" form="resume-form">
@@ -46,13 +39,21 @@
                 <form id="resume-form">
                     <!-- Job Target -->
                     <div class="form-group">
-                        <h2>Job Target</h2>
+                        <div class="section-header-row">
+                            <h2>Job Target</h2>
+                            <div class="save-progress-container">
+                                <button id="save-progress-btn" class="btn-save" title="Save your progress">
+                                    💾 Save Progress
+                                </button>
+                                <span id="save-status" class="save-status"></span>
+                            </div>
+                        </div>
                         
                         <!-- Industry hint popup -->
                         <div id="industry-hint" class="hint-popup" style="display: none;">
                             <div class="hint-content">
                                 <span class="hint-icon">💡</span>
-                                <span class="hint-text">Your progress auto-saves! Click <strong>💾 Save Progress</strong> in the header to manually save anytime.</span>
+                                <span class="hint-text">Your progress auto-saves! Click <strong>💾 Save Progress</strong> to manually save anytime.</span>
                                 <button type="button" class="hint-close" onclick="this.parentElement.parentElement.style.display='none'">×</button>
                             </div>
                         </div>
@@ -228,6 +229,9 @@
 
             <!-- Preview Section -->
             <div class="preview-section" id="preview-section">
+                <div class="edit-counter-container">
+                    <span id="edit-counter" class="edit-counter">✏️ AFTER PURCHASE <strong>5</strong> EDITS REMAINING</span>
+                </div>
                 <div class="preview-header">
                     <h2>Live Preview</h2>
                     <div class="preview-actions">
