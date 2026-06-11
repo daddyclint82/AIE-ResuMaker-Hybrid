@@ -59,6 +59,95 @@ def _persist_session(session_id: str):
     except Exception as e:
         print(f"[Session Persist Error] {e}")
 
+
+def compute_progress(session: dict) -> int:
+    """Compute 0-100% progress through the voice questionnaire.
+
+    Uses phase-based weighting so the bar moves smoothly across all phases:
+      Simple fields  →  0-15%
+      Experience     → 15-45%
+      Summary        → 45-60%
+      Skills         → 60-70%
+      Optional       → 70-95%
+      Done           → 100%
+    """
+    ctx = session.get("context", {})
+    data = session.get("data", {})
+    phase = ctx.get("phase", "simple")
+
+    # Phase boundaries (start_pct, end_pct)
+    PHASE_RANGE = {
+        "simple":      (0,  15),
+        "experience":  (15, 45),
+        "summary":     (45, 60),
+        "skills":      (60, 70),
+        "optional":    (70, 95),
+        "done":        (95, 100),
+    }
+
+    if phase == "done":
+        return 100
+
+    start_pct, end_pct = PHASE_RANGE.get(phase, (0, 0))
+
+    # --- Phase-internal progress ---
+    if phase == "simple":
+        idx = session.get("step_index", 0)
+        total = len(SIMPLE_STEPS)
+        pct = (idx / total) if total else 0
+
+    elif phase == "experience":
+        # How many jobs have been completed + how far into current job
+        exp_list = ctx.get("experience", [])
+        job_idx = ctx.get("exp_idx", 0)
+        field_idx = ctx.get("exp_field_idx", 0)
+        in_bullets = ctx.get("in_bullet_loop", False)
+        bullet_count = ctx.get("bullet_count", 0)
+        exp_done = ctx.get("exp_done", False)
+
+        # Estimate: each job ~4 fields + ~3 bullets = 7 sub-steps
+        STEPS_PER_JOB = 7
+        completed_jobs = job_idx  # jobs fully done before current
+        current_job_progress = 0
+        if field_idx < len(EXPERIENCE_FIELDS):
+            current_job_progress = field_idx
+        elif in_bullets or exp_done:
+            current_job_progress = len(EXPERIENCE_FIELDS) + min(bullet_count, 3)
+        # If at "add another job?" decision, count current job as complete
+        if exp_done:
+            completed_jobs = job_idx + 1
+            current_job_progress = 0
+        # Estimate total based on current job count (assume at least 1 more)
+        total_jobs_estimate = max(job_idx + 1, completed_jobs + 1)
+        total_steps = total_jobs_estimate * STEPS_PER_JOB
+        done_steps = (completed_jobs * STEPS_PER_JOB) + current_job_progress
+        pct = (done_steps / total_steps) if total_steps else 0
+
+    elif phase == "summary":
+        q_idx = ctx.get("summary_idx", 0)
+        total = len(SUMMARY_QUESTIONS)
+        pct = (q_idx / total) if total else 0
+
+    elif phase == "skills":
+        # Skills is one question, but may also be waiting for Groq categorization
+        pct = 0.5 if data.get("skills") else 0
+
+    elif phase == "optional":
+        section = ctx.get("opt_section", "projects")
+        SECTION_ORDER = ["projects", "competencies", "education", "community",
+                         "certifications", "references", "links"]
+        section_count = len(SECTION_ORDER)
+        try:
+            section_idx = SECTION_ORDER.index(section)
+        except ValueError:
+            section_idx = 0
+        pct = (section_idx / section_count) if section_count else 0
+
+    else:
+        pct = 0
+
+    return min(round(start_pct + pct * (end_pct - start_pct)), 99)
+
 # =============================================================================
 # STEP DEFINITIONS
 # =============================================================================
@@ -425,7 +514,7 @@ def _handle_optional_section(session, section_name, fields, label):
     return {
         "type": "decision",
         "field": f"_add_{section_name}",
-        "question": f"{label} saved. Add another? [Yes](action://add_item) or [Skip](action://skip_item)",
+        "question": f"{label} saved. Add another? [Yes](action://add_item) or [Next](action://skip_item)",
         "context_label": f"{label}s",
         "show_add_job": True
     }
@@ -1574,6 +1663,7 @@ async def voice_start(request: Request):
         "field": step["field"],
         "context_label": step.get("context_label", ""),
         "step_index": 0,
+        "progress_pct": compute_progress(session),
         "done": step.get("done", False),
         "can_go_back": False,
         "show_add_job": False
@@ -1710,6 +1800,7 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
                 "field": step["field"],
                 "context_label": _label,
                 "step_index": session.get("step_index", 0),
+                "progress_pct": compute_progress(session),
                 "done": step.get("done", False),
                 "can_go_back": True,
                 "show_add_job": step.get("show_add_job", False),
@@ -1776,6 +1867,7 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         "field": step["field"],
         "context_label": step.get("context_label", ""),
         "step_index": session.get("step_index", 0),
+        "progress_pct": compute_progress(session),
         "done": step.get("done", False),
         "can_go_back": can_go_back,
         "show_add_job": show_add_job,
@@ -1821,6 +1913,7 @@ async def voice_save(request: Request):
             return {
                 "success": True,
                 "session_id": session_id,
+                "progress_pct": compute_progress(session),
                 "state": {
                     "session_id": session_id,
                     "step_index": session.get("step_index", 0),
@@ -1877,6 +1970,7 @@ async def voice_load(request: Request):
                 "field": step["field"],
                 "context_label": step.get("context_label", ""),
                 "step_index": session.get("step_index", 0),
+                "progress_pct": compute_progress(session),
                 "done": step.get("done", False),
                 "can_go_back": can_go_back,
                 "show_add_job": step.get("show_add_job", False),

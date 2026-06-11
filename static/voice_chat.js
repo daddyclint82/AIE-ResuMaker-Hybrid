@@ -213,8 +213,6 @@
                     if (hist.length > 0) {
                         sessionId = priorSid;
                         window.sessionId = priorSid;
-                        const welcome = document.getElementById('welcome-message');
-                        if (welcome) welcome.remove();
                         hist.forEach(m => addMessage(m.role === 'user' ? 'user' : 'ai', m.text, m.role === 'user'));
                         scrollToBottom();
                         return; // rehydrated — do not start a new session
@@ -313,9 +311,6 @@
             try { localStorage.setItem('aie_voice_sid', sessionId); } catch (e) {}
             currentStepIndex = data.step_index || 0;
             
-            const welcome = document.getElementById('welcome-message');
-            if (welcome) welcome.remove();
-            
             // Prefix question with context label for clarity
             const displayQuestion = data.context_label 
                 ? `[${data.context_label}] ${data.question}` 
@@ -324,7 +319,7 @@
             addMessage('ai', displayQuestion, false);
             clearInput(data.field === '_bullet');
             currentField = data.field;
-            updateProgress(currentStepIndex);
+            updateProgress(data.progress_pct || 0);
             updateContextLabel(data.context_label);
             updateNavButtons(data.can_go_back, data.field, data.show_add_job);
             updateBulletUI(data);
@@ -448,7 +443,7 @@
                 addMessage('ai', displayQuestion, false);
                 clearInput(data.field === '_bullet');
                 currentField = data.field;
-                updateProgress(data.step_index);
+                updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
                 updateBulletUI(data);
@@ -500,7 +495,7 @@
                 addMessage('ai', displayQuestion, false);
                 clearInput(false);
                 currentField = data.field;
-                updateProgress(data.step_index);
+                updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
             }
@@ -548,7 +543,7 @@
                 addMessage('ai', displayQuestion, false);
                 clearInput(data.field === '_bullet');
                 currentField = data.field;
-                updateProgress(data.step_index);
+                updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
                 updateBulletUI(data);
@@ -589,9 +584,6 @@
             try { localStorage.setItem('aie_voice_sid', sessionId); } catch (e) {}
             currentStepIndex = data.step_index || 0;
             
-            const welcome = document.getElementById('welcome-message');
-            if (welcome) welcome.remove();
-            
             // GLOBAL CIRCUIT BREAKER: Wrap ALL UI rendering to prevent crash loops
             try {
                 const displayQuestion = data.context_label 
@@ -601,7 +593,7 @@
                 addMessage('ai', displayQuestion, false);
                 clearInput(data.field === '_bullet');
                 currentField = data.field;
-                updateProgress(currentStepIndex);
+                updateProgress(data.progress_pct || 0);
                 updateContextLabel(data.context_label);
                 updateNavButtons(data.can_go_back, data.field, data.show_add_job);
                 updateBulletUI(data);
@@ -655,7 +647,7 @@
                     }
                     clearInput(data.field === '_bullet');
                     currentField = data.field;
-                    updateProgress(data.step_index);
+                    updateProgress(data.progress_pct);
                     updateContextLabel(data.context_label);
                     updateNavButtons(data.can_go_back, data.field, data.show_add_job);
                     updateBulletUI(data);
@@ -928,6 +920,16 @@
     }
 
     function addMessage(type, text, isUser) {
+        // Dedup guard: skip if the last AI message is identical (prevents double greeting)
+        if (!isUser) {
+            const messages = chatMessages ? chatMessages.querySelectorAll('.ai-message .message-bubble') : [];
+            const lastAi = messages.length > 0 ? messages[messages.length - 1].textContent.trim() : '';
+            if (lastAi === text.trim()) {
+                console.log('[addMessage] Skipping duplicate AI message:', text.substring(0, 60));
+                return;
+            }
+        }
+
         const div = document.createElement('div');
         div.className = `message ${type}-message`;
 
@@ -1023,7 +1025,7 @@
                     }
                     clearInput(data.field === '_bullet');
                     currentField = data.field;
-                    updateProgress(data.step_index);
+                    updateProgress(data.progress_pct);
                     updateContextLabel(data.context_label);
                     updateNavButtons(data.can_go_back, data.field, data.show_add_job);
                     updateBulletUI(data);
@@ -1069,9 +1071,16 @@
         if (indicator) indicator.remove();
     }
 
-    function updateProgress(stepIndex) {
-        currentStepIndex = stepIndex;
-        const pct = Math.min(Math.round((stepIndex / totalSteps) * 100), 100);
+    function updateProgress(pctOrStepIndex) {
+        // If server sends progress_pct, use it directly; otherwise fall back to step-based calc
+        let pct;
+        if (typeof pctOrStepIndex === 'number' && pctOrStepIndex > 0 && pctOrStepIndex <= 100) {
+            // Could be either a step index or a percentage — check if it looks like a percentage
+            // Server sends progress_pct (0-100), old path sends step_index (0-9)
+            pct = pctOrStepIndex;
+        } else {
+            pct = 0;
+        }
         if (progressFill) progressFill.style.width = pct + '%';
         if (progressText) progressText.textContent = pct + '%';
     }
