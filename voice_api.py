@@ -250,7 +250,7 @@ def get_current_state(session: dict) -> dict:
             return {
                 "type": "question",
                 "field": "_bullet",
-                "question": f"What did you do at {exp_list[job_idx].get('company', 'this job')}? Say bullet 1.",
+                "question": f"What did you do at {exp_list[job_idx].get('company', 'this job')}? Write bullet 1.",
                 "context_label": f"Job {job_idx + 1}",
                 "show_add_job": True
             }
@@ -265,7 +265,7 @@ def get_current_state(session: dict) -> dict:
             return {
                 "type": "decision",
                 "field": "_add_job",
-                "question": "Add another job? Say yes or done.",
+                "question": "Add another job? [Yes](action://add_job) or [Done](action://finish_jobs)",
                 "context_label": f"Job {job_idx + 1}",
             }
         
@@ -274,7 +274,7 @@ def get_current_state(session: dict) -> dict:
             return {
                 "type": "decision",
                 "field": "_more_bullets",
-                "question": f"Got it. Add another bullet? Say yes or done.",
+                "question": f"Got it. Add another bullet? [Yes](action://add_bullet) or [Done](action://finish_bullets)",
                 "context_label": f"Job {job_idx + 1}",
                 "show_add_job": True
             }
@@ -287,7 +287,7 @@ def get_current_state(session: dict) -> dict:
             return {
                 "type": "question",
                 "field": "_bullet",
-                "question": f"What else did you do at {exp_list[job_idx].get('company', 'this job')}? Say bullet {bullet_count + 1}.",
+                "question": f"What else did you do at {exp_list[job_idx].get('company', 'this job')}? Write bullet {bullet_count + 1}.",
                 "context_label": f"Job {job_idx + 1}",
                 "show_add_job": True
             }
@@ -296,7 +296,7 @@ def get_current_state(session: dict) -> dict:
         return {
             "type": "decision",
             "field": "_add_job",
-            "question": "Add another job? Say yes or done.",
+            "question": "Add another job? [Yes](action://add_job) or [Done](action://finish_jobs)",
             "context_label": f"Job {job_idx + 1}",
         }
     
@@ -425,7 +425,7 @@ def _handle_optional_section(session, section_name, fields, label):
     return {
         "type": "decision",
         "field": f"_add_{section_name}",
-        "question": f"{label} saved. Add another? Say yes or skip.",
+        "question": f"{label} saved. Add another? [Yes](action://add_item) or [Skip](action://skip_item)",
         "context_label": f"{label}s",
         "show_add_job": True
     }
@@ -664,7 +664,7 @@ def _process_experience(session: dict, extracted: str) -> dict:
     return {
         "type": "decision",
         "field": "_more_bullets",
-        "question": f"Bullet saved. Add another? Say yes or done.",
+        "question": f"Bullet saved. Add another? [Yes](action://add_bullet) or [Done](action://finish_bullets)",
         "context_label": f"Job {job_idx + 1}",
         "show_add_job": True
     }
