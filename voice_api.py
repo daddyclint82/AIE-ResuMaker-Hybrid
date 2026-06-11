@@ -1654,6 +1654,142 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
 
 
 # =============================================================================
+# TERMS CHECK ENDPOINTS (Server-Authoritative Legal Gating)
+# =============================================================================
+
+@router.get("/terms-check")
+async def voice_terms_check(sessionId: str = ""):
+    """Check whether terms have been accepted for a given session (or globally).
+    
+    Returns {terms_accepted: bool, terms_accepted_at: str|null}.
+    If no session_id provided, checks if ANY session on disk has terms accepted
+    (covers the 'user came from landing page but has no voice session yet' case).
+    """
+    # 1. If session_id provided, check that specific session
+    if sessionId:
+        # Try memory first
+        session = voice_sessions.get(sessionId)
+        if session:
+            return {
+                "terms_accepted": session.get("terms_accepted", False),
+                "terms_accepted_at": session.get("terms_accepted_at", None)
+            }
+        # Fallback to disk
+        session_path = os.path.join(SESSIONS_DIR, f"{sessionId}.json")
+        if os.path.exists(session_path):
+            try:
+                with open(session_path, "r") as f:
+                    s = json.load(f)
+                    return {
+                        "terms_accepted": s.get("terms_accepted", False),
+                        "terms_accepted_at": s.get("terms_accepted_at", None)
+                    }
+            except Exception:
+                pass
+        # Session not found — return not accepted (user must re-accept)
+        return {"terms_accepted": False, "terms_accepted_at": None}
+    
+    # 2. No session_id — scan ALL sessions for any accepted terms
+    # This handles the case where a user accepted terms on the landing page
+    # but hasn't started a voice session yet.
+    for sid, session in voice_sessions.items():
+        if session.get("terms_accepted"):
+            return {
+                "terms_accepted": True,
+                "terms_accepted_at": session.get("terms_accepted_at")
+            }
+    # Check disk as well
+    try:
+        for fname in os.listdir(SESSIONS_DIR):
+            if fname.endswith(".json"):
+                try:
+                    with open(os.path.join(SESSIONS_DIR, fname), "r") as f:
+                        s = json.load(f)
+                        if s.get("terms_accepted"):
+                            return {
+                                "terms_accepted": True,
+                                "terms_accepted_at": s.get("terms_accepted_at")
+                            }
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    
+    return {"terms_accepted": False, "terms_accepted_at": None}
+
+
+@router.post("/terms-accept")
+async def voice_terms_accept(request: Request):
+    """Accept terms of service. Writes server-side record.
+    
+    If session_id is provided and exists, stamps terms into that session.
+    If no session_id or session doesn't exist, creates a fresh session shell
+    and stamps terms there (covers brand-new users who haven't started voice chat yet).
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    
+    session_id = body.get("session_id", "")
+    now_iso = datetime.now().isoformat()
+    
+    # 1. If session_id provided and exists, stamp it
+    if session_id and session_id in voice_sessions:
+        voice_sessions[session_id]["terms_accepted"] = True
+        voice_sessions[session_id]["terms_accepted_at"] = now_iso
+        _persist_session(session_id)
+        return {
+            "success": True,
+            "session_id": session_id,
+            "terms_accepted": True,
+            "terms_accepted_at": now_iso
+        }
+    
+    # 2. If session_id provided but only on disk, load and stamp
+    if session_id:
+        session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+        if os.path.exists(session_path):
+            try:
+                with open(session_path, "r") as f:
+                    session = json.load(f)
+                session["terms_accepted"] = True
+                session["terms_accepted_at"] = now_iso
+                voice_sessions[session_id] = session
+                _persist_session(session_id)
+                return {
+                    "success": True,
+                    "session_id": session_id,
+                    "terms_accepted": True,
+                    "terms_accepted_at": now_iso
+                }
+            except Exception as e:
+                print(f"[Terms Accept] Failed to load session from disk: {e}")
+    
+    # 3. No session_id or session not found — create a fresh shell session
+    new_id = session_id or secrets.token_urlsafe(16)
+    new_session = {
+        "session_id": new_id,
+        "step_index": 0,
+        "data": {},
+        "context": {"phase": "simple"},
+        "history": [],
+        "done": False,
+        "terms_accepted": True,
+        "terms_accepted_at": now_iso
+    }
+    voice_sessions[new_id] = new_session
+    _persist_session(new_id)
+    
+    return {
+        "success": True,
+        "session_id": new_id,
+        "terms_accepted": True,
+        "terms_accepted_at": now_iso
+    }
+
+
+# =============================================================================
 # API ENDPOINTS
 # =============================================================================
 

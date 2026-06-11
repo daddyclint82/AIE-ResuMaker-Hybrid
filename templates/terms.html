@@ -319,10 +319,27 @@
             termsCheckbox.addEventListener('change', updateButton);
             ageCheckbox.addEventListener('change', updateButton);
             
-            continueBtn.addEventListener('click', function() {
+            continueBtn.addEventListener('click', async function() {
                 if (termsCheckbox.checked && ageCheckbox.checked) {
+                    // 1. Stamp localStorage (instant, used by frontend gates)
                     localStorage.setItem('aie_terms_accepted', 'true');
                     localStorage.setItem('aie_terms_accepted_date', new Date().toISOString());
+                    
+                    // 2. Stamp server-side (authoritative record for legal compliance)
+                    // Fire-and-forget — don't block navigation on network latency.
+                    // If this fails, the next page load's hybrid check will re-sync.
+                    try {
+                        const voiceSid = localStorage.getItem('aie_voice_sid') || '';
+                        fetch('/api/voice/terms-accept', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ session_id: voiceSid })
+                        }).catch(() => {}); // swallow errors — non-blocking
+                    } catch (e) {
+                        // Server stamp is best-effort, not blocking
+                    }
+                    
+                    // 3. Navigate to return URL
                     const ret = new URLSearchParams(window.location.search).get('return');
                     window.location.href = ret || '/build';
                 }
