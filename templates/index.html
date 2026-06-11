@@ -16,8 +16,8 @@
             </div>
 
             <div class="mode-switch-container">
-                <button id="mode-switch-btn" class="btn-mode-switch" title="Switch to voice mode">
-                    🎤 Voice
+                <button id="mode-switch-btn" class="btn-mode-switch" title="Open Resume Chat Assistant">
+                    💬 Resume Chat Assistant
                 </button>
             </div>
 
@@ -37,6 +37,13 @@
             <!-- Form Section -->
             <div class="form-section">
                 <form id="resume-form">
+                    <!-- Mobile CTA Banner -->
+                    <div id="mobile-cta-banner" class="mobile-cta-banner">
+                        <span class="mobile-cta-icon">💡</span>
+                        <span class="mobile-cta-text">Typing a resume on a phone is slow! Tap <strong>Resume Chat Assistant</strong> at the top to complete your profile in minutes through a quick conversation.</span>
+                        <button type="button" class="mobile-cta-close" onclick="document.getElementById('mobile-cta-banner').style.display='none'">×</button>
+                    </div>
+
                     <!-- Job Target -->
                     <div class="form-group">
                         <div class="section-header-row">
