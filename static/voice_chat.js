@@ -930,12 +930,125 @@
     function addMessage(type, text, isUser) {
         const div = document.createElement('div');
         div.className = `message ${type}-message`;
-        div.innerHTML = `
-            <div class="message-bubble">${escapeHtml(text)}</div>
-            <div class="message-time">${formatTime()}</div>
-        `;
+
+        if (!isUser) {
+            // Parse Markdown action links: [Label](action://action_name)
+            const actionRegex = /\[([^\]]+)\]\(action:\/\/([^)]+)\)/g;
+            let renderedText = escapeHtml(text);
+            let hasActions = actionRegex.test(text);
+            actionRegex.lastIndex = 0; // reset after test
+
+            if (hasActions) {
+                // Replace action links with styled buttons
+                renderedText = escapeHtml(text).replace(
+                    /\[([^\]]+)\]\(action:\/\/([^)]+)\)/g,
+                    (match, label, action) => {
+                        return `<button class="action-btn" data-action="${action}" style="display:inline-block;padding:6px 16px;margin:2px 4px;background:#0066FF;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='#0052CC'" onmouseout="this.style.background='#0066FF'">${label}</button>`;
+                    }
+                );
+            }
+
+            div.innerHTML = `
+                <div class="message-bubble">${renderedText}</div>
+                <div class="message-time">${formatTime()}</div>
+            `;
+
+            // Attach click handlers for action buttons
+            if (hasActions) {
+                setTimeout(() => {
+                    div.querySelectorAll('.action-btn').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const action = btn.getAttribute('data-action');
+                            handleAction(action, text);
+                        });
+                    });
+                }, 0);
+            }
+        } else {
+            div.innerHTML = `
+                <div class="message-bubble">${escapeHtml(text)}</div>
+                <div class="message-time">${formatTime()}</div>
+            `;
+        }
+
         if (chatMessages) chatMessages.appendChild(div);
         scrollToBottom();
+    }
+
+    function handleAction(action, originalQuestion) {
+        // Map action:// URLs to transcript text the state machine already understands
+        const actionMap = {
+            'add_bullet': 'yes',
+            'finish_bullets': 'done',
+            'add_job': 'yes',
+            'finish_jobs': 'done',
+            'add_item': 'yes',
+            'skip_item': 'skip'
+        };
+        const text = actionMap[action] || action;
+        if (!text) return;
+
+        // Show the user's choice as a message
+        addMessage('user', actionMap[action], true);
+
+        // Send to the voice API just like a typed answer
+        sendActionText(text);
+    }
+
+    async function sendActionText(text) {
+        if (!sessionId) return;
+        if (textInput) textInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        showTyping();
+
+        try {
+            const response = await fetch('/api/voice/turn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, transcript: text, action: 'answer' })
+            });
+            const data = await response.json();
+            hideTyping();
+
+            if (data.error) {
+                addMessage('ai', 'Sorry: ' + data.error + '. Please try again.', false);
+            } else {
+                lastQuestion = data.question;
+                try {
+                    if (data.field !== 'skills_review') {
+                        const displayQuestion = data.context_label 
+                            ? `[${data.context_label}] ${data.question}` 
+                            : data.question;
+                        addMessage('ai', displayQuestion, false);
+                    }
+                    clearInput(data.field === '_bullet');
+                    currentField = data.field;
+                    updateProgress(data.step_index);
+                    updateContextLabel(data.context_label);
+                    updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                    updateBulletUI(data);
+
+                    if (data.field === 'skills_review' && data.skills_categorized) {
+                        currentSkillsCategorized = data.skills_categorized;
+                        renderSkillsPanel(data.skills_categorized);
+                    } else {
+                        hideSkillsPanel();
+                    }
+
+                    if (data.done) {
+                        showViewResumeButton();
+                    }
+                } catch (renderError) {
+                    console.warn('Render error after action:', renderError);
+                }
+            }
+        } catch (e) {
+            hideTyping();
+            addMessage('ai', 'Sorry, something went wrong. Please try again.', false);
+        } finally {
+            if (textInput) { textInput.disabled = false; textInput.focus(); }
+            if (sendBtn) sendBtn.disabled = false;
+        }
     }
 
     function showTyping() {
