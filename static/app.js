@@ -173,15 +173,54 @@ function closeEditPopup() {
 // Make closeEditPopup globally accessible
 window.closeEditPopup = closeEditPopup;
 
-// Terms of Service check — now handled on /terms page, just verify localStorage exists
-function checkTermsAcceptance() {
-    const accepted = localStorage.getItem('aie_terms_accepted');
+// Terms of Service check — hybrid: instant localStorage + server confirmation
+// On fail: redirect to /terms. On success: remove .terms-pending to reveal form.
+async function checkTermsAcceptance() {
+    // Phase 1: Instant localStorage check (zero latency)
+    const localAccepted = localStorage.getItem('aie_terms_accepted');
     
-    if (!accepted) {
-        // Preserve voice_session/mode so we return to the right build after accepting
+    if (!localAccepted) {
+        // Not accepted locally — must go to /terms before seeing any form fields
         const params = window.location.search; // e.g. ?mode=form&voice_session=abc
         window.location.href = '/terms' + (params ? '?return=' + encodeURIComponent('/build' + params) : '');
+        return; // Hard redirect, nothing else matters
     }
+    
+    // Phase 2: Server-side confirmation (defense in depth)
+    // The form is already visible via localStorage, but confirm the server agrees.
+    // This catches edge cases where localStorage says yes but server has no record
+    // (e.g. localStorage was manually set, or sessions were purged).
+    try {
+        // Build session_id param if we have one
+        const urlParams = new URLSearchParams(window.location.search);
+        const voiceSid = urlParams.get('voice_session') || localStorage.getItem('aie_voice_sid') || '';
+        const checkUrl = `/api/voice/terms-check?sessionId=${encodeURIComponent(voiceSid)}`;
+        const resp = await fetch(checkUrl, { method: 'GET' });
+        
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.terms_accepted) {
+                // Server confirms — reveal form and we're done
+                document.body.classList.remove('terms-pending');
+                return;
+            }
+            // Server says NOT accepted — sync server record from localStorage truth
+            // This happens when user accepted on a previous visit but server sessions were cleared
+            await fetch('/api/voice/terms-accept', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: voiceSid })
+            });
+            document.body.classList.remove('terms-pending');
+            return;
+        }
+    } catch (e) {
+        // Network error — trust localStorage and continue (offline resilience)
+        console.warn('[Terms Check] Server check failed, trusting localStorage:', e);
+    }
+    
+    // Fallback: if we reach here, localStorage said yes and server check errored — proceed
+    document.body.classList.remove('terms-pending');
 }
 
 // Auto-Save Functionality

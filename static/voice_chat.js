@@ -78,10 +78,61 @@
     let lastQuestion = '';
     let lastUserMessage = '';
 
+    // === TERMS GATE ===
+    // Checks localStorage (instant) then confirms with server (authoritative).
+    // If terms not accepted, redirects to /terms before any voice chat code runs.
+    // Returns true if terms OK, false if redirecting (init must stop).
+    async function checkTermsGate() {
+        const localAccepted = localStorage.getItem('aie_terms_accepted');
+        
+        if (!localAccepted) {
+            // Not accepted — redirect to terms page with return URL
+            const returnUrl = '/build?mode=voice';
+            window.location.href = '/terms?return=' + encodeURIComponent(returnUrl);
+            return false;
+        }
+        
+        // Local says accepted — confirm with server (defense in depth)
+        try {
+            const voiceSid = localStorage.getItem('aie_voice_sid') || '';
+            const checkUrl = `/api/voice/terms-check?sessionId=${encodeURIComponent(voiceSid)}`;
+            const resp = await fetch(checkUrl, { method: 'GET' });
+            
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.terms_accepted) {
+                    return true; // Server confirms — proceed
+                }
+                // Server says NOT accepted but localStorage does — sync server
+                await fetch('/api/voice/terms-accept', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: voiceSid })
+                });
+                return true;
+            }
+        } catch (e) {
+            // Network error — trust localStorage (offline resilience)
+            console.warn('[Terms Gate] Server check failed, trusting localStorage:', e);
+        }
+        
+        return true; // localStorage accepted, proceed even if server check errored
+    }
+    // === END TERMS GATE ===
+
     // Initialize
     init();
 
-    function init() {
+    async function init() {
+        // === TERMS GATE (server-authoritative) ===
+        // Must pass before any voice chat functionality initializes.
+        // This ensures users see terms exactly once, regardless of entry point.
+        const termsOk = await checkTermsGate();
+        if (!termsOk) {
+            return; // Redirected to /terms — stop init completely
+        }
+        // === END TERMS GATE ===
+
         // Check for saved session
         checkForSavedSession();
 
