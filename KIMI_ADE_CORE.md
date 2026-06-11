@@ -122,6 +122,7 @@ REMAINING_DEV_BUDGET = $4.75   # CRITICAL — treat as near-empty
 ---
 
 ## QUICK REFERENCE — KEY PATHS
+
 | Item | Path |
 |---|---|
 | FastAPI app + build + generators | `main.py` |
@@ -130,5 +131,7 @@ REMAINING_DEV_BUDGET = $4.75   # CRITICAL — treat as near-empty
 | Voice chat loop | `static/voice_chat.js` (bump `?v=` in `templates/voice_chat.html`) |
 | Session store | `voice_sessions/<id>.json` |
 | Start server | `./start.sh` → `uvicorn main:app --host 0.0.0.0 --port 8000` |
+
+* **Anti-Duplicate Greeting Guard**: The frontend `addMessage()` function in `voice_chat.js` contains a strict text-deduplication guard, and the hardcoded HTML welcome div has been completely stripped. The greeting is generated dynamically by the server. You are strictly forbidden from modifying the deduplication logic in `addMessage()` or re-introducing hardcoded greeting blocks into the HTML templates, as this causes a severe double-rendering race condition on mobile layouts.
 
 > **END OF MANUAL. Obey literally. When in doubt, READ the file and ASK the human.**

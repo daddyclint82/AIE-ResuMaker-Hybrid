@@ -52,10 +52,10 @@ function updateEditCounterUI() {
     const remaining = Math.max(0, MAX_EDITS - count);
     
     if (remaining > 0) {
-        counter.innerHTML = `✏️ <strong>${remaining}</strong> edit${remaining !== 1 ? 's' : ''} remaining`;
+        counter.innerHTML = `✏️ AFTER PURCHASE ${remaining} EDIT${remaining !== 1 ? 'S' : ''} REMAINING`;
         counter.className = 'edit-counter';
     } else {
-        counter.innerHTML = `✏️ <strong>0</strong> edits remaining — <a href="#" id="repurchase-link">Repurchase</a>`;
+        counter.innerHTML = `✏️ AFTER PURCHASE 0 EDITS REMAINING — <a href="#" id="repurchase-link">REPURCHASE</a>`;
         counter.className = 'edit-counter exhausted';
         
         // Re-attach click handler
@@ -465,7 +465,7 @@ function loadVoiceData() {
         // Set skills
         if (voiceData.skills && Array.isArray(voiceData.skills)) {
             skills = [...voiceData.skills];
-            renderSkillsTags();
+            renderSkills();
             console.log('[Voice→Form] Set skills:', skills);
         }
         
