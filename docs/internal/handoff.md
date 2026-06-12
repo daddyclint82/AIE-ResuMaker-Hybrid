@@ -12,7 +12,7 @@
 | `voice_api.py` | `/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid/voice_api.py` |
 | `voice_chat.js` | `/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid/static/voice_chat.js` |
 | Browser test | `/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid/tests/test_voice_browser.py` |
-| File gen test | `/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid/tests/test_file_generation.py` |
+| File gen test | `not yet created` |
 | Manual script | `/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid/generate_real_resume.py` |
 
 ## Next Session Target

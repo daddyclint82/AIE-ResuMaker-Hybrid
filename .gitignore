@@ -9,6 +9,8 @@ nohup.out
 *.bak
 *.old
 .DS_Store
+.pytest_cache/
+tests/__pycache__/
 
 # Generated files
 *.docx

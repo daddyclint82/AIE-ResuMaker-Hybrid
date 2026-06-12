@@ -1,13 +1,13 @@
 {
-  "name": "Clint Singleton - Complete Resume",
+  "name": "Jane Doe - Complete Resume",
   "target_job": "AI Infrastructure Engineer",
   "description": "Full resume data matching clint-resume Template.html with all sections, bullets, projects, competencies, education, certifications, and references",
   "data": {
-    "full_name": "Clint Singleton",
-    "email": "clints8282@gmail.com",
-    "phone": "936-800-7626",
-    "address": "227 Crestwood, Nacogdoches, TX 75961",
-    "city": "Nacogdoches",
+    "full_name": "Jane Doe",
+    "email": "jane.doe@example.com",
+    "phone": "555-555-5555",
+    "address": "123 Main St, Anytown, TX 00000",
+    "city": "Anytown",
     "state": "Texas",
     "industry": "AI Infrastructure / DevOps",
     "job_title": "AI Infrastructure Engineer",
@@ -19,7 +19,7 @@
         "company": "Self-Employed / Independent",
         "title": "AI Infrastructure Engineer",
         "dates": "2025",
-        "location": "Nacogdoches, TX | Remote",
+        "location": "Anytown, TX | Remote",
         "bullets": [
           "Designed, deployed, and maintained full-stack AI infrastructure — OpenClaw orchestration, Ollama LLM serving, llama.cpp inference, Whisper STT, Piper TTS across WSL2/Windows/Linux",
           "Built and operated DaddyClintBot — production Discord bot with systemd-managed 24/7 uptime, SQLite persistence, and multi-channel integration",
@@ -53,7 +53,7 @@
         "company": "AT&T Authorized Retailer (Allcom)",
         "title": "Store Manager",
         "dates": "2015–2018, 2020",
-        "location": "Nacogdoches, TX",
+        "location": "Anytown, TX",
         "bullets": [
           "Led sales floor operations and coached sales associates to maximize customer value and revenue per transaction",
           "Delivered premium digital solutions for customers at the highest service level",
@@ -159,7 +159,7 @@
         "bullets": [
           "Developed comprehensive move-in/move-out inspection checklist based on Texas Property Code Chapter 92",
           "Created fillable HTML forms for tenant documentation with automated email generation",
-          "Researched landlord-tenant law specific to Nacogdoches, TX"
+          "Researched landlord-tenant law specific to Anytown, TX"
         ],
         "result": "Professional-grade legal documentation tool for real estate operations"
       }
@@ -178,7 +178,7 @@
     "education": [
       {
         "school": "Stephen F. Austin State University",
-        "location": "Nacogdoches, TX",
+        "location": "Anytown, TX",
         "degree": "Bachelor of Science, Kinesiology with Art Minor; Physics Major Work",
         "dates": "",
         "honors": "Dean's List | National Honor Society"
@@ -192,7 +192,7 @@
       }
     ],
     "community": [
-      {"org": "Nacogdoches 1st Annual Jaycees Mud Run", "role": "Participant", "description": "Nacogdoches Jaycees"}
+      {"org": "Anytown 1st Annual Jaycees Mud Run", "role": "Participant", "description": "Anytown Jaycees"}
     ],
     "certifications": [
       {"name": "Halliburton Mud Engineer's Certificate", "issuer": "Halliburton", "date": "", "url": ""}

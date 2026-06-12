@@ -218,7 +218,7 @@ _jinja2.Environment._load_template = _safe_load_template
 
 
 # Load Fortune 1000 companies
-COMPANIES_FILE = os.path.join(BASE_DIR, "companies.json")
+COMPANIES_FILE = os.path.join(BASE_DIR, "data", "companies.json")
 companies = []
 try:
     with open(COMPANIES_FILE, 'r') as f:
@@ -251,7 +251,7 @@ except:
 
 
 # Load US cities data
-CITIES_FILE = os.path.join(BASE_DIR, "cities.json")
+CITIES_FILE = os.path.join(BASE_DIR, "data", "cities.json")
 us_cities_data = {"states": {}, "cities_by_state": {}}
 try:
     with open(CITIES_FILE, 'r') as f:
@@ -261,9 +261,9 @@ except:
 
 
 # Load education data
-UNIVERSITIES_FILE = os.path.join(BASE_DIR, "universities.json")
-DEGREES_FILE = os.path.join(BASE_DIR, "degrees.json")
-FIELDS_FILE = os.path.join(BASE_DIR, "fields_of_study.json")
+UNIVERSITIES_FILE = os.path.join(BASE_DIR, "data", "universities.json")
+DEGREES_FILE = os.path.join(BASE_DIR, "data", "degrees.json")
+FIELDS_FILE = os.path.join(BASE_DIR, "data", "fields_of_study.json")
 
 universities = []
 degrees = []
@@ -288,7 +288,7 @@ except:
     pass
 
 # Load skill categories for auto-grouping
-SKILL_CATEGORIES_FILE = os.path.join(BASE_DIR, "skill_categories.json")
+SKILL_CATEGORIES_FILE = os.path.join(BASE_DIR, "data", "skill_categories.json")
 skill_categories = {}
 skill_to_category = {}
 
