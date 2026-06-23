@@ -10,7 +10,7 @@ let certificationCount = 0;
 let projectCount = 0;
 let competencyCount = 0;
 let communityCount = 0;
-let currentResumeId = null;
+let currentResumeId = localStorage.getItem('aie_current_resume_id') || null;
 
 // DOM Elements
 const form = document.getElementById('resume-form');
@@ -1361,6 +1361,7 @@ async function handleFormSubmit(e) {
         
         if (result.success) {
             currentResumeId = result.resume_id;
+            localStorage.setItem('aie_current_resume_id', currentResumeId);
             previewContainer.innerHTML = result.preview_html;
             enableDownloadButtons();
             showSuccess('Resume built successfully!');
@@ -1494,6 +1495,7 @@ async function generatePreview() {
         
         if (result.success) {
             currentResumeId = result.resume_id;
+            localStorage.setItem('aie_current_resume_id', currentResumeId);
             enableDownloadButtons();
             
             // Show CLEAN preview first
