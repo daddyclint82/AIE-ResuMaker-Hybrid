@@ -120,10 +120,9 @@
     }
     // === END TERMS GATE ===
 
-    // Initialize
-    init();
-
     async function init() {
+        if (window.__aie_init_done) return;
+        window.__aie_init_done = true;
         // === TERMS GATE (server-authoritative) ===
         // Must pass before any voice chat functionality initializes.
         // This ensures users see terms exactly once, regardless of entry point.

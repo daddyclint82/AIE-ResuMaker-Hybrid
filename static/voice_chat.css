@@ -77,7 +77,7 @@ html, body {
 
 /* Progress Bar */
 .progress-bar {
-    height: 3px;
+    height: 8px;
     background: #E2E8F0;
     position: relative;
     flex-shrink: 0;
@@ -87,16 +87,21 @@ html, body {
     height: 100%;
     background: linear-gradient(90deg, #00D2C4, #0066FF);
     transition: width 0.3s ease;
-    border-radius: 0 2px 2px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.progress-label {
+    flex-shrink: 0;
+    padding: 4px 16px 6px;
+    background: #FFFFFF;
+    display: flex;
+    justify-content: flex-end;
 }
 
 .progress-text {
-    position: absolute;
-    right: 12px;
-    top: -20px;
-    font-size: 11px;
-    color: #64748B;
-    font-weight: 600;
+    font-size: 15px;
+    color: #1E293B;
+    font-weight: 700;
     letter-spacing: 0.02em;
 }
 
