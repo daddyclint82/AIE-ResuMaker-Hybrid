@@ -20,5 +20,5 @@ reportlab==4.5.1
 python-docx==1.2.0
 Pillow==12.2.0
 
-# Watermarked preview rendering (optional; requires `playwright install chromium`)
-playwright==1.60.0
+# Watermarked preview rendering: DISABLED on Render free tier (Chromium doesn't persist)
+# playwright==1.60.0

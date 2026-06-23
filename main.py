@@ -156,32 +156,6 @@ from voice_api import router as voice_router, voice_sessions as voice_session_st
 app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
 
-# Ensure Playwright Chromium is available at startup (Render free tier may wipe cache)
-import subprocess as _subprocess
-import shutil as _shutil
-
-def _ensure_playwright_chromium():
-    """Check if Chromium is installed; install if missing."""
-    try:
-        from playwright._impl._driver import compute_driver_executable
-        driver = compute_driver_executable()
-        if driver and os.path.exists(driver):
-            # Check if browser binary exists
-            result = _subprocess.run([driver, '--version'], capture_output=True, text=True, timeout=10)
-            if result.returncode == 0:
-                print("[AIE ResuMaker] Playwright Chromium: OK")
-                return
-    except Exception:
-        pass
-    print("[AIE ResuMaker] Playwright Chromium missing — installing...")
-    try:
-        _subprocess.run(["playwright", "install", "chromium"], check=True, timeout=120)
-        print("[AIE ResuMaker] Playwright Chromium installed successfully.")
-    except Exception as e:
-        print(f"[AIE ResuMaker] Playwright install failed (preview images will use CSS fallback): {e}")
-
-_ensure_playwright_chromium()
-
 @app.head("/")
 @app.get("/healthz")
 async def health_check():
@@ -2382,85 +2356,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 async def render_preview_to_image(html_content: str, resume_id: str) -> bytes:
     """Render preview HTML to watermarked PNG image.
-    Playwright/Chromium is imported lazily so the app still boots in
-    environments where the browser isn't installed (e.g. minimal Render build).
+    DISABLED on Render free tier — Chromium binary doesn't persist.
+    Returns None so the CSS-watermark fallback in /api/preview-timer is used.
     """
-    try:
-        from playwright.async_api import async_playwright
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page(viewport={"width": 816, "height": 1056})
-            
-            # Set content
-            await page.set_content(html_content)
-            await page.wait_for_load_state("networkidle")
-            
-            # Screenshot
-            screenshot = await page.screenshot(type="png")
-            await browser.close()
-            
-            # Open with PIL
-            img = Image.open(BytesIO(screenshot))
-            
-            # Add watermark
-            draw = ImageDraw.Draw(img)
-            
-            # Try to get a font, fallback to default
-            try:
-                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 32)
-                small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
-            except:
-                font = ImageFont.load_default()
-                small_font = ImageFont.load_default()
-            
-            # Watermark text
-            watermark_text = "AIE ResuMaker SAMPLE"
-            sub_text = "To get the highest quality format, click Purchase"
-            
-            # Calculate position for diagonal watermark
-            bbox = draw.textbbox((0, 0), watermark_text, font=font)
-            text_width = bbox[2] - bbox[0]
-            text_height = bbox[3] - bbox[1]
-            
-            # Draw multiple diagonal watermarks
-            img_width, img_height = img.size
-            for i in range(-2, 4):
-                x = (i * 300) % (img_width + text_width) - text_width
-                y = int(img_height * 0.3 + (i * 150))
-                
-                # Semi-transparent white background
-                overlay = Image.new('RGBA', img.size, (255, 255, 255, 0))
-                overlay_draw = ImageDraw.Draw(overlay)
-                overlay_draw.text((x, y), watermark_text, font=font, fill=(200, 0, 0, 80))
-                
-                # Composite
-                img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
-                draw = ImageDraw.Draw(img)
-            
-            # Add bottom message
-            bottom_box_height = 40
-            overlay = Image.new('RGBA', img.size, (255, 255, 255, 0))
-            overlay_draw = ImageDraw.Draw(overlay)
-            overlay_draw.rectangle([0, img_height - bottom_box_height, img_width, img_height], 
-                                   fill=(0, 0, 0, 180))
-            img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
-            draw = ImageDraw.Draw(img)
-            
-            bbox = draw.textbbox((0, 0), sub_text, font=small_font)
-            sub_width = bbox[2] - bbox[0]
-            sub_x = (img_width - sub_width) // 2
-            draw.text((sub_x, img_height - 30), sub_text, font=small_font, fill=(255, 255, 255))
-            
-            # Compress to lower quality
-            output = BytesIO()
-            img.save(output, format='PNG', quality=50, optimize=True)
-            output.seek(0)
-            
-            return output.getvalue()
-            
-    except Exception as e:
-        print(f"Error rendering preview image: {e}")
-        return None
+    return None
 
 @app.post("/api/preview-timer")
 async def get_timed_preview(request: Request):
