@@ -277,60 +277,6 @@ html, body {
     flex-shrink: 0;
 }
 
-.mic-btn {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    border: none;
-    background: #0066FF;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: all 0.2s ease;
-    padding: 0;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgb(0 102 255 / 0.2);
-}
-
-.mic-btn .mic-icon-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 50%;
-}
-
-.mic-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 4px 12px rgb(0 102 255 / 0.3);
-}
-
-.mic-btn:active {
-    transform: scale(0.95);
-}
-
-.mic-btn.recording {
-    background: #00D2C4;
-    box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.15), 0 0 0 8px rgba(0, 102, 255, 0.08);
-    animation: recordingPulse 2s infinite ease-in-out;
-}
-
-.mic-btn.recording .mic-icon-img {
-    filter: brightness(0.95);
-}
-
-@keyframes recordingPulse {
-    0%, 100% { 
-        transform: scale(1); 
-        box-shadow: 0 0 0 4px rgba(0, 102, 255, 0.15), 0 0 0 8px rgba(0, 102, 255, 0.08), 0 4px 12px rgb(0 210 196 / 0.3);
-    }
-    50% { 
-        transform: scale(1.05); 
-        box-shadow: 0 0 0 6px rgba(0, 102, 255, 0.12), 0 0 0 12px rgba(0, 102, 255, 0.06), 0 6px 16px rgb(0 210 196 / 0.4);
-    }
 }
 
 .text-input {
@@ -410,39 +356,6 @@ html, body {
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
-}
-
-/* Recording Status */
-.recording-status {
-    position: fixed;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #00D2C4;
-    color: #FFFFFF;
-    padding: 10px 20px;
-    border-radius: 24px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    z-index: 100;
-    box-shadow: 0 4px 12px rgba(0, 210, 196, 0.25);
-    letter-spacing: -0.01em;
-}
-
-.recording-status.hidden {
-    display: none;
-}
-
-.recording-dot {
-    width: 10px;
-    height: 10px;
-    background: #FFFFFF;
-    border-radius: 50%;
-    animation: blink 1.2s infinite ease-in-out;
-    box-shadow: 0 0 6px rgba(255,255,255,0.5);
 }
 
 @keyframes blink {

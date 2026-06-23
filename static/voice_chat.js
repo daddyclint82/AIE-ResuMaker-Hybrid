@@ -8,8 +8,7 @@
     const chatMessages = document.getElementById('chat-messages');
     const textInput = document.getElementById('text-input');
     const sendBtn = document.getElementById('send-btn');
-    const micBtn = document.getElementById('mic-btn');
-    const recordingStatus = document.getElementById('recording-status');
+    const recordingStatus = null; // DEPRECATED: voice mic removed — users use native keyboard dictation
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
     const contextLabel = document.getElementById('context-label');
@@ -66,8 +65,6 @@
         "Other Skills"
     ];
     let sessionId = null;
-    let isRecording = false;
-    let recognition = null;
     let accumulatedFinal = '';
     let currentStepIndex = 0;
     let totalSteps = 12;
@@ -135,13 +132,6 @@
         // Check for saved session
         checkForSavedSession();
 
-        // Check speech support
-        if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-            setupSpeechRecognition();
-        } else {
-            if (micBtn) micBtn.style.display = 'none';
-        }
-
         // Bind events
         if (sendBtn) {
             sendBtn.addEventListener('click', sendMessage);
@@ -150,9 +140,6 @@
             textInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') sendMessage();
             });
-        }
-        if (micBtn) {
-            micBtn.addEventListener('click', toggleRecording);
         }
         
         // Clear button
@@ -385,85 +372,6 @@
         }
     }
 
-    // ===== SPEECH RECOGNITION =====
-
-    function setupSpeechRecognition() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event) => {
-            let newFinal = '';
-            let interimTranscript = '';
-
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    newFinal += transcript + ' ';
-                } else {
-                    interimTranscript = transcript;
-                }
-            }
-            
-            if (newFinal) {
-                accumulatedFinal += newFinal;
-            }
-            
-            textInput.value = (accumulatedFinal + interimTranscript).trim();
-        };
-
-        recognition.onerror = (event) => {
-            console.error('Speech error:', event.error);
-            stopRecording();
-            if (event.error === 'not-allowed') {
-                addMessage('ai', 'Microphone access denied. Please allow mic permission or type your answer.', false);
-            }
-        };
-
-        recognition.onend = () => {
-            if (isRecording) {
-                try { recognition.start(); } catch(e) {}
-            }
-        };
-    }
-
-    function toggleRecording() {
-        if (isRecording) {
-            stopRecording();
-            if (textInput.value.trim()) {
-                sendMessage();
-            }
-        } else {
-            startRecording();
-        }
-    }
-
-    function startRecording() {
-        if (!recognition) return;
-        accumulatedFinal = '';
-        textInput.value = '';
-        try {
-            recognition.start();
-            isRecording = true;
-            micBtn.classList.add('recording');
-            recordingStatus.classList.remove('hidden');
-            textInput.placeholder = 'Listening... speak now';
-        } catch (e) {
-            console.error('Start recording failed:', e);
-        }
-    }
-
-    function stopRecording() {
-        if (!recognition) return;
-        try { recognition.stop(); } catch (e) {}
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        recordingStatus.classList.add('hidden');
-        textInput.placeholder = 'Type your answer...';
-    }
-
     // ===== NAVIGATION ACTIONS =====
 
     async function goBack() {
@@ -660,8 +568,6 @@
     async function sendMessage() {
         const text = textInput ? textInput.value.trim() : '';
         if (!text || !sessionId) return;
-
-        if (isRecording) stopRecording();
 
         lastUserMessage = text;
         addMessage('user', text, true);
@@ -1202,8 +1108,6 @@
     }
 
     function showViewResumeButton() {
-        console.log('[DEBUG] showViewResumeButton called');
-        if (micBtn) micBtn.style.display = 'none';
         if (textInput) textInput.style.display = 'none';
         if (sendBtn) sendBtn.style.display = 'none';
         if (navButtons) navButtons.style.display = 'none';
