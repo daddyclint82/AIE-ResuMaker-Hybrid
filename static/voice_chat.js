@@ -1190,6 +1190,16 @@
         }
     }
 
+    // Samsung Browser / aggressive-cache fallback: ensure skip button appears during optional first fields
+    setTimeout(() => {
+        if (skipSectionBtn && currentField) {
+            const optionalFields = ['name', 'competency', 'school', 'community_org', 'cert_name', 'reference_name', 'website'];
+            if (optionalFields.includes(currentField) && skipSectionBtn.style.display === 'none') {
+                skipSectionBtn.style.display = 'inline-block';
+            }
+        }
+    }, 500);
+
     function showViewResumeButton() {
         if (textInput) textInput.style.display = 'none';
         if (sendBtn) sendBtn.style.display = 'none';
