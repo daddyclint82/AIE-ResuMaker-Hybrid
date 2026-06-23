@@ -1,5 +1,5 @@
 /**
- * Voice Chat Resume Builder - ADHD Optimized
+ * Resume Chat Assistant - ADHD Optimized
  * Conversational interface with Back/Add buttons, micro-questions
  */
 
@@ -8,7 +8,6 @@
     const chatMessages = document.getElementById('chat-messages');
     const textInput = document.getElementById('text-input');
     const sendBtn = document.getElementById('send-btn');
-    const recordingStatus = null; // DEPRECATED: voice mic removed — users use native keyboard dictation
     const progressFill = document.getElementById('progress-fill');
     const progressText = document.getElementById('progress-text');
     const contextLabel = document.getElementById('context-label');

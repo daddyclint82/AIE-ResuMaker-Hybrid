@@ -1,7 +1,7 @@
-# AIE ResuMaker Hybrid — Architecture Summary
+# AIE ResuMaker — Architecture Summary
 
 ## What It Is
-A conversational, voice-first resume builder with ADHD-friendly micro-question design. Users speak or type their resume one field at a time.
+A conversational resume builder with ADHD-friendly micro-question design. Users answer one question at a time through a mobile-optimized chat interface. Voice input comes from native iOS/Android keyboard dictation — the app does not provide a custom microphone button.
 
 ## Core Flow (6 Phases)
 
@@ -12,9 +12,9 @@ A conversational, voice-first resume builder with ADHD-friendly micro-question d
 └─────────┘    └──────────┘    └─────────┘    └────────┘    └──────────┘    └──────┘
 ```
 
-**Simple:** full_name, email, phone, city, state, industry, job_title, experience_level, education_level
+**Simple:** full_name, email, phone, address, city, state, industry, job_title, experience_level, education_level
 
-**Experience:** For each job: company → title → dates → bullets (loop: "Add another bullet?") → "Add another job?"
+**Experience:** For each job: company → title → dates → location → bullets (loop: "Add another bullet?") → "Add another job?"
 
 **Summary:** 4 interview questions → Groq auto-generates professional summary
 
@@ -49,7 +49,7 @@ When `in_bullet_loop` becomes `False`, it has two meanings:
 ## Data Flow
 
 ```
-User Input (voice/text)
+User Input (text, usually via native mobile dictation)
     ↓
 POST /api/voice/turn {session_id, transcript}
     ↓
@@ -111,9 +111,8 @@ session = {
 
 1. **Form builder auto-populate** — Partially broken (arrays don't populate correctly)
 2. **City/State split** — "Austin, Texas" dumps into city field
-3. **Browser support** — SpeechRecognition only works in Chrome/Safari
-4. **Session persistence** — In-memory only, no cleanup (sessions grow forever)
-5. **Not deployed** — Still local development only
+3. **Session persistence** — Disk-persisted sessions (`voice_sessions/*.json`) grow forever; no cleanup
+4. **Route/filename legacy debt** — `/voice_chat` and `voice_chat.*` remain from old voice-first build even though the custom mic is gone
 
 ## Architecture Principles
 

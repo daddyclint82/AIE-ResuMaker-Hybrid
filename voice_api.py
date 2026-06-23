@@ -20,6 +20,10 @@ if os.path.exists(env_file):
 else:
     load_dotenv()
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/voice")
 
 import asyncio
@@ -32,32 +36,78 @@ session_locks: Dict[str, asyncio.Lock] = {}
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
-SESSIONS_DIR = os.path.join(os.path.dirname(__file__), "voice_sessions")
+# Use an absolute path under the project root for session JSON files.
+# On Render free tier this is ephemeral, but absolute + mkdir ensures consistency.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SESSIONS_DIR = os.path.join(BASE_DIR, "voice_sessions")
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
-# In-memory session storage with disk persistence
+# In-memory session storage with optional disk persistence
 voice_sessions: Dict[str, Any] = {}
+
+
+def _safe_load_disk_session(session_id: str) -> Optional[dict]:
+    """Load a session from disk with robust error handling."""
+    if not session_id:
+        return None
+    session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
+    try:
+        with open(session_path, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+        if not isinstance(loaded, dict):
+            logger.warning(f"[Session Load] {session_id}: disk file is not a dict")
+            return None
+        # DEFENSIVE: ensure all volatile state machine flags are present and typed correctly
+        ctx = loaded.get("context", {})
+        defaults = {
+            "exp_field_idx": 0,
+            "in_bullet_loop": False,
+            "bullet_count": 0,
+            "exp_done": False,
+            "awaiting_more_bullets": False,
+            "exp_idx": 0,
+            "summary_idx": 0,
+            "opt_idx": 0,
+            "opt_field_idx": 0,
+        }
+        for key, val in defaults.items():
+            ctx.setdefault(key, val)
+        loaded["context"] = ctx
+        logger.info(f"[Session Load] {session_id}: loaded from disk OK")
+        return loaded
+    except FileNotFoundError:
+        logger.info(f"[Session Load] {session_id}: no disk file found")
+        return None
+    except json.JSONDecodeError as e:
+        logger.error(f"[Session Load] {session_id}: corrupt JSON on disk: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"[Session Load] {session_id}: failed to load from disk: {e}")
+        return None
+
 
 # Load any existing persisted sessions on startup
 for fname in os.listdir(SESSIONS_DIR):
     if fname.endswith(".json"):
         sid = fname[:-5]
-        try:
-            with open(os.path.join(SESSIONS_DIR, fname), "r") as f:
-                voice_sessions[sid] = json.load(f)
-        except Exception:
-            pass
+        loaded = _safe_load_disk_session(sid)
+        if loaded:
+            voice_sessions[sid] = loaded
 
 def _persist_session(session_id: str):
-    """Save session to disk immediately."""
+    """Save session to disk immediately. On failure, log but keep in-memory session alive."""
     session = voice_sessions.get(session_id)
     if not session:
+        logger.warning(f"[Session Save] {session_id}: not in memory, skipping persist")
         return
+    session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
     try:
-        with open(os.path.join(SESSIONS_DIR, f"{session_id}.json"), "w") as f:
-            json.dump(session, f, default=str)
+        with open(session_path, "w", encoding="utf-8") as f:
+            json.dump(session, f, default=str, ensure_ascii=False)
+        logger.info(f"[Session Save] {session_id}: persisted to disk OK")
     except Exception as e:
-        pass
+        logger.error(f"[Session Save] {session_id}: failed to persist to disk: {e}")
+        # Keep in-memory session alive so the user can continue even if disk is full/failing.
 
 
 def compute_progress(session: dict) -> int:
