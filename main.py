@@ -371,6 +371,37 @@ import secrets
 # In-memory storage for demo (use Redis/DB in production)
 resumes = {}
 
+def save_resume_json(resume_id: str, data: dict):
+    """Persist resume data to disk as JSON sidecar so it survives restarts."""
+    try:
+        filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.json")
+        with open(filepath, "w") as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving resume JSON for {resume_id}: {e}")
+
+def load_resume_from_disk(resume_id: str) -> dict | None:
+    """Load resume data from JSON sidecar. Returns None if not found."""
+    try:
+        filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.json")
+        if os.path.exists(filepath):
+            with open(filepath, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading resume JSON for {resume_id}: {e}")
+    return None
+
+def get_resume(resume_id: str) -> dict | None:
+    """Get resume data from memory, falling back to disk."""
+    if resume_id in resumes:
+        return resumes[resume_id]
+    # Disk fallback
+    data = load_resume_from_disk(resume_id)
+    if data:
+        resumes[resume_id] = data  # restore to memory
+        return data
+    return None
+
 # Student verification tokens: {token: {email: str, verified: bool, expires: datetime}}
 student_verifications = {}
 
@@ -889,6 +920,7 @@ async def build_resume(
     
     resume_id = f"{full_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     resumes[resume_id] = resume_data
+    save_resume_json(resume_id, resume_data)
     
     docx_path = generate_docx(resume_id, resume_data)
     pdf_path = generate_pdf(resume_id, resume_data)
@@ -2235,8 +2267,11 @@ async def payment_success(request: Request, session_id: str = "", resume_id: str
         
         if session.payment_status == "paid":
             # Payment confirmed - mark resume as premium
-            if resume_id in resumes:
-                resumes[resume_id]["paid"] = True
+            resume = get_resume(resume_id)
+            if resume:
+                resume["paid"] = True
+                resumes[resume_id] = resume
+                save_resume_json(resume_id, resume)
             
             # Track referral conversion
             ref_code = ref or session.get("metadata", {}).get("referral_code", "")
@@ -2288,9 +2323,13 @@ async def stripe_webhook(request: Request):
             resume_id = session.get("metadata", {}).get("resume_id", "")
             ref_code = session.get("metadata", {}).get("referral_code", "")
             
-            if resume_id and resume_id in resumes:
-                resumes[resume_id]["paid"] = True
-                print(f"Payment confirmed for resume: {resume_id}")
+            if resume_id:
+                resume = get_resume(resume_id)
+                if resume:
+                    resume["paid"] = True
+                    resumes[resume_id] = resume
+                    save_resume_json(resume_id, resume)
+                    print(f"Payment confirmed for resume: {resume_id}")
             
             # Track referral conversion from webhook
             if ref_code and ref_code in referral_codes:
@@ -2306,7 +2345,9 @@ async def stripe_webhook(request: Request):
 @app.get("/api/check-payment/{resume_id}")
 async def check_payment(resume_id: str):
     """Check if resume has been paid for"""
-    resume = resumes.get(resume_id, {})
+    resume = get_resume(resume_id)
+    if not resume:
+        return {"paid": False}
     return {"paid": resume.get("paid", False)}
 
 
@@ -2402,10 +2443,15 @@ async def get_timed_preview(request: Request):
         data = await request.json()
         resume_id = data.get("resume_id", "")
         
-        if not resume_id or resume_id not in resumes:
+        if not resume_id:
             return JSONResponse({"error": "Resume not found"}, status_code=404)
         
-        resume_data = resumes[resume_id]
+        resume_data = get_resume(resume_id)
+        if not resume_data:
+            return JSONResponse({"error": "Resume not found"}, status_code=404)
+        # Handle both flat (form builder) and nested (voice) formats
+        if "data" in resume_data and "template_style" not in resume_data:
+            resume_data = resume_data["data"]
         template_style = resume_data.get("template_style", "professional")
         
         # Generate watermarked image with correct theme
@@ -3075,6 +3121,7 @@ async def parse_voice(request: Request):
             "session_id": state.session_id,
             "paid": False
         }
+        save_resume_json(resume_id, resumes[resume_id])
         
         return {
             "success": True,
