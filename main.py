@@ -156,6 +156,32 @@ from voice_api import router as voice_router, voice_sessions as voice_session_st
 app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
 
+# Ensure Playwright Chromium is available at startup (Render free tier may wipe cache)
+import subprocess as _subprocess
+import shutil as _shutil
+
+def _ensure_playwright_chromium():
+    """Check if Chromium is installed; install if missing."""
+    try:
+        from playwright._impl._driver import compute_driver_executable
+        driver = compute_driver_executable()
+        if driver and os.path.exists(driver):
+            # Check if browser binary exists
+            result = _subprocess.run([driver, '--version'], capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                print("[AIE ResuMaker] Playwright Chromium: OK")
+                return
+    except Exception:
+        pass
+    print("[AIE ResuMaker] Playwright Chromium missing — installing...")
+    try:
+        _subprocess.run(["playwright", "install", "chromium"], check=True, timeout=120)
+        print("[AIE ResuMaker] Playwright Chromium installed successfully.")
+    except Exception as e:
+        print(f"[AIE ResuMaker] Playwright install failed (preview images will use CSS fallback): {e}")
+
+_ensure_playwright_chromium()
+
 @app.head("/")
 @app.get("/healthz")
 async def health_check():

@@ -9,8 +9,8 @@ services:
     name: aie-resumaker-hybrid
     runtime: python
     plan: free
-    buildCommand: "pip install -r requirements.txt && playwright install chromium || true"
-    startCommand: "playwright install chromium 2>/dev/null; uvicorn main:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "pip install -r requirements.txt && playwright install --with-deps chromium"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: "/healthz"
     autoDeploy: true
     envVars:
