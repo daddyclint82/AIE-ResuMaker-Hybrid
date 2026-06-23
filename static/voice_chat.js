@@ -15,6 +15,7 @@
     const backBtn = document.getElementById('back-btn');
     const addBtn = document.getElementById('add-btn');
     const doneJobsBtn = document.getElementById('done-jobs-btn');
+    const skipSectionBtn = document.getElementById('skip-section-btn');
     const saveBtn = document.getElementById('save-btn');
 
     // 42 Skill Categories (all tiers)
@@ -176,6 +177,9 @@
         if (saveBtn) {
             saveBtn.addEventListener('click', saveProgress);
         }
+        if (skipSectionBtn) {
+            skipSectionBtn.addEventListener('click', skipCurrentSection);
+        }
 
         // UNIVERSAL OVERRIDE: "COMPILE RESUME NOW" button below header
         const compileBtn = document.createElement('button');
@@ -231,6 +235,52 @@
             } else {
                 document.body.insertBefore(compileBtn, document.body.firstChild);
             }
+        }
+    }
+
+    async function skipCurrentSection() {
+        if (!sessionId) return;
+
+        if (textInput) textInput.disabled = true;
+        if (sendBtn) sendBtn.disabled = true;
+        showTyping();
+
+        try {
+            const response = await fetch('/api/voice/turn', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    transcript: '__SKIP_SECTION__',
+                    action: 'skip_section'
+                })
+            });
+            const data = await response.json();
+            hideTyping();
+
+            if (data.error) {
+                addMessage('ai', 'Sorry: ' + data.error, false);
+            } else {
+                const displayQuestion = data.context_label
+                    ? `[${data.context_label}] ${data.question}`
+                    : data.question;
+                addMessage('ai', displayQuestion, false);
+                clearInput(data.field === '_bullet');
+                currentField = data.field;
+                updateProgress(data.progress_pct);
+                updateContextLabel(data.context_label);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateBulletUI(data);
+            }
+        } catch (e) {
+            hideTyping();
+            console.error('Skip section error:', e);
+        } finally {
+            if (textInput) {
+                textInput.disabled = false;
+                textInput.focus();
+            }
+            if (sendBtn) sendBtn.disabled = false;
         }
     }
 
@@ -1103,6 +1153,16 @@
             } else {
                 addBtn.style.display = 'none';
             }
+        }
+
+        // Show skip section button during first field of an optional section
+        const inOptionalFirstField = field && (
+            field === 'name' || field === 'competency' || field === 'school' ||
+            field === 'community_org' || field === 'cert_name' || field === 'reference_name' ||
+            field === 'website'
+        );
+        if (skipSectionBtn) {
+            skipSectionBtn.style.display = inOptionalFirstField ? 'inline-block' : 'none';
         }
     }
 

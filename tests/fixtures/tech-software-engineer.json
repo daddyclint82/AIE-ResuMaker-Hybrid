@@ -1,0 +1,59 @@
+{
+  "name": "Tech Job Seeker - Software Engineer",
+  "target_job": "Software Engineer",
+  "description": "Full voice questionnaire for a technology role. Should trigger tech stack question in projects section.",
+  "answers": [
+    {"step": "1A", "phase": "simple", "field": "full_name", "value": "Alex Coder"},
+    {"step": "1B", "phase": "simple", "field": "email", "value": "alex@example.com"},
+    {"step": "1C", "phase": "simple", "field": "phone", "value": "555-0100"},
+    {"step": "1D", "phase": "simple", "field": "city", "value": "Austin"},
+    {"step": "1E", "phase": "simple", "field": "state", "value": "TX"},
+    {"step": "1F", "phase": "simple", "field": "industry", "value": "Technology"},
+    {"step": "1G", "phase": "simple", "field": "job_title", "value": "Software Engineer"},
+    {"step": "1H", "phase": "simple", "field": "experience_level", "value": "mid"},
+    {"step": "1I", "phase": "simple", "field": "education_level", "value": "bachelor"},
+
+    {"step": "2A1", "phase": "experience", "field": "company", "value": "TechStart Inc"},
+    {"step": "2A2", "phase": "experience", "field": "title", "value": "Backend Developer"},
+    {"step": "2A3", "phase": "experience", "field": "dates", "value": "2022 to 2024"},
+    {"step": "2A4", "phase": "experience", "field": "_bullet", "value": "Built REST APIs serving 10k requests per minute using FastAPI and PostgreSQL"},
+    {"step": "2A5", "phase": "experience", "field": "_more_bullets", "value": "yes"},
+    {"step": "2A6", "phase": "experience", "field": "_bullet", "value": "Dockerized microservices and deployed to AWS ECS with Terraform"},
+    {"step": "2A7", "phase": "experience", "field": "_more_bullets", "value": "yes"},
+    {"step": "2A8", "phase": "experience", "field": "_bullet", "value": "Improved CI/CD pipeline reducing deployment time by 40 percent"},
+    {"step": "2A9", "phase": "experience", "field": "_more_bullets", "value": "done"},
+    {"step": "2A10", "phase": "experience", "field": "_add_job", "value": "done"},
+
+    {"step": "3A", "phase": "summary", "field": "summary_q1", "value": "I build scalable backend systems that keep teams shipping fast"},
+    {"step": "3B", "phase": "summary", "field": "summary_q2", "value": "I solve API performance bottlenecks and automate cloud deployments"},
+    {"step": "3C", "phase": "summary", "field": "summary_q3", "value": "Reduced deploy time by 40 percent and supported 10k rpm"},
+    {"step": "3D", "phase": "summary", "field": "summary_q4", "value": "none"},
+
+    {"step": "4A", "phase": "skills", "field": "skills", "value": "Python, FastAPI, PostgreSQL, Docker, AWS, Terraform, CI/CD, Git, Linux"},
+
+    {"step": "5A1", "phase": "optional", "field": "project_name", "value": "AI Resume Builder"},
+    {"step": "5A2", "phase": "optional", "field": "tech", "value": "Python, FastAPI, Stripe"},
+    {"step": "5A3", "phase": "optional", "field": "project_description", "value": "Voice-powered resume generator"},
+    {"step": "5A4", "phase": "optional", "field": "project_result", "value": "Helped users create resumes 10x faster"},
+    {"step": "5A5", "phase": "optional", "field": "_projects_decision", "value": "done"},
+    {"step": "5B", "phase": "optional", "field": "_competencies_decision", "value": "skip"},
+    {"step": "5C", "phase": "optional", "field": "_education_decision", "value": "skip"},
+    {"step": "5D", "phase": "optional", "field": "_community_decision", "value": "skip"},
+    {"step": "5E", "phase": "optional", "field": "_certifications_decision", "value": "skip"},
+    {"step": "5F", "phase": "optional", "field": "_references_decision", "value": "skip"},
+    {"step": "5G", "phase": "optional", "field": "website", "value": "skip"},
+    {"step": "5H", "phase": "optional", "field": "linkedin", "value": "skip"}
+  ],
+  "expected_results": {
+    "simple_fields_count": 9,
+    "jobs": 1,
+    "bullets_per_job": 3,
+    "summary_questions": 4,
+    "skills_categorized": true,
+    "phase_final": "done",
+    "validate_skills_weights": true
+  },
+  "test_assertions": {
+    "tech_stack_should_appear": true
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "Investment Advisor - Finance Non-Tech",
+  "target_job": "Investment Advisor",
+  "description": "Full voice questionnaire for a finance role. Should NOT trigger tech stack question in projects section.",
+  "answers": [
+    {"step": "1A", "phase": "simple", "field": "full_name", "value": "Jordan Finance"},
+    {"step": "1B", "phase": "simple", "field": "email", "value": "jordan@example.com"},
+    {"step": "1C", "phase": "simple", "field": "phone", "value": "555-0200"},
+    {"step": "1D", "phase": "simple", "field": "city", "value": "Dallas"},
+    {"step": "1E", "phase": "simple", "field": "state", "value": "TX"},
+    {"step": "1F", "phase": "simple", "field": "industry", "value": "Finance"},
+    {"step": "1G", "phase": "simple", "field": "job_title", "value": "Investment Advisor"},
+    {"step": "1H", "phase": "simple", "field": "experience_level", "value": "senior"},
+    {"step": "1I", "phase": "simple", "field": "education_level", "value": "master"},
+
+    {"step": "2A1", "phase": "experience", "field": "company", "value": "Wealth Partners LLC"},
+    {"step": "2A2", "phase": "experience", "field": "title", "value": "Senior Advisor"},
+    {"step": "2A3", "phase": "experience", "field": "dates", "value": "2019 to 2024"},
+    {"step": "2A4", "phase": "experience", "field": "_bullet", "value": "Managed 50 million in client assets across 120 households"},
+    {"step": "2A5", "phase": "experience", "field": "_more_bullets", "value": "yes"},
+    {"step": "2A6", "phase": "experience", "field": "_bullet", "value": "Developed retirement income strategies for high-net-worth clients"},
+    {"step": "2A7", "phase": "experience", "field": "_more_bullets", "value": "yes"},
+    {"step": "2A8", "phase": "experience", "field": "_bullet", "value": "Grew client base by 30 percent through referrals and seminars"},
+    {"step": "2A9", "phase": "experience", "field": "_more_bullets", "value": "done"},
+    {"step": "2A10", "phase": "experience", "field": "_add_job", "value": "done"},
+
+    {"step": "3A", "phase": "summary", "field": "summary_q1", "value": "I help families preserve and grow wealth across generations"},
+    {"step": "3B", "phase": "summary", "field": "summary_q2", "value": "I solve retirement planning and portfolio allocation challenges"},
+    {"step": "3C", "phase": "summary", "field": "summary_q3", "value": "50 million under management and 30 percent client growth"},
+    {"step": "3D", "phase": "summary", "field": "summary_q4", "value": "none"},
+
+    {"step": "4A", "phase": "skills", "field": "skills", "value": "Financial Planning, Portfolio Management, Client Relations, Retirement Strategies, Risk Assessment, Wealth Management"},
+
+    {"step": "5A1", "phase": "optional", "field": "project_name", "value": "Client Education Seminar Series"},
+    {"step": "5A2", "phase": "optional", "field": "project_description", "value": "Created and delivered seminars on retirement planning"},
+    {"step": "5A3", "phase": "optional", "field": "project_result", "value": "Increased client retention by 25 percent"},
+    {"step": "5A4", "phase": "optional", "field": "_projects_decision", "value": "done"},
+    {"step": "5B", "phase": "optional", "field": "_competencies_decision", "value": "skip"},
+    {"step": "5C", "phase": "optional", "field": "_education_decision", "value": "skip"},
+    {"step": "5D", "phase": "optional", "field": "_community_decision", "value": "skip"},
+    {"step": "5E", "phase": "optional", "field": "_certifications_decision", "value": "skip"},
+    {"step": "5F", "phase": "optional", "field": "_references_decision", "value": "skip"},
+    {"step": "5G", "phase": "optional", "field": "website", "value": "skip"},
+    {"step": "5H", "phase": "optional", "field": "linkedin", "value": "skip"}
+  ],
+  "expected_results": {
+    "simple_fields_count": 9,
+    "jobs": 1,
+    "bullets_per_job": 3,
+    "summary_questions": 4,
+    "skills_categorized": true,
+    "phase_final": "done",
+    "validate_skills_weights": true
+  },
+  "test_assertions": {
+    "tech_stack_should_appear": false
+  }
+}
