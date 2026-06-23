@@ -272,10 +272,33 @@ EXPERIENCE_FIELDS = [
 
 PROJECT_FIELDS = [
     {"field": "name", "question": "Project name? (e.g., 'AI Resume Builder')"},
-    {"field": "tech", "question": "Tech stack? Say 'Python, FastAPI, Stripe | 2025'"},
     {"field": "description", "question": "What did you build or accomplish?"},
     {"field": "result", "question": "What was the outcome or result?"},
 ]
+
+# Tech stack is asked conditionally based on skills detected as technology-related
+TECH_KEYWORDS = [
+    "python", "javascript", "js", "typescript", "ts", "java", "c++", "c#", "go", "rust", "ruby", "php",
+    "swift", "kotlin", "scala", "r", "matlab", "sql", "html", "css", "react", "vue", "angular", "svelte",
+    "node", "nodejs", "django", "flask", "fastapi", "spring", "rails", "laravel", "express", "nextjs",
+    "aws", "azure", "gcp", "cloud", "docker", "kubernetes", "k8s", "terraform", "ansible", "jenkins",
+    "ci/cd", "devops", "github", "gitlab", "bitbucket", "git", "linux", "unix", "bash", "powershell",
+    "nginx", "apache", "redis", "mongodb", "postgres", "postgresql", "mysql", "sqlite", "dynamodb",
+    "elasticsearch", "kafka", "rabbitmq", "graphql", "rest", "api", "microservices", "serverless",
+    "lambda", "tensorflow", "pytorch", "keras", "scikit", "pandas", "numpy", "ml", "machine learning",
+    "ai", "artificial intelligence", "llm", "data science", "analytics", "big data", "spark", "hadoop",
+    "blockchain", "solidity", "smart contract", "web3", "cybersecurity", "penetration testing", "networking",
+    "programming", "developer", "development", "software", "engineering", "computer", "computing",
+    "automation", "scripting", "database", "infrastructure", "platform", "saas", "paaS", "iaas",
+    "full stack", "frontend", "backend", "back end", "front end", "mobile app", "web app", "web development",
+    "system administration", "sysadmin", "site reliability", "sre", "network engineer", "security engineer",
+]
+
+TECH_CATEGORIES = {
+    "Programming & Development", "Frameworks & Libraries", "AI/ML & Data Science",
+    "Cloud & Infrastructure", "DevOps & Automation", "Databases & Data Storage",
+    "Cybersecurity", "Testing & Quality Assurance", "Mobile Development", "Embedded Systems",
+}
 
 COMPETENCY_FIELDS = [
     {"field": "label", "question": "Competency name? (e.g., 'Operational Leadership')"},
@@ -333,6 +356,32 @@ def get_relevant_tiers(industry: str, summary_q4: str = "") -> List[str]:
                 if cat not in ordered:
                     ordered.append(cat)
     return ordered
+
+def _has_tech_skills(session: dict) -> bool:
+    """Return True if the user's skills indicate a technology/programming/computer role."""
+    data = session.get("data", {})
+    categorized = data.get("skills_categorized", {})
+
+    # Check categorized skill categories first
+    if categorized:
+        if isinstance(categorized, dict):
+            detected_cats = set(str(k).title() for k in categorized.keys())
+        else:
+            detected_cats = set()
+        for cat in TECH_CATEGORIES:
+            if cat in detected_cats:
+                return True
+
+    # Fallback: keyword scan on raw skills text
+    skills_text = data.get("skills", "") + " " + data.get("job_title", "") + " " + data.get("industry", "")
+    lower_text = skills_text.lower()
+    for kw in TECH_KEYWORDS:
+        # Match whole-word-ish boundaries to avoid false positives (e.g., "go" in "management")
+        pattern = r"(?:^|\W)" + re.escape(kw) + r"(?:$|\W)"
+        if re.search(pattern, lower_text):
+            return True
+    return False
+
 
 # =============================================================================
 # STATE MACHINE
@@ -481,7 +530,11 @@ def get_current_state(session: dict) -> dict:
         section = ctx.get("opt_section", "projects")
         
         if section == "projects":
-            return _handle_optional_section(session, "projects", PROJECT_FIELDS, "Project")
+            # Inject tech stack question only for tech-related resumes
+            fields = list(PROJECT_FIELDS)
+            if _has_tech_skills(session) and not ctx.get("tech_stack_asked", False):
+                fields.insert(1, {"field": "tech", "question": "Tech stack? Say 'Python, FastAPI, Stripe | 2025'"})
+            return _handle_optional_section(session, "projects", fields, "Project")
         elif section == "competencies":
             return _handle_optional_section(session, "competencies", COMPETENCY_FIELDS, "Competency")
         elif section == "education":
@@ -575,6 +628,19 @@ async def process_answer(session: dict, transcript: str) -> dict:
     phase = ctx.get("phase", "simple")
     extracted = transcript.strip()
     
+    # Handle explicit skip-section action from frontend
+    if transcript == "__SKIP_SECTION__":
+        section = ctx.get("opt_section", "projects")
+        item_list = ctx.get(section, [])
+        # Remove the empty item we may have created
+        if item_list and not any(item_list[-1].values() if isinstance(item_list[-1], dict) else True):
+            item_list.pop()
+        ctx[section] = item_list
+        session["context"] = ctx
+        _advance_optional_section(session)
+        _persist_session(session.get("session_id"))
+        return get_current_state(session)
+
     # Handle skip/none for optional things
     lower = extracted.lower()
     
@@ -639,6 +705,9 @@ async def process_answer(session: dict, transcript: str) -> dict:
                 session["data"] = data
             except Exception as e:
                 pass
+        
+        # Pre-compute whether we need tech stack later (stored in context)
+        ctx["needs_tech_stack"] = _has_tech_skills(session)
         
         # Move to optional sections after skills
         ctx["phase"] = "optional"
@@ -886,6 +955,9 @@ def _process_optional(session: dict, extracted: str) -> dict:
             # Add another item - reset field index for new item
             ctx["opt_idx"] = item_idx + 1
             ctx["opt_field_idx"] = 0
+            # Reset tech stack asked flag when adding another project so next project can ask too
+            if section == "projects":
+                ctx.pop("tech_stack_asked", None)
             session["context"] = ctx
             return get_current_state(session)
         elif lower in ["next", "done", "skip", "no"]:
@@ -934,6 +1006,9 @@ def _process_optional(session: dict, extracted: str) -> dict:
     
     # Collecting field data
     field_name = fields[field_idx]["field"]
+    # Mark tech stack as asked so it only appears once per project
+    if section == "projects" and field_name == "tech":
+        ctx["tech_stack_asked"] = True
     # SANITIZE: strip control words from non-decision fields
     CONTROL_WORDS = {"yes", "done", "no", "skip", "next", "add", "more", "stop", "finished"}
     if lower in CONTROL_WORDS:
@@ -963,7 +1038,7 @@ def _advance_optional_section(session: dict):
     ctx["opt_idx"] = 0
     ctx["opt_field_idx"] = 0
     # Clear any leftover flags from previous sections
-    for flag in ["awaiting_more_bullets", "exp_done", "in_bullet_loop"]:
+    for flag in ["awaiting_more_bullets", "exp_done", "in_bullet_loop", "tech_stack_asked"]:
         ctx.pop(flag, None)
     session["context"] = ctx
 
