@@ -1550,12 +1550,18 @@ async function degradePreview(resumeId) {
         if (result.success) {
             // Keep the preview header/buttons, only replace the preview content
             const previewContainer = document.getElementById('preview-container');
+            
+            // Use watermarked image if available, otherwise fall back to watermarked HTML
+            const previewContent = result.watermarked_image 
+                ? `<img src="${result.watermarked_image}" 
+                     style="max-width:100%;border:1px solid #ccc;" 
+                     oncontextmenu="return false;" 
+                     draggable="false">`
+                : (result.watermarked_html || result.clean_html || '');
+            
             previewContainer.innerHTML = `
                 <div style="position:relative;text-align:center;">
-                    <img src="${result.watermarked_image}" 
-                         style="max-width:100%;border:1px solid #ccc;"
-                         oncontextmenu="return false;"
-                         draggable="false">
+                    ${previewContent}
                     <div style="margin-top:15px;padding:15px;background:#f8f9fa;border-radius:8px;">
                         <p style="font-size:16px;color:#333;margin-bottom:10px;">
                             <strong>👆 This is a watermarked sample</strong>
