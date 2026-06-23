@@ -2467,7 +2467,23 @@ async def get_timed_preview(request: Request):
                 "watermarked_image": f"data:image/png;base64,{image_base64}"
             }
         else:
-            return JSONResponse({"error": "Failed to generate preview"}, status_code=500)
+            # Fallback: return CSS-watermarked HTML when Chromium is unavailable
+            watermarked_html = f'''
+            <div style="position:relative;overflow:hidden;">
+                <div style="filter:blur(3px);opacity:0.6;pointer-events:none;">{preview_html}</div>
+                <div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:60px;pointer-events:none;">
+                    <span style="transform:rotate(-30deg);font-size:48px;font-weight:bold;color:rgba(200,0,0,0.3);font-family:sans-serif;white-space:nowrap;">AIE ResuMaker SAMPLE</span>
+                    <span style="transform:rotate(-30deg);font-size:48px;font-weight:bold;color:rgba(200,0,0,0.3);font-family:sans-serif;white-space:nowrap;">AIE ResuMaker SAMPLE</span>
+                    <span style="transform:rotate(-30deg);font-size:48px;font-weight:bold;color:rgba(200,0,0,0.3);font-family:sans-serif;white-space:nowrap;">AIE ResuMaker SAMPLE</span>
+                </div>
+            </div>
+            '''
+            return {
+                "success": True,
+                "clean_html": preview_html,
+                "watermarked_html": watermarked_html,
+                "watermarked_image": None
+            }
             
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
