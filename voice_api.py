@@ -57,7 +57,7 @@ def _persist_session(session_id: str):
         with open(os.path.join(SESSIONS_DIR, f"{session_id}.json"), "w") as f:
             json.dump(session, f, default=str)
     except Exception as e:
-        print(f"[Session Persist Error] {e}")
+        pass
 
 
 def compute_progress(session: dict) -> int:
@@ -300,7 +300,6 @@ def get_current_state(session: dict) -> dict:
         section = ctx.get("opt_section", "unknown")
         opt_idx = ctx.get("opt_idx", 0)
         opt_field_idx = ctx.get("opt_field_idx", 0)
-        print(f"[STATE MACHINE FATAL] phase={phase} | section={section} | opt_idx={opt_idx} | opt_field_idx={opt_field_idx}")
     
     # Phase 1: Simple fields
     if phase == "simple":
@@ -430,7 +429,6 @@ def get_current_state(session: dict) -> dict:
     # Phase 5: Optional sections (projects, competencies, community, certs, links)
     if phase == "optional":
         section = ctx.get("opt_section", "projects")
-        print(f"[STATE MACHINE FATAL] optional section={section}, opt_idx={ctx.get('opt_idx', 0)}, opt_field_idx={ctx.get('opt_field_idx', 0)}")
         
         if section == "projects":
             return _handle_optional_section(session, "projects", PROJECT_FIELDS, "Project")
@@ -537,7 +535,6 @@ async def process_answer(session: dict, transcript: str) -> dict:
     current_field = ctx.get("field", "")
     if isinstance(current_field, str) and current_field.startswith("_") and current_field not in ("_add_job", "_decision", "_add_references"):
         if lower in ("yes", "done", "no", "skip", "next"):
-            print(f"[INTERCEPT] Safely blocked text leak '{lower}' for standard field '{current_field}'")
             # Return next state WITHOUT storing the control word as data
             return get_current_state(session)
     # === END INTERCEPT ===
@@ -554,7 +551,6 @@ async def process_answer(session: dict, transcript: str) -> dict:
             ctx["awaiting_more_bullets"] = False
             session["context"] = ctx
             _persist_session(session.get("session_id"))
-            print(f"[GLOBAL SAFETY] Forced bullet loop exit for '{lower}'")
             return get_current_state(session)
     
     # Phase 1: Simple fields
@@ -592,7 +588,7 @@ async def process_answer(session: dict, transcript: str) -> dict:
                 data["skills_categorized"] = categorized
                 session["data"] = data
             except Exception as e:
-                print(f"[Skills Categorize Error] {e}")
+                pass
         
         # Move to optional sections after skills
         ctx["phase"] = "optional"
@@ -619,7 +615,6 @@ def _process_experience(session: dict, extracted: str) -> dict:
     job_idx = ctx.get("exp_idx", 0)
     field_idx = ctx.get("exp_field_idx", 0)
     
-    print(f"DEBUG _process_experience: extracted='{extracted}', field_idx={field_idx}, in_bullet_loop={ctx.get('in_bullet_loop', False)}, exp_done={ctx.get('exp_done', False)}, bullet_count={ctx.get('bullet_count', 0)}")
     
     # Ensure current job exists
     while len(exp_list) <= job_idx:
@@ -629,15 +624,12 @@ def _process_experience(session: dict, extracted: str) -> dict:
     sanitized_text = str(extracted).strip().lower()
     
     # 2. Add explicit debug hooks to isolate the exact evaluation failure
-    print(f"[STATE DB DEBUG] Input: '{sanitized_text}' | field_idx: {field_idx} | in_bullet_loop: {ctx.get('in_bullet_loop', False)} | exp_done: {ctx.get('exp_done', False)}")
     
     # 3. Hard stop: if user sends "done" at ANY point in experience phase,
     # force exit immediately and do NOT let it leak into field or bullet storage.
     if sanitized_text in ["done", "no", "stop", "finished"]:
-        print(f"[STATE DB DEBUG] MATCHED BREAK LOOP COMMAND. Forcing state mutation and early return.")
         # If still collecting fields, fast-forward past them
         if field_idx < len(EXPERIENCE_FIELDS):
-            print(f"[STATE DB DEBUG] Fast-forwarding fields from {field_idx} to {len(EXPERIENCE_FIELDS)}")
             ctx["exp_field_idx"] = len(EXPERIENCE_FIELDS)
         ctx["in_bullet_loop"] = False
         ctx["exp_done"] = True
@@ -656,11 +648,9 @@ def _process_experience(session: dict, extracted: str) -> dict:
         ctx["exp_field_idx"] = field_idx + 1
         ctx["experience"] = exp_list
         session["context"] = ctx
-        print(f"DEBUG: Stored field {field_name}={extracted}, new field_idx={field_idx+1}")
         return get_current_state(session)
     
     # In bullet collection mode
-    print(f"DEBUG: Checking first bullet branch: not in_bullet_loop={not ctx.get('in_bullet_loop', False)}, not exp_done={not ctx.get('exp_done', False)}")
     if not ctx.get("in_bullet_loop", False) and not ctx.get("exp_done", False):
         # First bullet - initialize bullet loop state properly
         ctx["in_bullet_loop"] = True
@@ -679,15 +669,12 @@ def _process_experience(session: dict, extracted: str) -> dict:
         ctx["bullet_count"] = 1
         ctx["experience"] = exp_list
         session["context"] = ctx
-        print(f"DEBUG: First bullet stored, bullet_count=1")
         return get_current_state(session)
     
     bullet_count = ctx.get("bullet_count", 0)
     
     # Handle "Add another job?" decision
-    print(f"DEBUG: Checking exp_done branch: exp_done={ctx.get('exp_done', False)}")
     if ctx.get("exp_done", False):
-        print(f"DEBUG: In exp_done branch, lower='{lower}'")
         if lower in ["yes", "y", "add", "more"]:
             # Start new job
             ctx["exp_done"] = False
@@ -713,7 +700,6 @@ def _process_experience(session: dict, extracted: str) -> dict:
             return get_current_state(session)
     
     # Check if user wants more bullets (after decision prompt)
-    print(f"DEBUG: Checking 'yes' branch: lower='{lower}'")
     if lower in ["yes", "y", "add", "more"]:
         # User wants to add another bullet - set flag and return bullet prompt
         ctx["awaiting_more_bullets"] = True
@@ -721,7 +707,6 @@ def _process_experience(session: dict, extracted: str) -> dict:
         return get_current_state(session)
     
     # Check if user is done with bullets
-    print(f"DEBUG: Checking 'done' branch: lower='{lower}', in list={lower in ['done', 'no', 'n', 'finished', 'next', 'skip']}")
     if lower in ["done", "no", "n", "finished", "next", "skip"]:
         # Move to "add another job?" decision
         ctx["in_bullet_loop"] = False
@@ -729,11 +714,9 @@ def _process_experience(session: dict, extracted: str) -> dict:
         ctx["awaiting_more_bullets"] = False
         ctx["exp_done"] = True  # Mark that we're done with this job's bullets
         session["context"] = ctx
-        print(f"DEBUG: Set exp_done=True, in_bullet_loop=False")
         return get_current_state(session)
     
     # User provided another bullet
-    print(f"DEBUG: Storing as bullet")
     if "description" not in exp_list[job_idx]:
         exp_list[job_idx]["description"] = []
     if "bullets" not in exp_list[job_idx]:
@@ -748,7 +731,6 @@ def _process_experience(session: dict, extracted: str) -> dict:
     ctx["experience"] = exp_list
     session["context"] = ctx
     
-    print(f"DEBUG: Bullet stored, bullet_count={bullet_count+1}")
     # After collecting a bullet, ask if they want more
     return {
         "type": "decision",
@@ -819,8 +801,6 @@ def _process_optional(session: dict, extracted: str) -> dict:
     item_idx = ctx.get("opt_idx", 0)
     field_idx = ctx.get("opt_field_idx", 0)
     
-    print(f"[OPTIONAL DEBUG] section={section}, item_idx={item_idx}, field_idx={field_idx}, extracted='{extracted}'")
-    print(f"[OPTIONAL DEBUG] BEFORE: opt_idx={ctx.get('opt_idx')}, opt_field_idx={ctx.get('opt_field_idx')}")
     
     item_list = ctx.get(section, [])
     while len(item_list) <= item_idx:
@@ -852,17 +832,14 @@ def _process_optional(session: dict, extracted: str) -> dict:
     
     # Decision to add more items (field_idx >= len(fields) means we're at decision point)
     if field_idx >= len(fields):
-        print(f"[OPTIONAL DEBUG] DECISION POINT: lower='{lower}', item_idx={item_idx}")
         if lower in ["yes", "y", "add", "more"]:
             # Add another item - reset field index for new item
-            print(f"[OPTIONAL DEBUG] Adding another item: opt_idx={item_idx + 1}, opt_field_idx=0")
             ctx["opt_idx"] = item_idx + 1
             ctx["opt_field_idx"] = 0
             session["context"] = ctx
             return get_current_state(session)
         elif lower in ["next", "done", "skip", "no"]:
             # Done with this section - save data and move to next
-            print(f"[OPTIONAL DEBUG] Done with section {section}, advancing to next")
             # Filter out empty dicts before saving AND strip control words
             CONTROL_WORDS = {"yes", "skip", "done", "next", "no", "add", "more", "stop", "finished"}
             filtered_items = []
@@ -888,7 +865,6 @@ def _process_optional(session: dict, extracted: str) -> dict:
             return get_current_state(session)
         else:
             # Unrecognized input - REPEAT the decision prompt (stay in phase="optional")
-            print(f"[OPTIONAL DEBUG] Unrecognized '{lower}', staying in section {section}")
             # Do NOT advance section; re-ask the same decision
             ctx["opt_field_idx"] = field_idx  # stay at decision boundary
             session["context"] = ctx
@@ -912,14 +888,12 @@ def _process_optional(session: dict, extracted: str) -> dict:
     CONTROL_WORDS = {"yes", "done", "no", "skip", "next", "add", "more", "stop", "finished"}
     if lower in CONTROL_WORDS:
         stored_value = ""
-        print(f"[SANITIZE] Stripped control word '{lower}' from {section}.{field_name}")
     else:
         stored_value = extracted
     item_list[item_idx][field_name] = stored_value
     ctx[section] = item_list
     ctx["opt_field_idx"] = field_idx + 1
     session["context"] = ctx
-    print(f"[OPTIONAL DEBUG] AFTER STORE: opt_idx={ctx.get('opt_idx')}, opt_field_idx={ctx.get('opt_field_idx')}, field={field_name}")
     return get_current_state(session)
 
 
@@ -1203,7 +1177,7 @@ User skills: {skills_text}"""
                 # Remove empty categories
                 return {k: v for k, v in parsed.items() if v}
     except Exception as e:
-        print(f"[Groq Categorize Error] {e}")
+        pass
     
     # Fallback
     skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
@@ -1263,10 +1237,8 @@ Write a concise, compelling professional summary that incorporates the keywords 
             if response.status_code == 200:
                 result = response.json()
                 return result["choices"][0]["message"]["content"].strip()
-            else:
-                print(f"[Groq Summary API Error] {response.status_code}: {response.text}")
-    except Exception as e:
-        print(f"[Groq Summary Error] {e}")
+    except Exception:
+        pass
     
     # Fallback
     return f"{q1} {q2} {q3}".strip()
@@ -1764,7 +1736,7 @@ async def voice_terms_accept(request: Request):
                     "terms_accepted_at": now_iso
                 }
             except Exception as e:
-                print(f"[Terms Accept] Failed to load session from disk: {e}")
+                pass
     
     # 3. No session_id or session not found — create a fresh shell session
     new_id = session_id or secrets.token_urlsafe(16)
@@ -1846,7 +1818,6 @@ async def voice_turn(request: Request):
         action = body.get("action", "answer")
         transcript = body.get("transcript", "").strip()
         
-        print(f"[HTTP REQUEST] session_id={session_id[:8] if session_id else 'NONE'} | action={action} | transcript='{transcript}'")
         
         # Acquire per-session lock to enforce strict sequential processing
         if session_id not in session_locks:
@@ -1883,9 +1854,7 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
                     ctx.setdefault("opt_field_idx", 0)
                     loaded_session["context"] = ctx
                     voice_sessions[session_id] = loaded_session
-                    print(f"[Session Load] Hydrated session {session_id[:8]}... with flags: exp_field_idx={ctx['exp_field_idx']}, in_bullet_loop={ctx['in_bullet_loop']}, bullet_count={ctx['bullet_count']}, exp_done={ctx['exp_done']}")
             except Exception as e:
-                print(f"[Session Load Error] {e}")
                 pass
     
     if not session_id or session_id not in voice_sessions:
@@ -1905,7 +1874,6 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         ctx["exp_idx"] = 0
         session["context"] = ctx
         _persist_session(session_id)
-        print("[ESCAPE HATCH] Forced experience loop exit to summary phase.")
         return get_current_state(session)
     # === END ESCAPE HATCH ===
     
@@ -1921,7 +1889,6 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         session["context"] = ctx
         session["done"] = True
         _persist_session(session_id)
-        print("[UNIVERSAL OVERRIDE] Bypassed all optional sections. Forced session compilation.")
         return get_current_state(session)
     # === END UNIVERSAL OVERRIDE ===
     
@@ -1955,7 +1922,6 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
             ctx.pop("_resume_phase", None)
             ctx.pop("_resume_step_index", None)
             session["context"] = ctx
-            print(f"[UN-DONE RECOVERY] Re-opened session at phase={ctx.get('phase')} step_index={session.get('step_index')}")
             # Do NOT consume the triggering word as an answer — just reopen and
             # re-ask the current question so the user can respond fresh.
             _persist_session(session_id)
@@ -2092,7 +2058,6 @@ async def voice_save(request: Request):
             }
         
     except Exception as e:
-        print(f"[Voice Save Error] {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -2145,7 +2110,6 @@ async def voice_load(request: Request):
             }
         
     except Exception as e:
-        print(f"[Voice Load Error] {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -2191,9 +2155,8 @@ async def voice_preview(request: Request):
         try:
             docx_path = generate_docx(resume_id, resume_data)
             pdf_path = generate_pdf(resume_id, resume_data)
-            print(f"[Voice Preview] Generated files: DOCX={docx_path}, PDF={pdf_path}")
         except Exception as gen_err:
-            print(f"[Voice Preview] File generation warning: {gen_err}")
+            pass
         
         # Generate preview HTML
         preview_html = generate_preview_html(resume_data, resume_data["template_style"])
@@ -2208,7 +2171,6 @@ async def voice_preview(request: Request):
         }
         
     except Exception as e:
-        print(f"[Voice Preview Error] {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
