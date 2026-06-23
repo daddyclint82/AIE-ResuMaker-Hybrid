@@ -300,6 +300,30 @@
                         window.sessionId = priorSid;
                         hist.forEach(m => addMessage(m.role === 'user' ? 'user' : 'ai', m.text, m.role === 'user'));
                         scrollToBottom();
+                        // Sync UI nav state with current server state
+                        try {
+                            const stateResp = await fetch('/api/voice/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ session_id: priorSid })
+                            });
+                            const stateData = await stateResp.json();
+                            if (stateData.success && stateData.state) {
+                                const loadResp = await fetch('/api/voice/load', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ state: stateData.state })
+                                });
+                                const loadData = await loadResp.json();
+                                if (!loadData.error) {
+                                    currentField = loadData.field;
+                                    updateNavButtons(loadData.can_go_back, loadData.field, loadData.show_add_job);
+                                    updateBulletUI(loadData);
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Rehydrate] UI sync failed:', e);
+                        }
                         return; // rehydrated — do not start a new session
                     }
                 }
