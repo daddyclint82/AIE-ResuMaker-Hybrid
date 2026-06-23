@@ -1,16 +1,15 @@
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import json
 import os
 import re
 import httpx
-from datetime import datetime
+from datetime import datetime, timedelta
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-import tempfile
 import base64
 from io import BytesIO
 
@@ -71,7 +70,6 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
     """Send student verification email with unique link"""
     try:
         if not SMTP_USER or not SMTP_PASS:
-            print(f"[EMAIL] SMTP not configured. Token for {to_email}: {token}")
             return False
         
         # Create message
@@ -141,15 +139,11 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_FROM, to_email, msg.as_string())
         
-        print(f"[EMAIL] Verification sent to {to_email}")
         return True
         
     except Exception as e:
-        print(f"[EMAIL ERROR] Failed to send to {to_email}: {e}")
         return False
 
-print(f"[AIE ResuMaker] Environment: {APP_ENV}")
-print(f"[AIE ResuMaker] Stripe key prefix: {STRIPE_SECRET_KEY[:7]}..." if STRIPE_SECRET_KEY else "[AIE ResuMaker] WARNING: No Stripe secret key configured!")
 
 from voice_api import router as voice_router, voice_sessions as voice_session_store
 
@@ -306,7 +300,6 @@ def _load_skill_categories():
                 for skill in skills:
                     skill_to_category[skill.lower()] = category
     except Exception as e:
-        print(f"Warning: Could not load skill categories: {e}")
         skill_categories = {}
         skill_to_category = {}
 
@@ -377,8 +370,8 @@ def save_resume_json(resume_id: str, data: dict):
         filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.json")
         with open(filepath, "w") as f:
             json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"Error saving resume JSON for {resume_id}: {e}")
+    except Exception:
+        pass
 
 def load_resume_from_disk(resume_id: str) -> dict | None:
     """Load resume data from JSON sidecar. Returns None if not found."""
@@ -387,8 +380,8 @@ def load_resume_from_disk(resume_id: str) -> dict | None:
         if os.path.exists(filepath):
             with open(filepath, "r") as f:
                 return json.load(f)
-    except Exception as e:
-        print(f"Error loading resume JSON for {resume_id}: {e}")
+    except Exception:
+        pass
     return None
 
 def get_resume(resume_id: str) -> dict | None:
@@ -608,14 +601,6 @@ async def check_edu_status(email: str = "", token: str = ""):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@app.get("/mockup", response_class=HTMLResponse)
-async def mockup_page(request: Request):
-    return templates.TemplateResponse(request=request, name="landing-mockup.html")
-
-@app.get("/preview-mockup", response_class=HTMLResponse)
-async def preview_mockup_page(request: Request):
-    return templates.TemplateResponse(request=request, name="preview-mockup.html")
-
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse(request=request, name="landing.html")
@@ -640,7 +625,6 @@ async def build_page(request: Request):
             "timestamp": datetime.now(),
             "converted": False
         })
-        print(f"[REFERRAL] Visit tracked for code: {ref_code}, total visits: {referral_codes[ref_code]['visits']}")
     
     # Check for voice session data (new voice_sessions from voice_api)
     voice_data = None
@@ -658,7 +642,6 @@ async def build_page(request: Request):
         if isinstance(raw_data.get("skills"), str):
             raw_data["skills"] = [s.strip() for s in raw_data["skills"].split(",") if s.strip()]
         voice_data = raw_data
-        print(f"[BUILD] Loading voice session {voice_session}")
     
     # Determine mode
     if mode == "voice":
@@ -681,31 +664,6 @@ async def build_page(request: Request):
             "session_id": voice_session
         }
         return templates.TemplateResponse(request=request, name="index.html", context=ctx)
-
-@app.get("/debug/storage")
-async def debug_storage():
-    """Debug endpoint to check browser storage - returns a page that dumps localStorage"""
-    html_content = """
-    <!DOCTYPE html>
-    <html>
-    <head><title>Debug Storage</title></head>
-    <body>
-    <h1>Browser Storage Debug</h1>
-    <pre id="output"></pre>
-    <script>
-        const data = localStorage.getItem('aie_resume_progress');
-        const output = document.getElementById('output');
-        if (data) {
-            const parsed = JSON.parse(data);
-            output.textContent = JSON.stringify(parsed, null, 2);
-        } else {
-            output.textContent = 'No saved data found in localStorage';
-        }
-    </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
 
 @app.get("/terms", response_class=HTMLResponse)
 async def terms(request: Request):
@@ -875,9 +833,6 @@ async def build_resume(
             skills_list = [s.strip() for s in skills.split("|") if s.strip()]
         skills_categorized = session_data.get("skills_categorized") or categorize_skills(skills_list)
         session_address = session_data.get("address", "")
-        print(f"[BUILD] Session-authoritative build from {voice_session}: "
-              f"exp={len(exp_list)} edu={len(edu_list)} proj={len(proj_list)} "
-              f"comp={len(comp_list)} comm={len(comm_list)} cert={len(cert_list)}")
     else:
         # Original form-DOM path (desktop form users)
         exp_list = json.loads(experience) if experience else []
@@ -2278,7 +2233,6 @@ async def payment_success(request: Request, session_id: str = "", resume_id: str
             if ref_code and ref_code in referral_codes:
                 referral_codes[ref_code]["conversions"] += 1
                 referral_codes[ref_code]["reward_unlocked"] = True
-                print(f"[REFERRAL] Conversion tracked for code: {ref_code}")
             
             return templates.TemplateResponse(
                 request=request,
@@ -2329,13 +2283,11 @@ async def stripe_webhook(request: Request):
                     resume["paid"] = True
                     resumes[resume_id] = resume
                     save_resume_json(resume_id, resume)
-                    print(f"Payment confirmed for resume: {resume_id}")
             
             # Track referral conversion from webhook
             if ref_code and ref_code in referral_codes:
                 referral_codes[ref_code]["conversions"] += 1
                 referral_codes[ref_code]["reward_unlocked"] = True
-                print(f"[REFERRAL] Webhook conversion tracked for code: {ref_code}")
         
         return {"status": "success"}
     
@@ -2968,7 +2920,6 @@ async def parse_with_groq(transcript: str, state: ResumeState = None) -> dict:
     If state is provided, uses context-aware prompting.
     """
     if not GROQ_API_KEY:
-        print("[GROQ] No API key configured")
         return {}
     
     # Use context-aware prompt if we have state
@@ -2999,7 +2950,6 @@ async def parse_with_groq(transcript: str, state: ResumeState = None) -> dict:
         )
         
         if response.status_code != 200:
-            print(f"[GROQ] Error: {response.status_code} - {response.text}")
             return {}
         
         data = response.json()
@@ -3009,7 +2959,6 @@ async def parse_with_groq(transcript: str, state: ResumeState = None) -> dict:
             parsed = json.loads(content)
             return parsed
         except json.JSONDecodeError:
-            print(f"[GROQ] Invalid JSON response: {content}")
             return {}
 
 
@@ -3076,7 +3025,6 @@ async def parse_voice(request: Request):
         }
         
     except Exception as e:
-        print(f"[PARSE VOICE] Error: {e}")
         import traceback
         traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -3158,23 +3106,6 @@ async def voice_page(request: Request):
 
 
 # === Voice feature ends ===
-
-
-@app.get("/api/download/{resume_id}")
-async def download_resume(resume_id: str, format: str = "docx"):
-    """Download resume as .docx or .pdf"""
-    output_dir = RESUME_STORAGE_DIR
-    
-    if format.lower() == "pdf":
-        filepath = os.path.join(output_dir, f"{resume_id}.pdf")
-        filename = f"resume_{resume_id}.pdf"
-    else:
-        filepath = os.path.join(output_dir, f"{resume_id}.docx")
-        filename = f"resume_{resume_id}.docx"
-    
-    if os.path.exists(filepath):
-        return FileResponse(filepath, filename=filename)
-    return JSONResponse({"error": "Resume not found"}, status_code=404)
 
 
 if __name__ == "__main__":
