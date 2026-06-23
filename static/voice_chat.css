@@ -37,8 +37,13 @@ html, body {
     color: #1E293B;
     gap: 12px;
     flex-shrink: 0;
-    border-bottom: 1px solid #E2E8F0;
     letter-spacing: -0.01em;
+}
+
+#compile-bar {
+    flex-shrink: 0;
+    border-bottom: 1px solid #E2E8F0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .back-btn {
@@ -924,4 +929,19 @@ html, body {
     border-bottom: 1px solid #E2E8F0;
     color: #1E293B;
     padding-bottom: 4px;
+}
+
+/* === Mobile viewport fix: keep input visible === */
+@media (max-width: 768px) {
+    .voice-chat-container {
+        height: 100dvh;
+    }
+    .chat-messages {
+        flex: 1 1 0;
+        min-height: 0;
+    }
+    .chat-input-area {
+        flex-shrink: 0;
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
 }

@@ -192,11 +192,11 @@
             saveBtn.addEventListener('click', saveProgress);
         }
 
-        // UNIVERSAL OVERRIDE: Container-anchored "COMPILE RESUME NOW" button in header
+        // UNIVERSAL OVERRIDE: "COMPILE RESUME NOW" button below header
         const compileBtn = document.createElement('button');
         compileBtn.id = 'universal-compile-btn';
         compileBtn.textContent = '⚙️ COMPILE RESUME NOW';
-        compileBtn.style.cssText = 'position:absolute!important;top:12px!important;right:16px!important;padding:6px 14px!important;background:#FF4D4D!important;color:#FFFFFF!important;border:none!important;border-radius:20px!important;font-size:13px!important;font-weight:700!important;cursor:pointer!important;z-index:999!important;box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;';
+        compileBtn.style.cssText = 'display:block;width:100%;padding:10px 16px;background:#FF4D4D;color:#FFFFFF;border:none;border-radius:0;font-size:14px;font-weight:700;cursor:pointer;z-index:999;box-shadow:0 -2px 4px rgba(0,0,0,0.05);text-align:center;';
 
         compileBtn.addEventListener('click', async () => {
             if (!sessionId) {
@@ -231,21 +231,20 @@
             }
         });
 
-        // Mount into .chat-header with relative positioning context
+        // Insert Compile button as a full-width bar below the header
         const chatHeader = document.querySelector('.chat-header');
-        if (chatHeader) {
-            chatHeader.style.position = 'relative';
-            chatHeader.appendChild(compileBtn);
+        if (chatHeader && chatHeader.parentNode) {
+            const compileBar = document.createElement('div');
+            compileBar.id = 'compile-bar';
+            compileBar.style.cssText = 'width:100%;flex-shrink:0;';
+            compileBar.appendChild(compileBtn);
+            chatHeader.parentNode.insertBefore(compileBar, chatHeader.nextSibling);
         } else {
-            // Fallback: mount into .voice-chat-container with relative positioning
             const chatContainer = document.querySelector('.voice-chat-container');
             if (chatContainer) {
-                chatContainer.style.position = 'relative';
-                chatContainer.appendChild(compileBtn);
+                chatContainer.insertBefore(compileBtn, chatContainer.firstChild);
             } else {
-                // Emergency fallback to body with fixed positioning
-                compileBtn.style.cssText = 'position:fixed!important;top:20px!important;right:20px!important;padding:6px 14px!important;background:#FF4D4D!important;color:#FFFFFF!important;border:none!important;border-radius:20px!important;font-size:13px!important;font-weight:700!important;cursor:pointer!important;z-index:999!important;box-shadow:0 2px 4px rgba(0,0,0,0.1)!important;';
-                document.body.appendChild(compileBtn);
+                document.body.insertBefore(compileBtn, document.body.firstChild);
             }
         }
     }
