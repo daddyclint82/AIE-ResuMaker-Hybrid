@@ -206,7 +206,7 @@ SIMPLE_STEPS = [
     {"field": "full_name", "question": "Hey! I'm AIe ResuMaker. Let's build your resume together. First — what's your full name?"},
     {"field": "email", "question": "What's your email address?"},
     {"field": "phone", "question": "What's your phone number?"},
-    {"field": "address", "question": "What's your full address? Say 'street, city, state zip' — like '227 Crestwood, Nacogdoches, TX 75961'."},
+    {"field": "address", "question": "What's your full address? Say 'street, city, state zip' — like '123 Main St, Anytown, TX 12345'."}
     {"field": "city", "question": "What city?"},
     {"field": "state", "question": "What state?"},
     {"field": "industry", "question": "What industry are you targeting?"},
