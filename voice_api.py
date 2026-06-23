@@ -1988,6 +1988,11 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
     session = voice_sessions[session_id]
     
     # === ESCAPE HATCH: Force exit from experience phase ===
+    if action == "current":
+        return get_current_state(session)
+    # === END ESCAPE HATCH ===
+    
+    # === ESCAPE HATCH: Force exit from experience phase ===
     if action == "force_done_jobs":
         ctx = session.get("context", {})
         ctx["phase"] = "summary"
