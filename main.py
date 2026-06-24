@@ -150,6 +150,18 @@ from voice_api import router as voice_router, voice_sessions as voice_session_st
 app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
 
+@app.middleware("http")
+async def static_no_cache_middleware(request: Request, call_next):
+    """Force no-cache on /static JS/CSS files. Render/browser caches hate query strings."""
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/static/") and (path.endswith(".js") or path.endswith(".css")):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        response.headers["Vary"] = "*"
+    return response
+
 @app.head("/")
 @app.get("/healthz")
 async def health_check():

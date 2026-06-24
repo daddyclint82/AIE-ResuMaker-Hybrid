@@ -74,6 +74,27 @@
     let skillsPanelExpanded = false;
     let lastQuestion = '';
     let lastUserMessage = '';
+    const AIE_VOICE_VERSION = 'v=34';
+
+    // === DEBUG EXPOSURE ===
+    window.__AIE_VOICE_VERSION__ = AIE_VOICE_VERSION;
+    window.getVoiceState = function() {
+        const lastAiBubble = document.querySelector('.ai-message:last-child .message-bubble');
+        const lastAiText = lastAiBubble ? lastAiBubble.textContent.trim() : '';
+        return {
+            version: AIE_VOICE_VERSION,
+            currentField: currentField,
+            sessionId: sessionId,
+            hasVoiceSession: !!localStorage.getItem('aie_voice_session'),
+            hasVoiceSid: !!localStorage.getItem('aie_voice_sid'),
+            navDisplay: navButtons ? (navButtons.classList.contains('hidden') ? 'hidden' : getComputedStyle(navButtons).display) : 'missing',
+            skipBtnExists: !!skipSectionBtn,
+            skipBtnDisplay: skipSectionBtn ? skipSectionBtn.style.display : 'missing',
+            contextLabel: contextLabel ? contextLabel.textContent : '',
+            lastAiMessage: lastAiText,
+            userAgent: navigator.userAgent
+        };
+    };
 
     // === TERMS GATE ===
     // Checks localStorage (instant) then confirms with server (authoritative).
@@ -269,7 +290,7 @@
                 currentField = data.field;
                 updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
                 updateBulletUI(data);
             }
         } catch (e) {
@@ -287,11 +308,51 @@
     // ===== SAVE / LOAD =====
 
     async function checkForSavedSession() {
-        // Attempt transcript rehydration from server before starting fresh
+        console.group('[checkForSavedSession] v=' + AIE_VOICE_VERSION);
         const priorSid = localStorage.getItem('aie_voice_sid');
+        console.log('priorSid=', priorSid);
+
         if (priorSid) {
             try {
-                const r = await fetch(`/api/voice/session-history?sessionId=${encodeURIComponent(priorSid)}`);
+                // === AUTHORITATIVE STATE PULL ===
+                // Always ask the server for the real current state first.
+                console.log('Pulling authoritative state for', priorSid);
+                const stateRespRaw = await fetchWithRetry('/api/voice/turn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: priorSid, transcript: '', action: 'current' })
+                }, 3, 500);
+                const stateResp = stateRespRaw.ok ? await stateRespRaw.json() : null;
+                console.log('Authoritative state response:', stateResp);
+
+                if (stateResp && !stateResp.error && stateResp.field) {
+                    sessionId = priorSid;
+                    window.sessionId = priorSid;
+                    currentField = stateResp.field;
+                    currentStepIndex = stateResp.step_index || 0;
+
+                    const displayQuestion = stateResp.context_label
+                        ? `[${stateResp.context_label}] ${stateResp.question}`
+                        : stateResp.question;
+                    addMessage('ai', displayQuestion, false);
+                    clearInput(stateResp.field === '_bullet');
+                    updateProgress(stateResp.progress_pct || 0);
+                    updateContextLabel(stateResp.context_label);
+                    updateNavButtons(stateResp.can_go_back, stateResp.field, stateResp.show_add_job, stateResp.context_label);
+                    updateBulletUI(stateResp);
+                    console.log('Rehydrated via authoritative /turn action=current');
+                    console.groupEnd();
+                    return;
+                } else {
+                    console.warn('Authoritative state pull failed or returned no field:', stateResp);
+                }
+            } catch (e) {
+                console.warn('[Rehydrate] Authoritative pull failed:', e);
+            }
+
+            // === FALLBACK: transcript history rehydration ===
+            try {
+                const r = await fetchWithRetry(`/api/voice/session-history?sessionId=${encodeURIComponent(priorSid)}`, { method: 'GET' }, 2, 300);
                 if (r.ok) {
                     const payload = await r.json();
                     const hist = Array.isArray(payload.history) ? payload.history : [];
@@ -300,43 +361,39 @@
                         window.sessionId = priorSid;
                         hist.forEach(m => addMessage(m.role === 'user' ? 'user' : 'ai', m.text, m.role === 'user'));
                         scrollToBottom();
-                        // Sync UI nav state with current server state
+                        // After rendering history, ask server for current state again
                         try {
-                            const stateResp = await fetch('/api/voice/save', {
+                            const stateResp2Raw = await fetchWithRetry('/api/voice/turn', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ session_id: priorSid })
-                            });
-                            const stateData = await stateResp.json();
-                            if (stateData.success && stateData.state) {
-                                const loadResp = await fetch('/api/voice/load', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ state: stateData.state })
-                                });
-                                const loadData = await loadResp.json();
-                                if (!loadData.error) {
-                                    currentField = loadData.field;
-                                    updateNavButtons(loadData.can_go_back, loadData.field, loadData.show_add_job);
-                                    updateBulletUI(loadData);
-                                }
+                                body: JSON.stringify({ session_id: priorSid, transcript: '', action: 'current' })
+                            }, 2, 300);
+                            const stateResp2 = stateResp2Raw.ok ? await stateResp2Raw.json() : null;
+                            if (stateResp2 && !stateResp2.error) {
+                                currentField = stateResp2.field;
+                                updateNavButtons(stateResp2.can_go_back, stateResp2.field, stateResp2.show_add_job, stateResp2.context_label);
+                                updateBulletUI(stateResp2);
                             }
-                        } catch (e) {
-                            console.warn('[Rehydrate] UI sync failed:', e);
+                        } catch (e2) {
+                            console.warn('[Rehydrate] History fallback UI sync failed:', e2);
                         }
-                        return; // rehydrated — do not start a new session
+                        console.groupEnd();
+                        return;
                     }
                 }
             } catch (e) {
-                console.warn('[Rehydrate] failed, starting fresh:', e);
+                console.warn('[Rehydrate] history fetch failed, starting fresh:', e);
             }
         }
+
+        // === LEGACY localStorage session snapshot ===
         const saved = localStorage.getItem('aie_voice_session');
         if (saved) {
             try {
                 const state = JSON.parse(saved);
                 if (confirm('Resume your previous session?')) {
                     await loadSession(state);
+                    console.groupEnd();
                     return;
                 } else {
                     localStorage.removeItem('aie_voice_session');
@@ -346,12 +403,30 @@
                 localStorage.removeItem('aie_voice_session');
             }
         }
-        // Start fresh
+
+        // === START FRESH ===
         try {
             startSession();
         } catch (e) {
             console.error('Start session failed:', e);
         }
+        console.groupEnd();
+    }
+
+    async function fetchWithRetry(url, options, maxAttempts, delayMs) {
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const resp = await fetch(url, options);
+                if (resp.ok) return resp;
+                if (resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
+                return resp; // 4xx is not retriable
+            } catch (e) {
+                console.warn(`fetchWithRetry attempt ${attempt} failed for ${url}:`, e);
+                if (attempt === maxAttempts) throw e;
+                await new Promise(r => setTimeout(r, delayMs * attempt));
+            }
+        }
+        throw new Error('fetchWithRetry exhausted');
     }
 
     async function saveProgress() {
@@ -430,7 +505,7 @@
             currentField = data.field;
             updateProgress(data.progress_pct || 0);
             updateContextLabel(data.context_label);
-            updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+            updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
             updateBulletUI(data);
 
             // Restore skills if in review phase
@@ -475,7 +550,7 @@
                 currentField = data.field;
                 updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
                 updateBulletUI(data);
             }
         } catch (e) {
@@ -527,7 +602,7 @@
                 currentField = data.field;
                 updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
             }
         } catch (e) {
             hideTyping();
@@ -575,7 +650,7 @@
                 currentField = data.field;
                 updateProgress(data.progress_pct);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
                 updateBulletUI(data);
             }
         } catch (e) {
@@ -625,7 +700,7 @@
                 currentField = data.field;
                 updateProgress(data.progress_pct || 0);
                 updateContextLabel(data.context_label);
-                updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
                 updateBulletUI(data);
             } catch (renderError) {
                 console.warn("Caught a layout rendering exception in startSession, bypassing:", renderError);
@@ -677,7 +752,7 @@
                     currentField = data.field;
                     updateProgress(data.progress_pct);
                     updateContextLabel(data.context_label);
-                    updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                    updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
                     updateBulletUI(data);
 
                     // Handle skills review phase
@@ -1055,7 +1130,7 @@
                     currentField = data.field;
                     updateProgress(data.progress_pct);
                     updateContextLabel(data.context_label);
-                    updateNavButtons(data.can_go_back, data.field, data.show_add_job);
+                    updateNavButtons(data.can_go_back, data.field, data.show_add_job, data.context_label);
                     updateBulletUI(data);
 
                     if (data.field === 'skills_review' && data.skills_categorized) {
@@ -1123,49 +1198,87 @@
         contextLabel.classList.remove('hidden');
     }
 
-    function updateNavButtons(canBack, field, showAddJob) {
+    function getLastAiMessageText() {
+        const bubbles = document.querySelectorAll('.ai-message .message-bubble');
+        if (!bubbles.length) return '';
+        return bubbles[bubbles.length - 1].textContent.trim();
+    }
+
+    function shouldShowSkipSection(field, ctxLabel) {
+        const OPTIONAL_FIRST_FIELDS = ['name', 'competency', 'school', 'community_org', 'cert_name', 'reference_name', 'website'];
+        const label = (ctxLabel || (contextLabel ? contextLabel.textContent : '')).trim();
+        const lastAi = getLastAiMessageText();
+
+        // Primary check: field name + context label
+        if (field && OPTIONAL_FIRST_FIELDS.includes(field)) {
+            if (/\b(Project|Competency|Education|Community|Cert|Reference|Links)\b/.test(label)) {
+                return true;
+            }
+        }
+
+        // Strong fallback: scan last AI message for optional section markers
+        if (field && OPTIONAL_FIRST_FIELDS.includes(field)) {
+            if (/\[Project\s+\d+\]|\[Competency\s+\d+\]|\[Education\s+\d+\]|\[Community\s+\d+\]|\[Cert\s+\d+\]|\[Reference\s+\d+\]|\[Links\s*\d*\]/i.test(lastAi)) {
+                return true;
+            }
+            if (/Project name\?|Competency name\?|School name\?|Organization or event\?|Certification name\?|Reference name\?|Website or portfolio\?/i.test(lastAi)) {
+                return true;
+            }
+        }
+
+        // Final safety net: if field looks optional and we have a session, show it unless in review/edit
+        if (field && OPTIONAL_FIRST_FIELDS.includes(field) && sessionId) {
+            const reviewPhases = ['skills_review', '_more_bullets', '_decision', '_add_job', '_add_projects', '_add_competencies', '_add_education', '_add_community', '_add_certifications', '_add_references'];
+            if (!reviewPhases.includes(field)) return true;
+        }
+
+        return false;
+    }
+
+    function updateNavButtons(canBack, field, showAddJob, ctxLabel) {
+        console.group('[updateNavButtons] v=' + AIE_VOICE_VERSION);
+        console.log('input:', { canBack, field, showAddJob, ctxLabel, sessionId, currentField });
+
         canGoBack = canBack;
-        
-        const isLoopField = field && !field.startsWith('_') && (
-            field === 'company' || field === 'title' ||
-            field === 'school' || field === 'degree' ||
-            field === 'project_name' || field === 'competency' ||
-            field === 'community_org' || field === 'community_role' ||
-            field === 'cert_name' || field === 'cert_issuer' ||
-            field === 'reference_name' || field === 'reference_phone' ||
-            field === 'website' || field === 'linkedin'
+        const safeField = field || currentField || '';
+        const safeLabel = ctxLabel || (contextLabel ? contextLabel.textContent : '');
+
+        const isLoopField = safeField && !safeField.startsWith('_') && (
+            safeField === 'company' || safeField === 'title' ||
+            safeField === 'school' || safeField === 'degree' ||
+            safeField === 'project_name' || safeField === 'competency' ||
+            safeField === 'community_org' || safeField === 'community_role' ||
+            safeField === 'cert_name' || safeField === 'cert_issuer' ||
+            safeField === 'reference_name' || safeField === 'reference_phone' ||
+            safeField === 'website' || safeField === 'linkedin'
         );
-        
-        const isBulletField = field === '_bullet';
-        const isMoreBullets = field === '_more_bullets';
-        const isAddJob = field === '_add_job';
-        const isDecisionPoint = field === '_decision' || field === '_add_references';
-        
-        // Show Done with Jobs button during entire experience phase
-        const inExperiencePhase = isBulletField || isMoreBullets || isAddJob || 
-                                   field === 'company' || field === 'title' || 
-                                   field === 'dates' || field === 'location';
-        
+
+        const isBulletField = safeField === '_bullet';
+        const isMoreBullets = safeField === '_more_bullets';
+        const isAddJob = safeField === '_add_job';
+        const isDecisionPoint = safeField === '_decision' || safeField === '_add_references';
+
+        const inExperiencePhase = isBulletField || isMoreBullets || isAddJob ||
+                                   safeField === 'company' || safeField === 'title' ||
+                                   safeField === 'dates' || safeField === 'location';
+
         if (navButtons) {
             if (canBack || isLoopField || isDecisionPoint || isBulletField || isMoreBullets || isAddJob || showAddJob) {
                 navButtons.classList.remove('hidden');
             } else {
-                navButtons.classList.add('hidden');
+                // SAFETY NET: always show nav buttons if skip should be visible
+                if (shouldShowSkipSection(safeField, safeLabel)) {
+                    navButtons.classList.remove('hidden');
+                } else {
+                    navButtons.classList.add('hidden');
+                }
             }
         }
-        
+
         if (backBtn) backBtn.style.display = canBack ? 'inline-block' : 'none';
-        
-        // Show save button always when we have a session
-        if (saveBtn) {
-            saveBtn.style.display = sessionId ? 'inline-block' : 'none';
-        }
-        
-        // ESCAPE HATCH: Show Done with Jobs button during entire experience phase
-        if (doneJobsBtn) {
-            doneJobsBtn.style.display = inExperiencePhase ? 'inline-block' : 'none';
-        }
-        
+        if (saveBtn) saveBtn.style.display = sessionId ? 'inline-block' : 'none';
+        if (doneJobsBtn) doneJobsBtn.style.display = inExperiencePhase ? 'inline-block' : 'none';
+
         if (addBtn) {
             if (isDecisionPoint || isLoopField || isBulletField || isMoreBullets || isAddJob || showAddJob) {
                 addBtn.style.display = 'inline-block';
@@ -1179,26 +1292,26 @@
             }
         }
 
-        // Show skip section button during first field of an optional section
-        const inOptionalFirstField = field && (
-            field === 'name' || field === 'competency' || field === 'school' ||
-            field === 'community_org' || field === 'cert_name' || field === 'reference_name' ||
-            field === 'website'
-        );
+        const showSkip = shouldShowSkipSection(safeField, safeLabel);
+        console.log('skip decision:', { showSkip, safeField, safeLabel, lastAi: getLastAiMessageText() });
         if (skipSectionBtn) {
-            skipSectionBtn.style.display = inOptionalFirstField ? 'inline-block' : 'none';
+            skipSectionBtn.style.display = showSkip ? 'inline-block' : 'none';
+            skipSectionBtn.style.visibility = showSkip ? 'visible' : 'hidden';
         }
+        console.groupEnd();
     }
 
-    // Samsung Browser / aggressive-cache fallback: ensure skip button appears during optional first fields
+    // Aggressive delayed fallback for slow mobile rehydration / cached JS
     setTimeout(() => {
+        console.log('[skip fallback] currentField=', currentField, 'ctxLabel=', contextLabel ? contextLabel.textContent : '');
         if (skipSectionBtn && currentField) {
-            const optionalFields = ['name', 'competency', 'school', 'community_org', 'cert_name', 'reference_name', 'website'];
-            if (optionalFields.includes(currentField) && skipSectionBtn.style.display === 'none') {
+            if (shouldShowSkipSection(currentField, contextLabel ? contextLabel.textContent : '')) {
                 skipSectionBtn.style.display = 'inline-block';
+                skipSectionBtn.style.visibility = 'visible';
+                if (navButtons) navButtons.classList.remove('hidden');
             }
         }
-    }, 500);
+    }, 1500);
 
     function showViewResumeButton() {
         if (textInput) textInput.style.display = 'none';
@@ -1301,9 +1414,29 @@
         return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     }
 
+    function initDebugBanner() {
+        if (document.getElementById('aie-debug-banner')) return;
+        const banner = document.createElement('div');
+        banner.id = 'aie-debug-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(220,20,60,0.95);color:#fff;padding:6px 8px;z-index:2147483647;font-size:12px;font-family:monospace;white-space:pre-wrap;word-break:break-word;line-height:1.4;';
+        document.body.appendChild(banner);
+
+        function update() {
+            const st = window.getVoiceState ? window.getVoiceState() : {};
+            banner.textContent = `AIE ${st.version || AIE_VOICE_VERSION} | Field: ${st.currentField || 'none'} | Session: ${st.sessionId || 'none'} | Nav: ${st.navDisplay || '?'} | Skip: ${st.skipBtnDisplay || '?'}`;
+        }
+        update();
+        setInterval(update, 800);
+    }
+
     // Initialize safely
     try {
         init();
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initDebugBanner);
+        } else {
+            initDebugBanner();
+        }
     } catch (e) {
         console.error('Init failed:', e);
     }
