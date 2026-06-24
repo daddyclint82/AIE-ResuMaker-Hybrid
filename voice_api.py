@@ -1991,7 +1991,10 @@ async def voice_turn(request: Request):
                        session_id=session_id,
                        action=action,
                        field=body_json.get("field"),
+                       context_label=body_json.get("context_label"),
+                       question_preview=(body_json.get("question") or "")[:80],
                        phase=voice_sessions.get(session_id, {}).get("context", {}).get("phase"),
+                       done=body_json.get("done"),
                        error=body_json.get("error"),
                        duration_ms=round((time.time() - t0) * 1000, 2))
             return resp
@@ -2265,6 +2268,7 @@ async def voice_save(request: Request):
             _voice_log("voice_save_end", request, rid, session_id=session_id,
                        phase=session.get("context", {}).get("phase"),
                        field=get_current_state(session).get("field"),
+                       context_label=get_current_state(session).get("context_label"),
                        duration_ms=round((time.time() - t0) * 1000, 2))
             return {
                 "success": True,
@@ -2324,6 +2328,7 @@ async def voice_load(request: Request):
             can_go_back = not (phase == "simple" and session.get("step_index", 0) == 0)
             _voice_log("voice_load_end", request, rid, session_id=session_id,
                        phase=phase, field=step.get("field"),
+                       context_label=step.get("context_label", ""),
                        duration_ms=round((time.time() - t0) * 1000, 2))
             return {
                 "success": True,

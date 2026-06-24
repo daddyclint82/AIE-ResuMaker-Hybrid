@@ -38,3 +38,6 @@ voice-questionnaire.json
 
 # Archived voice session snapshots (created by manual cleanups)
 voice_sessions_archive_*/
+
+# User-generated resume storage
+storage/

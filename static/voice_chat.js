@@ -74,7 +74,7 @@
     let skillsPanelExpanded = false;
     let lastQuestion = '';
     let lastUserMessage = '';
-    const AIE_VOICE_VERSION = 'v=34';
+    const AIE_VOICE_VERSION = 'v=36';
 
     // === DEBUG EXPOSURE ===
     window.__AIE_VOICE_VERSION__ = AIE_VOICE_VERSION;
@@ -1205,7 +1205,11 @@
     }
 
     function shouldShowSkipSection(field, ctxLabel) {
-        const OPTIONAL_FIRST_FIELDS = ['name', 'competency', 'school', 'community_org', 'cert_name', 'reference_name', 'website'];
+        // These must match the actual `field` values returned by the server for the FIRST
+        // question of each optional section. Server field names: project -> "name",
+        // competency -> "label", education -> "school", community -> "org",
+        // certifications -> "name", references -> "name", links -> "website".
+        const OPTIONAL_FIRST_FIELDS = ['name', 'label', 'school', 'org', 'website'];
         const label = (ctxLabel || (contextLabel ? contextLabel.textContent : '')).trim();
         const lastAi = getLastAiMessageText();
 
@@ -1226,10 +1230,13 @@
             }
         }
 
-        // Final safety net: if field looks optional and we have a session, show it unless in review/edit
+        // Final safety net: same field list, but require a recognizable optional-section
+        // context label so we don't show skip on unrelated fields named "name"/"school".
         if (field && OPTIONAL_FIRST_FIELDS.includes(field) && sessionId) {
             const reviewPhases = ['skills_review', '_more_bullets', '_decision', '_add_job', '_add_projects', '_add_competencies', '_add_education', '_add_community', '_add_certifications', '_add_references'];
-            if (!reviewPhases.includes(field)) return true;
+            if (!reviewPhases.includes(field) && /\b(Project|Competency|Education|Community|Cert|Reference|Links)\b/.test(label)) {
+                return true;
+            }
         }
 
         return false;
@@ -1246,11 +1253,8 @@
         const isLoopField = safeField && !safeField.startsWith('_') && (
             safeField === 'company' || safeField === 'title' ||
             safeField === 'school' || safeField === 'degree' ||
-            safeField === 'project_name' || safeField === 'competency' ||
-            safeField === 'community_org' || safeField === 'community_role' ||
-            safeField === 'cert_name' || safeField === 'cert_issuer' ||
-            safeField === 'reference_name' || safeField === 'reference_phone' ||
-            safeField === 'website' || safeField === 'linkedin'
+            safeField === 'name' || safeField === 'label' ||
+            safeField === 'org' || safeField === 'website' || safeField === 'linkedin'
         );
 
         const isBulletField = safeField === '_bullet';
@@ -1312,6 +1316,18 @@
             }
         }
     }, 1500);
+
+    // Watchdog: keep rechecking skip visibility on mobile where state can race
+    setInterval(() => {
+        if (skipSectionBtn && currentField) {
+            const desired = shouldShowSkipSection(currentField, contextLabel ? contextLabel.textContent : '');
+            if (desired && skipSectionBtn.style.display !== 'inline-block') {
+                skipSectionBtn.style.display = 'inline-block';
+                skipSectionBtn.style.visibility = 'visible';
+                if (navButtons) navButtons.classList.remove('hidden');
+            }
+        }
+    }, 1000);
 
     function showViewResumeButton() {
         if (textInput) textInput.style.display = 'none';
@@ -1415,18 +1431,30 @@
     }
 
     function initDebugBanner() {
-        if (document.getElementById('aie-debug-banner')) return;
-        const banner = document.createElement('div');
-        banner.id = 'aie-debug-banner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(220,20,60,0.95);color:#fff;padding:6px 8px;z-index:2147483647;font-size:12px;font-family:monospace;white-space:pre-wrap;word-break:break-word;line-height:1.4;';
-        document.body.appendChild(banner);
+        let banner = document.getElementById('debug-banner') || document.getElementById('aie-debug-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'aie-debug-banner';
+            document.body.appendChild(banner);
+        }
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(220,20,60,0.95);color:#fff;padding:6px 8px;z-index:2147483647;font-size:12px;font-family:monospace;white-space:pre-wrap;word-break:break-word;line-height:1.4;display:block;';
 
         function update() {
             const st = window.getVoiceState ? window.getVoiceState() : {};
-            banner.textContent = `AIE ${st.version || AIE_VOICE_VERSION} | Field: ${st.currentField || 'none'} | Session: ${st.sessionId || 'none'} | Nav: ${st.navDisplay || '?'} | Skip: ${st.skipBtnDisplay || '?'}`;
+            banner.textContent = [
+                `AIE ${st.version || AIE_VOICE_VERSION}`,
+                `Field: ${st.currentField || 'none'}`,
+                `Session: ${st.sessionId || 'none'}`,
+                `Nav: ${st.navDisplay || '?'}`,
+                `Skip exists: ${st.skipBtnExists}`,
+                `Skip display: ${st.skipBtnDisplay || '?'}`,
+                `Context: ${st.contextLabel || ''}`,
+                `Last AI: ${(st.lastAiMessage || '').substring(0, 80)}`,
+                `UA: ${(st.userAgent || '').split(' ').pop()}`
+            ].join(' | ');
         }
         update();
-        setInterval(update, 800);
+        setInterval(update, 500);
     }
 
     // Initialize safely
