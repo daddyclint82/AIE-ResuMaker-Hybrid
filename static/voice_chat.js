@@ -1205,41 +1205,10 @@
     }
 
     function shouldShowSkipSection(field, ctxLabel) {
-        // These must match the actual `field` values returned by the server for the FIRST
-        // question of each optional section. Server field names: project -> "name",
-        // competency -> "label", education -> "school", community -> "org",
-        // certifications -> "name", references -> "name", links -> "website".
-        const OPTIONAL_FIRST_FIELDS = ['name', 'label', 'school', 'org', 'website'];
-        const label = (ctxLabel || (contextLabel ? contextLabel.textContent : '')).trim();
-        const lastAi = getLastAiMessageText();
-
-        // Primary check: field name + context label
-        if (field && OPTIONAL_FIRST_FIELDS.includes(field)) {
-            if (/\b(Project|Competency|Education|Community|Cert|Reference|Links)\b/.test(label)) {
-                return true;
-            }
-        }
-
-        // Strong fallback: scan last AI message for optional section markers
-        if (field && OPTIONAL_FIRST_FIELDS.includes(field)) {
-            if (/\[Project\s+\d+\]|\[Competency\s+\d+\]|\[Education\s+\d+\]|\[Community\s+\d+\]|\[Cert\s+\d+\]|\[Reference\s+\d+\]|\[Links\s*\d*\]/i.test(lastAi)) {
-                return true;
-            }
-            if (/Project name\?|Competency name\?|School name\?|Organization or event\?|Certification name\?|Reference name\?|Website or portfolio\?/i.test(lastAi)) {
-                return true;
-            }
-        }
-
-        // Final safety net: same field list, but require a recognizable optional-section
-        // context label so we don't show skip on unrelated fields named "name"/"school".
-        if (field && OPTIONAL_FIRST_FIELDS.includes(field) && sessionId) {
-            const reviewPhases = ['skills_review', '_more_bullets', '_decision', '_add_job', '_add_projects', '_add_competencies', '_add_education', '_add_community', '_add_certifications', '_add_references'];
-            if (!reviewPhases.includes(field) && /\b(Project|Competency|Education|Community|Cert|Reference|Links)\b/.test(label)) {
-                return true;
-            }
-        }
-
-        return false;
+        // PERMANENT SKIP: show whenever we have an active session.
+        // The button is harmless on non-optional fields because the backend
+        // treats "__SKIP_SECTION__" as a no-op when not in an optional section.
+        return !!sessionId;
     }
 
     function updateNavButtons(canBack, field, showAddJob, ctxLabel) {

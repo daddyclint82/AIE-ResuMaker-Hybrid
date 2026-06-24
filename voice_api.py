@@ -653,15 +653,17 @@ async def process_answer(session: dict, transcript: str) -> dict:
     
     # Handle explicit skip-section action from frontend
     if transcript == "__SKIP_SECTION__":
-        section = ctx.get("opt_section", "projects")
-        item_list = ctx.get(section, [])
-        # Remove the empty item we may have created
-        if item_list and not any(item_list[-1].values() if isinstance(item_list[-1], dict) else True):
-            item_list.pop()
-        ctx[section] = item_list
-        session["context"] = ctx
-        _advance_optional_section(session)
-        _persist_session(session.get("session_id"))
+        # Only advance if we're actually in an optional section; otherwise treat as no-op
+        if ctx.get("phase") == "optional":
+            section = ctx.get("opt_section", "projects")
+            item_list = ctx.get(section, [])
+            # Remove the empty item we may have created
+            if item_list and not any(item_list[-1].values() if isinstance(item_list[-1], dict) else True):
+                item_list.pop()
+            ctx[section] = item_list
+            session["context"] = ctx
+            _advance_optional_section(session)
+            _persist_session(session.get("session_id"))
         return get_current_state(session)
 
     # Handle skip/none for optional things
