@@ -74,7 +74,7 @@
     let skillsPanelExpanded = false;
     let lastQuestion = '';
     let lastUserMessage = '';
-    const AIE_VOICE_VERSION = 'v=36';
+    const AIE_VOICE_VERSION = 'v=37';
 
     // === DEBUG EXPOSURE ===
     window.__AIE_VOICE_VERSION__ = AIE_VOICE_VERSION;
@@ -1406,24 +1406,14 @@
             banner.id = 'aie-debug-banner';
             document.body.appendChild(banner);
         }
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:rgba(220,20,60,0.95);color:#fff;padding:6px 8px;z-index:2147483647;font-size:12px;font-family:monospace;white-space:pre-wrap;word-break:break-word;line-height:1.4;display:block;';
+        banner.style.cssText = 'background:#cc0000;color:#fff;font-size:12px;padding:6px 10px;font-family:monospace;white-space:pre-wrap;word-break:break-word;z-index:9999;position:sticky;top:0;';
 
         function update() {
             const st = window.getVoiceState ? window.getVoiceState() : {};
-            banner.textContent = [
-                `AIE ${st.version || AIE_VOICE_VERSION}`,
-                `Field: ${st.currentField || 'none'}`,
-                `Session: ${st.sessionId || 'none'}`,
-                `Nav: ${st.navDisplay || '?'}`,
-                `Skip exists: ${st.skipBtnExists}`,
-                `Skip display: ${st.skipBtnDisplay || '?'}`,
-                `Context: ${st.contextLabel || ''}`,
-                `Last AI: ${(st.lastAiMessage || '').substring(0, 80)}`,
-                `UA: ${(st.userAgent || '').split(' ').pop()}`
-            ].join(' | ');
+            banner.textContent = `AIE ${st.version || AIE_VOICE_VERSION} | Field: ${st.currentField || 'none'} | Session: ${st.sessionId || 'none'} | Nav: ${st.navDisplay || '?'} | Skip: ${st.skipBtnDisplay || '?'}`;
         }
         update();
-        setInterval(update, 500);
+        setInterval(update, 800);
     }
 
     // Initialize safely
