@@ -6,6 +6,8 @@ import os
 import json
 import secrets
 import re
+import time
+import uuid
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
@@ -197,6 +199,27 @@ def compute_progress(session: dict) -> int:
         pct = 0
 
     return min(round(start_pct + pct * (end_pct - start_pct)), 99)
+
+def _request_id(request: Request) -> str:
+    """Extract or generate a request ID for tracing."""
+    rid = request.headers.get("x-request-id", "")
+    if not rid:
+        rid = request.query_params.get("request_id", "")
+    return rid or str(uuid.uuid4())[:12]
+
+
+def _voice_log(tag: str, request: Request, rid: str, **kwargs):
+    """Structured voice API log line. Render dashboard will show these."""
+    line = {
+        "ts": datetime.utcnow().isoformat() + "Z",
+        "tag": tag,
+        "rid": rid,
+        "method": request.method,
+        "path": request.url.path,
+        "client": request.client.host if request.client else None,
+        **kwargs
+    }
+    logger.info(json.dumps(line, default=str, ensure_ascii=False))
 
 # =============================================================================
 # STEP DEFINITIONS
@@ -1893,6 +1916,8 @@ async def voice_terms_accept(request: Request):
 @router.post("/start")
 async def voice_start(request: Request):
     """Start a new voice session."""
+    rid = _request_id(request)
+    _voice_log("voice_start_begin", request, rid)
     session_id = secrets.token_urlsafe(16)
     session = {
         "session_id": session_id,
@@ -1921,6 +1946,7 @@ async def voice_start(request: Request):
         "text": f"[{_opening_label}] {step['question']}".strip() if _opening_label else step["question"]
     })
     _persist_session(session_id)
+    _voice_log("voice_start_end", request, rid, session_id=session_id, field=step.get("field"), phase=ctx.get("phase"))
     return {
         "session_id": session_id,
         "question": step["question"],
@@ -1937,8 +1963,15 @@ async def voice_start(request: Request):
 @router.post("/turn")
 async def voice_turn(request: Request):
     """Process a voice turn (answer or back)."""
+    rid = _request_id(request)
+    t0 = time.time()
     try:
         body = await request.json()
+        _voice_log("voice_turn_begin", request, rid,
+                   session_id=body.get("session_id"),
+                   action=body.get("action"),
+                   transcript_len=len(body.get("transcript", "")),
+                   debug=body.get("debug") or request.query_params.get("debug"))
         session_id = body.get("session_id", "")
         action = body.get("action", "answer")
         transcript = body.get("transcript", "").strip()
@@ -1949,11 +1982,24 @@ async def voice_turn(request: Request):
             session_locks[session_id] = asyncio.Lock()
         
         async with session_locks[session_id]:
-            return await _voice_turn_locked(session_id, action, transcript)
+            resp = await _voice_turn_locked(session_id, action, transcript)
+            if isinstance(resp, JSONResponse):
+                body_json = json.loads(resp.body.decode())
+            else:
+                body_json = dict(resp)
+            _voice_log("voice_turn_end", request, rid,
+                       session_id=session_id,
+                       action=action,
+                       field=body_json.get("field"),
+                       phase=voice_sessions.get(session_id, {}).get("context", {}).get("phase"),
+                       error=body_json.get("error"),
+                       duration_ms=round((time.time() - t0) * 1000, 2))
+            return resp
     
     except Exception as e:
         import traceback
         traceback.print_exc()
+        _voice_log("voice_turn_error", request, rid, error=str(e), error_type=type(e).__name__)
         return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
 
 async def _voice_turn_locked(session_id: str, action: str, transcript: str):
@@ -2124,7 +2170,7 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
     # Persist after every turn
     _persist_session(session_id)
     
-    return {
+    response = {
         "session_id": session_id,
         "question": step["question"],
         "field": step["field"],
@@ -2136,34 +2182,78 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         "show_add_job": show_add_job,
         "data_preview": session.get("data", {})
     }
+    return response
+
+
+@router.get("/debug-state")
+async def voice_debug_state(request: Request, sessionId: str = ""):
+    """Return full server-side state for a session (debugging only)."""
+    rid = _request_id(request)
+    _voice_log("voice_debug_state", request, rid, session_id=sessionId)
+    if not sessionId:
+        return JSONResponse({"error": "sessionId required"}, status_code=400)
+    session = voice_sessions.get(sessionId)
+    if session is None:
+        path = os.path.join(SESSIONS_DIR, f"{sessionId}.json")
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    session = json.load(f)
+            except Exception as e:
+                return JSONResponse({"error": str(e)}, status_code=500)
+        else:
+            return JSONResponse({"error": "session not found"}, status_code=404)
+    step = get_current_state(session)
+    return {
+        "session_id": sessionId,
+        "in_memory": sessionId in voice_sessions,
+        "on_disk": os.path.exists(os.path.join(SESSIONS_DIR, f"{sessionId}.json")),
+        "context": session.get("context", {}),
+        "step_index": session.get("step_index", 0),
+        "current_step": step,
+        "can_go_back": not (session.get("context", {}).get("phase") == "simple" and session.get("step_index", 0) == 0),
+        "show_add_job": step.get("show_add_job", False),
+        "history_count": len(session.get("history", [])),
+        "data_keys": list(session.get("data", {}).keys()),
+        "done": session.get("done", False)
+    }
 
 
 @router.get("/session-history")
-async def voice_session_history(sessionId: str = ""):
+async def voice_session_history(request: Request, sessionId: str = ""):
     """Return stored transcript turns for a session (rehydration support)."""
+    rid = _request_id(request)
+    _voice_log("voice_session_history", request, rid, session_id=sessionId)
     if not sessionId:
         return JSONResponse({"error": "sessionId required", "history": []}, status_code=400)
     session = voice_sessions.get(sessionId)
     if session is None:
         path = os.path.join(SESSIONS_DIR, f"{sessionId}.json")
         if not os.path.exists(path):
+            _voice_log("voice_session_history_notfound", request, rid, session_id=sessionId)
             return JSONResponse({"history": []}, status_code=404)
         try:
             with open(path, "r") as f:
                 session = json.load(f)
         except Exception as e:
+            _voice_log("voice_session_history_error", request, rid, session_id=sessionId, error=str(e))
             return JSONResponse({"error": str(e), "history": []}, status_code=500)
+    _voice_log("voice_session_history_ok", request, rid, session_id=sessionId, history_len=len(session.get("history", [])))
     return {"session_id": sessionId, "history": session.get("history", [])}
 
 
 @router.post("/save")
 async def voice_save(request: Request):
     """Save session state for later."""
+    rid = _request_id(request)
+    t0 = time.time()
     try:
         body = await request.json()
         session_id = body.get("session_id", "")
+        _voice_log("voice_save_begin", request, rid, session_id=session_id, in_memory=session_id in voice_sessions)
         
         if not session_id or session_id not in voice_sessions:
+            _voice_log("voice_save_notfound", request, rid, session_id=session_id)
             return JSONResponse({"error": "No session"}, status_code=400)
         
         # Acquire lock to ensure consistent read
@@ -2172,7 +2262,10 @@ async def voice_save(request: Request):
         
         async with session_locks[session_id]:
             session = voice_sessions[session_id]
-            
+            _voice_log("voice_save_end", request, rid, session_id=session_id,
+                       phase=session.get("context", {}).get("phase"),
+                       field=get_current_state(session).get("field"),
+                       duration_ms=round((time.time() - t0) * 1000, 2))
             return {
                 "success": True,
                 "session_id": session_id,
@@ -2190,18 +2283,23 @@ async def voice_save(request: Request):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        _voice_log("voice_save_error", request, rid, error=str(e), error_type=type(e).__name__)
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @router.post("/load")
 async def voice_load(request: Request):
     """Restore session from saved state."""
+    rid = _request_id(request)
+    t0 = time.time()
     try:
         body = await request.json()
         state = body.get("state", {})
         session_id = state.get("session_id", "")
+        _voice_log("voice_load_begin", request, rid, session_id=session_id, has_state=bool(state))
         
         if not session_id:
+            _voice_log("voice_load_nosid", request, rid)
             return JSONResponse({"error": "No session ID"}, status_code=400)
         
         # Acquire lock for write
@@ -2224,7 +2322,9 @@ async def voice_load(request: Request):
             ctx = session.get("context", {})
             phase = ctx.get("phase", "simple")
             can_go_back = not (phase == "simple" and session.get("step_index", 0) == 0)
-            
+            _voice_log("voice_load_end", request, rid, session_id=session_id,
+                       phase=phase, field=step.get("field"),
+                       duration_ms=round((time.time() - t0) * 1000, 2))
             return {
                 "success": True,
                 "session_id": session_id,
@@ -2242,6 +2342,7 @@ async def voice_load(request: Request):
     except Exception as e:
         import traceback
         traceback.print_exc()
+        _voice_log("voice_load_error", request, rid, error=str(e), error_type=type(e).__name__)
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
