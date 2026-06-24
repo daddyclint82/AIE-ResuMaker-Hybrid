@@ -74,7 +74,7 @@
     let skillsPanelExpanded = false;
     let lastQuestion = '';
     let lastUserMessage = '';
-    const AIE_VOICE_VERSION = 'v=37';
+    const AIE_VOICE_VERSION = 'v=38';
 
     // === DEBUG EXPOSURE ===
     window.__AIE_VOICE_VERSION__ = AIE_VOICE_VERSION;
