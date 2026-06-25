@@ -1,3 +1,15 @@
+# ================================================
+# ARCHITECTURE REFERENCE
+# See: docs/architecture/decisions.md
+# Key decisions: Flat-dict state machine, exp_done/in_bullet_loop flag ordering,
+# summary generation before phase transition, skills control-word filtering,
+# server-authoritative voice sessions.
+#
+# Known issues: docs/known-blockers.md
+# Setup & run: docs/setup-and-run.md
+# Project hub: docs/project-memory.md
+# ================================================
+
 """
 Clean Voice Chat API for AIE ResuMaker — simplified, correct state machine.
 """

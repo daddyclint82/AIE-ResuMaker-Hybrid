@@ -1,3 +1,14 @@
+# ================================================
+# ARCHITECTURE REFERENCE
+# See: docs/architecture/decisions.md
+# Key decisions: Server-authoritative builds, flat-dict state machine,
+# voice session persistence, PDF/DOCX export, Render deployment config.
+#
+# Known issues: docs/known-blockers.md
+# Setup & run: docs/setup-and-run.md
+# Project hub: docs/project-memory.md
+# ================================================
+
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
