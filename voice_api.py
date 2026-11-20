@@ -425,6 +425,21 @@ def _has_tech_skills(session: dict) -> bool:
     return False
 
 
+TECH_STACK_FIELD = {"field": "tech", "question": "Tech stack? Say 'Python, FastAPI, Stripe | 2025'"}
+
+
+def _project_fields(session: dict) -> List[dict]:
+    """Questions for one project; tech resumes get a tech-stack question after the name.
+
+    get_current_state (asks), _process_optional (stores) and _go_back_optional
+    must all index this same list, or answers land in the wrong field.
+    """
+    fields = list(PROJECT_FIELDS)
+    if _has_tech_skills(session):
+        fields.insert(1, TECH_STACK_FIELD)
+    return fields
+
+
 # =============================================================================
 # STATE MACHINE
 # =============================================================================
@@ -572,11 +587,7 @@ def get_current_state(session: dict) -> dict:
         section = ctx.get("opt_section", "projects")
         
         if section == "projects":
-            # Inject tech stack question only for tech-related resumes
-            fields = list(PROJECT_FIELDS)
-            if _has_tech_skills(session) and not ctx.get("tech_stack_asked", False):
-                fields.insert(1, {"field": "tech", "question": "Tech stack? Say 'Python, FastAPI, Stripe | 2025'"})
-            return _handle_optional_section(session, "projects", fields, "Project")
+            return _handle_optional_section(session, "projects", _project_fields(session), "Project")
         elif section == "competencies":
             return _handle_optional_section(session, "competencies", COMPETENCY_FIELDS, "Competency")
         elif section == "education":
@@ -975,7 +986,7 @@ def _process_optional(session: dict, extracted: str) -> dict:
         item_list.append({})
     
     fields = {
-        "projects": PROJECT_FIELDS,
+        "projects": _project_fields(session),
         "competencies": COMPETENCY_FIELDS,
         "education": [
             {"field": "school", "question": "School name?"},
@@ -1004,9 +1015,6 @@ def _process_optional(session: dict, extracted: str) -> dict:
             # Add another item - reset field index for new item
             ctx["opt_idx"] = item_idx + 1
             ctx["opt_field_idx"] = 0
-            # Reset tech stack asked flag when adding another project so next project can ask too
-            if section == "projects":
-                ctx.pop("tech_stack_asked", None)
             session["context"] = ctx
             return get_current_state(session)
         elif lower in ["next", "done", "skip", "no"]:
@@ -1055,9 +1063,6 @@ def _process_optional(session: dict, extracted: str) -> dict:
     
     # Collecting field data
     field_name = fields[field_idx]["field"]
-    # Mark tech stack as asked so it only appears once per project
-    if section == "projects" and field_name == "tech":
-        ctx["tech_stack_asked"] = True
     # SANITIZE: strip control words from non-decision fields
     CONTROL_WORDS = {"yes", "done", "no", "skip", "next", "add", "more", "stop", "finished"}
     if lower in CONTROL_WORDS:
@@ -1087,7 +1092,7 @@ def _advance_optional_section(session: dict):
     ctx["opt_idx"] = 0
     ctx["opt_field_idx"] = 0
     # Clear any leftover flags from previous sections
-    for flag in ["awaiting_more_bullets", "exp_done", "in_bullet_loop", "tech_stack_asked"]:
+    for flag in ["awaiting_more_bullets", "exp_done", "in_bullet_loop", "tech_stack_asked"]:  # tech_stack_asked: stale key in pre-fix sessions
         ctx.pop(flag, None)
     session["context"] = ctx
 
@@ -1229,7 +1234,7 @@ def _go_back_optional(session: dict) -> dict:
     item_list = ctx.get(section, [])
     
     fields = {
-        "projects": PROJECT_FIELDS,
+        "projects": _project_fields(session),
         "competencies": COMPETENCY_FIELDS,
         "community": [{"field": "org"}],
         "certifications": [{"field": "name"}],
