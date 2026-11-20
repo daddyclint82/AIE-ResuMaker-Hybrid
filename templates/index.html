@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIE ResuMaker - Build Your Professional Resume</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="{{ asset_url('style.css') }}">
 </head>
 <body class="terms-pending">
     <div class="app-container">
         <!-- Header -->
         <header class="app-header">
             <div class="header-branding">
-                <img src="/static/images/logo.png" alt="AIe ResuMaker Logo" class="app-logo" onerror="this.style.display='none'; this.nextElementSibling.style.marginLeft='0';">
+                <img src="{{ asset_url('images/logo.png') }}" alt="AIe ResuMaker Logo" class="app-logo" onerror="this.style.display='none'; this.nextElementSibling.style.marginLeft='0';">
                 <h1>AIE ResuMaker</h1>
             </div>
 
@@ -243,11 +243,11 @@
                 <div class="purchase-bar">
                     <div class="purchase-options">
                         <button id="buy-premium" class="btn-logo-purchase regular">
-                            <img src="/static/images/logo.png" alt="Regular" class="logo-purchase-img">
+                            <img src="{{ asset_url('images/logo.png') }}" alt="Regular" class="logo-purchase-img">
                             <span class="logo-purchase-price">$9.99</span>
                         </button>
                         <button id="buy-referral" class="btn-logo-purchase student">
-                            <img src="/static/images/logo-discount.png" alt="Share & Save" class="logo-purchase-img">
+                            <img src="{{ asset_url('images/logo-discount.png') }}" alt="Share & Save" class="logo-purchase-img">
                             <span class="logo-purchase-price">$4.99</span>
                         </button>
                     </div>
@@ -272,6 +272,6 @@
     <!-- Voice Session Data (if coming from voice chat) -->
     <script id="voice-data" type="application/json">{{ voice_data | safe }}</script>
     
-    <script src="/static/app.js?v=9"></script>
+    <script src="{{ asset_url('app.js') }}"></script>
 </body>
 </html>

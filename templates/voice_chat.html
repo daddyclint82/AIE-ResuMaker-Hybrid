@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIe ResuMaker — Voice Build</title>
-    <link rel="stylesheet" href="/static/voice_chat.css?v=38">
+    <link rel="stylesheet" href="{{ asset_url('voice_chat.css') }}">
 </head>
 <body>
     <div class="voice-chat-container">
@@ -12,7 +12,7 @@
         <header class="chat-header">
             <a href="/" class="back-btn">←</a>
             <div class="chat-title">
-                <img src="/static/images/aei-logo.jpg" alt="AIe" class="logo-img" style="height: 28px; width: 28px; border-radius: 6px; object-fit: cover;">
+                <img src="{{ asset_url('images/aei-logo.jpg') }}" alt="AIe" class="logo-img" style="height: 28px; width: 28px; border-radius: 6px; object-fit: cover;">
                 <span>AIe ResuMaker</span>
             </div>
         </header>
@@ -59,6 +59,6 @@
 
     </div>
 
-    <script src="/static/voice_chat.js?v=38"></script>
+    <script src="{{ asset_url('voice_chat.js') }}"></script>
 </body>
 </html>

@@ -67,6 +67,13 @@ Treating the frontend form DOM as the source of truth for voice builds is a fata
 - Users dictate via native iOS/Android keyboard voice input.
 - The UI is the **Resume Chat Assistant** (`index.html` has the mode-switch button; `voice_chat.html` is the mobile chat route).
 
+### Static Asset Caching
+
+- Templates link static files with `{{ asset_url('app.js') }}`, which appends `?v=` + the first 12 hex chars of the file's SHA-256.
+- A `/static` request whose `v` matches is served `Cache-Control: public, max-age=31536000, immutable`; any other `/static` request gets `no-cache` (ETag revalidation, a 304 when unchanged).
+- Editing a file changes its URL on the next deploy, so there are no `?v=NN` numbers to bump and no reason to send `no-store` (which made phones re-download every script on every page).
+- Render's edge already Brotli-compresses responses, so the app does not add gzip middleware.
+
 ### Terms Gate
 
 Legal acceptance is enforced before the chat flow begins. `/terms` carries a `return` param so accepting terms routes back to `/build?...voice_session=X` without dropping the session.

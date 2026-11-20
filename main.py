@@ -13,6 +13,7 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import hashlib
 import json
 import os
 import re
@@ -162,15 +163,18 @@ app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
 
 @app.middleware("http")
-async def static_no_cache_middleware(request: Request, call_next):
-    """Force no-cache on /static JS/CSS files. Render/browser caches hate query strings."""
+async def static_cache_headers(request: Request, call_next):
+    """URLs from asset_url() carry the file's content hash, so they can never go
+    stale: cache them for a year. Any other /static request must revalidate,
+    which costs a 304, not a re-download."""
     response = await call_next(request)
     path = request.url.path
-    if path.startswith("/static/") and (path.endswith(".js") or path.endswith(".css")):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
-        response.headers["Vary"] = "*"
+    if path.startswith("/static/") and response.status_code in (200, 304):
+        version = _asset_versions.get(path[len("/static/"):])
+        if version and request.query_params.get("v") == version:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
     return response
 
 @app.head("/")
@@ -192,6 +196,26 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Setup templates
 templates = Jinja2Templates(directory=templates_dir)
+
+# Link static files with {{ asset_url('app.js') }}: the ?v= is a hash of the
+# file's bytes, so editing a file changes its URL on the next deploy and there
+# is nothing to bump by hand.
+_asset_versions: Dict[str, str] = {}
+
+
+def asset_url(path: str) -> str:
+    version = _asset_versions.get(path)
+    if version is None:
+        try:
+            with open(os.path.join(static_dir, path), "rb") as f:
+                version = hashlib.sha256(f.read()).hexdigest()[:12]
+        except OSError:
+            return f"/static/{path}"
+        _asset_versions[path] = version
+    return f"/static/{path}?v={version}"
+
+
+templates.env.globals["asset_url"] = asset_url
 
 # === Fix: Jinja2's _load_template uses (loader_ref, name) as cache key and
 # passes globals (which may contain unhashable dicts/lists) into the cache.
