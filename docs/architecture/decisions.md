@@ -86,6 +86,7 @@ Legal acceptance is enforced before the chat flow begins. `/terms` carries a `re
 ### Resume Themes
 
 - Professional, Modern, Minimal with distinct CSS.
+- The theme styles the HTML preview only. The PDF and DOCX downloads have one layout each.
 
 ## Data Flow
 
@@ -208,6 +209,14 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - A typed state answer is stored as its code ("illinois" to "IL"): the form's State list uses codes.
 - The review form lost both: `loadVoiceData` ran before `/api/states` had filled the State list, so no state was selected, the City box stayed disabled, and a disabled field is left out of the build. The PDF and preview header had no location. The form now applies the state once the options exist and enables City; its duplicate address parsing is gone.
 - Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
+
+### 2026-11-20 — PDF Text Outside cp1252: Embedded Liberation Fonts
+
+- reportlab's built-in Times/Helvetica cover only cp1252 and drew everything else as a black box, so user-typed text came out as "Nguy■n", "■à N■ng", "H■S". The NFKC step above covers model text only.
+- `generate_pdf` now embeds Liberation Serif (Regular, Bold, Italic) and, for the contact line, Liberation Sans, from `fonts/` (2.1.5, SIL OFL 1.1). They are metric-compatible with Times New Roman/Arial: on a 3-page resume every line breaks at the same word and no word moves more than 0.11 pt (`docs/review/pdf-unicode-fonts/`). Each PDF grows by about 85 KB of embedded font subsets.
+- Text is NFC-composed first. reportlab can't position combining marks, so accents typed as separate marks (as the Windows Vietnamese keyboard does) landed on the next letter.
+- About 225 symbols the Liberation fonts lack (✓ ★ ⇒ ① ❖ ➤ …) still go to the standard Symbol/ZapfDingbats fonts that drew them before. CJK and emoji have no glyph in either and still print as boxes.
+- Guarded by `tests/test_pdf_fonts.py`.
 
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
