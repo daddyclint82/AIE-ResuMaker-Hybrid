@@ -7,7 +7,8 @@ Run: python tests/test_voice_flow_regressions.py   (or pytest)
    must be stored under the field that was asked, and the result answer must
    not loop.
 3. The LLM gets the job context (core edge, keywords) and its answers are
-   used; when it fails, the summary and skills fall back to templates.
+   used as written; when it fails, the summary and skills fall back to
+   templates.
 4. The key is read from OLLAMA_API_KEY when LLM_API_KEY is unset.
 5. City and state come from the address answer; only what it lacks is asked.
 6. The skills prompt's categories fit the industry: retail gets the retail
@@ -166,7 +167,7 @@ def test_llm_gets_the_job_context_and_its_answers_are_used():
     prompt = skills_req["json"]["messages"][1]["content"]
     assert "User's Core Edge: Fast shipper" in prompt, prompt[:400]
     assert "Target Keywords from Job Posting: Kubernetes, Terraform" in prompt, prompt[:400]
-    assert s["data"]["summary"] == "Backend engineer who cut H2S alarms."   # NFKC: no black box in the PDF
+    assert s["data"]["summary"] == "Backend engineer who cut H₂S alarms.", s["data"]["summary"]  # as written
     assert s["data"]["skills_categorized"] == {"Programming & Development": [{"name": "Python", "weight": 95}]}
 
 

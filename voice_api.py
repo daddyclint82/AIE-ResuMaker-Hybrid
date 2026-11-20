@@ -19,7 +19,6 @@ import json
 import secrets
 import re
 import time
-import unicodedata
 import uuid
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
@@ -1421,9 +1420,7 @@ async def _llm_chat(system: str, prompt: str, *, temperature: float, max_tokens:
             response = await http_client.post(f"{LLM_BASE_URL}/chat/completions", timeout=timeout,
                                               headers={"Authorization": f"Bearer {LLM_API_KEY}"}, json=body)
         if response.status_code == 200:
-            # NFKC turns look-alikes models write (H₂S, narrow spaces) into plain characters;
-            # the PDF export's built-in fonts print a black box for a subscript 2.
-            return unicodedata.normalize("NFKC", response.json()["choices"][0]["message"]["content"]).strip()
+            return response.json()["choices"][0]["message"]["content"].strip()
         logger.warning(f"[LLM] {LLM_MODEL}: HTTP {response.status_code} {response.text[:200]}")
     except Exception as e:
         logger.warning(f"[LLM] {LLM_MODEL}: {type(e).__name__}: {e}")

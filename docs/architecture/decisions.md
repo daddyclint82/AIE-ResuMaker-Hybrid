@@ -200,7 +200,7 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - Ollama caps concurrent requests per account, so the site sends one LLM request at a time.
 - The skills prompt read the core edge and job keywords from `data`, where they never are, so both were always blank. It now reads `context["summary_answers"]`. With the keywords filled in, the model started adding them as skills the user never listed, so the skills prompt now allows only the user's skills, each once.
 - The summary prompt now rules out "I"/"my" and names the buzzwords to skip: in the model test MiniMax wrote in first person in 1 of 6 summaries and used buzzwords in 2; on the final code, 0 of 6 for both.
-- Model text is NFKC-normalized: the PDF's built-in fonts printed "H₂S" as a black box.
+- Model text is kept as written. It was NFKC-normalized while the PDF's built-in fonts printed "H₂S" as a black box; once the PDF embedded Liberation fonts, NFKC only degraded it (H₂S to H2S, ™ to TM, m² to m2). The one character it saved, the non-breaking hyphen, the PDF now folds itself (below).
 - `/healthz` reports `"llm": true` once a key is set. Failed calls log `[LLM]` warnings instead of failing silently.
 - Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
 
@@ -213,7 +213,7 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 
 ### 2026-11-20 — PDF Text Outside cp1252: Embedded Liberation Fonts
 
-- reportlab's built-in Times/Helvetica cover only cp1252 and drew everything else as a black box, so user-typed text came out as "Nguy■n", "■à N■ng", "H■S". The NFKC step above covers model text only.
+- reportlab's built-in Times/Helvetica cover only cp1252 and drew everything else as a black box, so user-typed text came out as "Nguy■n", "■à N■ng", "H■S".
 - `generate_pdf` now embeds Liberation Serif (Regular, Bold, Italic) and, for the contact line, Liberation Sans, from `fonts/` (2.1.5, SIL OFL 1.1). They are metric-compatible with Times New Roman/Arial: on a 3-page resume every line breaks at the same word and no word moves more than 0.11 pt (`docs/review/pdf-unicode-fonts/`). Each PDF grows by about 85 KB of embedded font subsets.
 - Text is NFC-composed first. reportlab can't position combining marks, so accents typed as separate marks (as the Windows Vietnamese keyboard does) landed on the next letter.
 - About 225 symbols the Liberation fonts lack (✓ ★ ⇒ ① ❖ ➤ …) still go to the standard Symbol/ZapfDingbats fonts that drew them before. CJK and emoji have no glyph in either and still print as boxes.
