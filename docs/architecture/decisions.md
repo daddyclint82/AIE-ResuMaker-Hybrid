@@ -13,13 +13,13 @@ Conversational resume builder with ADHD-friendly micro-question design. Users an
 └─────────┘    └──────────┘    └─────────┘    └────────┘    └──────────┘    └──────┘
 ```
 
-**Simple:** full_name, email, phone, address, city, state, industry, job_title, experience_level, education_level
+**Simple:** full_name, email, phone, address, city, state, industry, job_title, experience_level, education_level (city and state are read from the address and asked only if it lacks them)
 
 **Experience:** For each job: company → title → dates → location → bullets (loop: "Add another bullet?") → "Add another job?"
 
-**Summary:** 4 interview questions → Groq auto-generates professional summary
+**Summary:** 4 interview questions → the LLM auto-generates professional summary
 
-**Skills:** Comma-separated list → Groq categorizes into weighted categories
+**Skills:** Comma-separated list → the LLM categorizes into weighted categories
 
 **Optional:** projects → competencies → community → certifications → links (each: collect fields → "Add another?")
 
@@ -49,8 +49,8 @@ When `in_bullet_loop` becomes `False`, it has two meanings:
 ### Skills Categorization Pipeline
 
 1. Determine priority tier from industry + job keywords (7 tiers: technology, oil_gas, healthcare, finance, creative, trades, general).
-2. Build top-15 category list to reduce Groq noise.
-3. Groq returns JSON: `{"Category": [{"name": "Python", "weight": 95}]}`.
+2. Build top-15 category list to reduce model noise.
+3. The LLM returns JSON: `{"Category": [{"name": "Python", "weight": 95}]}`.
 
 ### Server-Authoritative Build
 
@@ -94,6 +94,7 @@ Legal acceptance is enforced before the chat flow begins. `/terms` carries a `re
 ### Resume Themes
 
 - Professional, Modern, Minimal with distinct CSS.
+- The theme styles the HTML preview only. The PDF and DOCX downloads have one layout each.
 
 ## Data Flow
 
@@ -108,7 +109,7 @@ Phase Router:
   simple → store field, increment step_index
   experience → _process_experience (complex bullet/job loop)
   summary → _process_summary (store answers, generate on last)
-  skills → store + categorize with Groq
+  skills → store + categorize with the LLM
   optional → _process_optional (repeatable sections)
     ↓
 get_current_state(session) → next question/decision/done
@@ -125,7 +126,7 @@ session = {
     "data": {                       # Final resume data
         "full_name": "...",
         "experience": [...],        # Jobs with descriptions
-        "summary": "...",           # Groq-generated
+        "summary": "...",           # LLM-generated
         "skills_categorized": {...}, # Weighted categories
         "projects": [...],
         # ... etc
@@ -144,11 +145,11 @@ session = {
 }
 ```
 
-## Groq Integration (3 Points)
+## LLM Integration (3 Points)
 
-1. **Summary Generation** — `llama-3.3-70b-versatile`, 2-3 sentences from 4 interview answers.
+1. **Summary Generation** — MiniMax M3.1 Flash on Ollama Cloud (`LLM_MODEL`, `LLM_BASE_URL`), 2-3 sentences from 4 interview answers.
 2. **Skills Categorization** — Same model, returns weighted JSON with 15 prioritized categories.
-3. **Fallback** — If no API key, uses template concatenation for summary, flat list for skills.
+3. **Fallback** — If no key or the call fails, uses template concatenation for summary, flat list for skills.
 
 ## Critical Fixes Applied
 
@@ -198,6 +199,34 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - **The tech-stack project question shifted answers and looped.** Display asked 4 project questions while storage and back used the 3 `PROJECT_FIELDS`, so tech was saved as description, description as result, and "What was the outcome or result?" repeated. `get_current_state`, `_process_optional` and `_go_back_optional` now all use `_project_fields(session)`.
 - Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
 
+### 2026-11-20 — Summary and Skills Model: MiniMax M3.1 Flash on Ollama Cloud
+
+- Groq retired `llama-3.3-70b-versatile` for non-enterprise keys, so production was writing template summaries. On the app's real prompts for six made-up candidates, MiniMax M3.1 Flash beat GPT-OSS 20B (`docs/review/llm-model-test/`).
+- The provider is env-only: `LLM_BASE_URL` (default `https://ollama.com/v1`), `LLM_API_KEY` (or Ollama's usual `OLLAMA_API_KEY`, which production uses), `LLM_MODEL` (default `minimax-m3.1-flash`). Any OpenAI-compatible API works if the model accepts `reasoning_effort`.
+- Both calls send `reasoning_effort: "low"` with room for reasoning tokens (summary 1024, skills 3000). At default effort the old 300-token summary budget went on thinking and the summary came back cut off.
+- Both calls wait up to 45 s (`LLM_TIMEOUT`). On 2026-11-20 about 1 call in 5 sat ~20 s at Ollama before answering, and the old 15 s / 20 s limits (sized for Groq) sent those to the template; on production the summary and the skills each fell back once that way. The chat shows its typing indicator while it waits.
+- Ollama caps concurrent requests per account, so the site sends one LLM request at a time.
+- The skills prompt read the core edge and job keywords from `data`, where they never are, so both were always blank. It now reads `context["summary_answers"]`. With the keywords filled in, the model started adding them as skills the user never listed, so the skills prompt now allows only the user's skills, each once.
+- The summary prompt now rules out "I"/"my" and names the buzzwords to skip: in the model test MiniMax wrote in first person in 1 of 6 summaries and used buzzwords in 2; on the final code, 0 of 6 for both.
+- Model text is NFKC-normalized: the PDF's built-in fonts printed "H₂S" as a black box.
+- `/healthz` reports `"llm": true` once a key is set. Failed calls log `[LLM]` warnings instead of failing silently.
+- Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
+
+### 2026-11-20 — The Address Fills City and State
+
+- The chat asked for the full address and then for city and state again. `city_state_from_address` in `voice_api.py` reads both from the address answer (commas or dictation without them, full state names or codes, ZIP+4, a trailing "USA"); only a part it can't read is asked. Back steps over the skipped questions to the address and clears what it filled.
+- A typed state answer is stored as its code ("illinois" to "IL"): the form's State list uses codes.
+- The review form lost both: `loadVoiceData` ran before `/api/states` had filled the State list, so no state was selected, the City box stayed disabled, and a disabled field is left out of the build. The PDF and preview header had no location. The form now applies the state once the options exist and enables City; its duplicate address parsing is gone.
+- Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
+
+### 2026-11-20 — PDF Text Outside cp1252: Embedded Liberation Fonts
+
+- reportlab's built-in Times/Helvetica cover only cp1252 and drew everything else as a black box, so user-typed text came out as "Nguy■n", "■à N■ng", "H■S". The NFKC step above covers model text only.
+- `generate_pdf` now embeds Liberation Serif (Regular, Bold, Italic) and, for the contact line, Liberation Sans, from `fonts/` (2.1.5, SIL OFL 1.1). They are metric-compatible with Times New Roman/Arial: on a 3-page resume every line breaks at the same word and no word moves more than 0.11 pt (`docs/review/pdf-unicode-fonts/`). Each PDF grows by about 85 KB of embedded font subsets.
+- Text is NFC-composed first. reportlab can't position combining marks, so accents typed as separate marks (as the Windows Vietnamese keyboard does) landed on the next letter.
+- About 225 symbols the Liberation fonts lack (✓ ★ ⇒ ① ❖ ➤ …) still go to the standard Symbol/ZapfDingbats fonts that drew them before. CJK and emoji have no glyph in either and still print as boxes.
+- Guarded by `tests/test_pdf_fonts.py`.
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.
@@ -224,6 +253,6 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 
 ## Performance Notes
 
-- Groq calls dominate latency; summary and skills categorization are the expensive points.
+- LLM calls dominate latency; summary and skills categorization are the expensive points.
 - PDF/DOCX export uses reportlab and python-docx locally; on Render, Playwright/Chromium is disabled — CSS watermark fallback keeps previews lightweight.
 - Disk session writes happen per turn; growth is unbounded — see [`docs/known-blockers.md`](../known-blockers.md).

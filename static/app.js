@@ -500,7 +500,11 @@ function loadVoiceData() {
                 console.log(`[Voice→Form] Set ${formKey} = ${voiceData[voiceKey]}`);
             }
         });
-        
+        // State: the server reads it from the address (or asks). The <select> gets its
+        // options later from /api/states, so setupStateCityAutocomplete applies it then.
+        const stateSelect = form.querySelector('select[name="state"]');
+        if (stateSelect && voiceData.state) stateSelect.dataset.pending = voiceData.state;
+
         // Set skills
         if (voiceData.skills && Array.isArray(voiceData.skills)) {
             skills = [...voiceData.skills];
@@ -633,48 +637,6 @@ function loadVoiceData() {
             }
         }
         
-        // Handle address parsing if present (voice asks for "street, city, state zip")
-        if (voiceData.address && typeof voiceData.address === 'string') {
-            const addressStr = voiceData.address;
-            // Try to parse "street, city, state zip" format
-            const parts = addressStr.split(',').map(p => p.trim());
-            if (parts.length >= 3) {
-                // Last part should be "state zip"
-                const stateZip = parts[parts.length - 1].trim();
-                const stateZipMatch = stateZip.match(/^([A-Za-z\s]+)\s*(\d{5}(-\d{4})?)?$/);
-                if (stateZipMatch) {
-                    const stateName = stateZipMatch[1].trim();
-                    // Find matching state option
-                    const stateSelect = form.querySelector('select[name="state"]');
-                    if (stateSelect) {
-                        // Try to find by text content or value
-                        const stateOption = Array.from(stateSelect.options).find(opt => 
-                            opt.text.toLowerCase().includes(stateName.toLowerCase()) || 
-                            opt.value.toLowerCase() === stateName.toLowerCase()
-                        );
-                        if (stateOption) {
-                            stateSelect.value = stateOption.value;
-                            // Trigger city input enable
-                            const cityInput = document.getElementById('city');
-                            if (cityInput) {
-                                cityInput.disabled = false;
-                                cityInput.placeholder = 'Type to search cities...';
-                            }
-                        }
-                    }
-                    // City is second-to-last part
-                    const cityInput = form.querySelector('input[name="city"]');
-                    if (cityInput) {
-                        cityInput.value = parts[parts.length - 2];
-                    }
-                }
-            }
-            // If we couldn't parse properly, just put the whole thing in city as fallback
-            if (!form.querySelector('input[name="city"]').value) {
-                form.querySelector('input[name="city"]').value = addressStr;
-            }
-        }
-        
         // Save to localStorage so user doesn't lose it
         saveProgress(false);
         
@@ -711,7 +673,9 @@ function loadSavedProgress() {
         setValue('full_name', data.full_name);
         setValue('email', data.email);
         setValue('phone', data.phone);
-        setValue('state', data.state);
+        // The state <select> has no options yet; setupStateCityAutocomplete applies it
+        const stateSelect = form.querySelector('select[name="state"]');
+        if (stateSelect && data.state) stateSelect.dataset.pending = data.state;
         setValue('city', data.city);
         setValue('linkedin', data.linkedin);
         setValue('website', data.website);
@@ -2791,7 +2755,15 @@ async function setupStateCityAutocomplete() {
     } catch (error) {
         console.error('Error loading states:', error);
     }
-    
+
+    // A state from the voice session or saved progress was set before the options existed
+    const pending = (stateSelect.dataset.pending || '').trim().toLowerCase();
+    delete stateSelect.dataset.pending;
+    const match = pending && Array.from(stateSelect.options).find(opt =>
+        opt.value && (opt.value.toLowerCase() === pending || opt.textContent.toLowerCase() === pending));
+    if (match) stateSelect.value = match.value;
+    if (cityInput.value) cityInput.disabled = false;   // a disabled field is left out of the build
+
     // State change handler
     stateSelect.addEventListener('change', async () => {
         const stateCode = stateSelect.value;
@@ -2813,7 +2785,8 @@ async function setupStateCityAutocomplete() {
             console.error('Error loading cities:', error);
         }
     });
-    
+    if (stateSelect.value) stateSelect.dispatchEvent(new Event('change'));   // load its city list
+
     // City autocomplete
     let debounceTimer;
     cityInput.addEventListener('input', () => {

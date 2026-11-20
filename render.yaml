@@ -1,7 +1,7 @@
 # Render Blueprint for AIe ResuMaker Hybrid
 # Docs: https://render.com/docs/blueprint-spec
 #
-# Secrets (STRIPE_*, GROQ_API_KEY) are NOT defined here — set them in the
+# Secrets (STRIPE_*, OLLAMA_API_KEY) are NOT defined here — set them in the
 # Render dashboard (Environment tab). Never commit secret values.
 
 services:
@@ -31,7 +31,7 @@ services:
         sync: false
       - key: STRIPE_STUDENT_PRICE_ID
         sync: false
-      - key: GROQ_API_KEY
+      - key: OLLAMA_API_KEY
         sync: false
       - key: BASE_URL
         sync: false
