@@ -18,7 +18,7 @@
     const skipSectionBtn = document.getElementById('skip-section-btn');
     const saveBtn = document.getElementById('save-btn');
 
-    // 42 Skill Categories (all tiers)
+    // Every skill category; includes all of SKILL_TIERS in voice_api.py
     const ALL_SKILL_CATEGORIES = [
         "Programming & Development",
         "Frameworks & Libraries", 
@@ -53,6 +53,8 @@
         "Customer Service & Hospitality",
         "Counseling & Social Work",
         "Food Service & Culinary",
+        "Retail & Merchandising",
+        "Inventory & Supply Chain",
         "Design & Visual Arts",
         "Writing & Content",
         "Media & Broadcasting",
@@ -851,7 +853,7 @@
                     <input type="text" id="new-skill-input" placeholder="Add a skill..." />
                     <select id="new-skill-category">
                         <option value="">Category...</option>`;
-        // Add all 42 categories so user can add to any category
+        // Add every category so the user can add a skill to any of them
         const usedCats = new Set(Object.keys(categorized));
         for (const cat of ALL_SKILL_CATEGORIES) {
             const hasSkills = usedCats.has(cat);

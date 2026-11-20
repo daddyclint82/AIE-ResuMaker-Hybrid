@@ -19,7 +19,7 @@
 3. **Adjust expected_results:**
    - `jobs`: How many jobs you're adding
    - `bullets_per_job`: How many bullets per job (usually 3)
-   - Set `skills_categorized: true` if you want to test Groq categorization
+   - Set `skills_categorized: true` if you want to test LLM categorization
 
 4. **Run it:**
    ```bash

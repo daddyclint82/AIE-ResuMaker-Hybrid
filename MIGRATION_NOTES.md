@@ -4,7 +4,7 @@
 
 Set these environment variables in the **Render dashboard** (Environment tab).
 **Never** put real secret values in this file or any tracked file. Pull live values
-from your password manager / Stripe dashboard / Groq console at deploy time.
+from your password manager / Stripe dashboard / Ollama settings at deploy time.
 
 ### Required Environment Variables (set in Render dashboard, NOT in git)
 
@@ -20,8 +20,8 @@ STRIPE_PRICE_ID=<REDACTED: set in Render dashboard>
 STRIPE_STUDENT_PRICE_ID=<REDACTED: set in Render dashboard>
 STRIPE_WEBHOOK_SECRET=<REDACTED: set in Render dashboard>
 
-# Groq — copy from console.groq.com → API Keys
-GROQ_API_KEY=<REDACTED: set in Render dashboard>
+# Ollama — create at ollama.com/settings/keys (summary + skills LLM)
+OLLAMA_API_KEY=<REDACTED: set in Render dashboard>
 ```
 
 > ⚠️ Secret key prefixes are intentionally NOT written in this file to avoid

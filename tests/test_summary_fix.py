@@ -12,7 +12,7 @@ from voice_api import (
     voice_start,
     process_answer,
     get_current_state,
-    generate_summary_with_groq,
+    generate_summary_with_llm,
     voice_sessions
 )
 
@@ -136,9 +136,9 @@ async def test_summary_generation():
 
 
 async def test_generate_summary_directly():
-    """Test the generate_summary_with_groq function directly."""
+    """Test the generate_summary_with_llm function directly."""
     print("\n" + "=" * 60)
-    print("Testing generate_summary_with_groq Directly")
+    print("Testing generate_summary_with_llm Directly")
     print("=" * 60)
     
     # Create mock session with summary answers
@@ -156,7 +156,7 @@ async def test_generate_summary_directly():
         }
     }
     
-    summary = await generate_summary_with_groq(session)
+    summary = await generate_summary_with_llm(session)
     
     print(f"\nGenerated summary: '{summary}'")
     

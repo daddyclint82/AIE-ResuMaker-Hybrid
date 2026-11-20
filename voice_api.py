@@ -21,7 +21,7 @@ import re
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 import httpx
 from fastapi import APIRouter, Request
@@ -47,12 +47,25 @@ voice_sessions: Dict[str, Any] = {}
 # Per-session async locks to enforce strict sequential processing
 session_locks: Dict[str, asyncio.Lock] = {}
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+# The summary and skills steps call an OpenAI-compatible chat API. Default: MiniMax
+# M3.1 Flash on Ollama's cloud (chosen in docs/review/llm-model-test/); another
+# provider is an env change. Without a key both steps use template fallbacks.
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://ollama.com/v1").rstrip("/")
+# OLLAMA_API_KEY is the name Ollama's docs use; LLM_API_KEY wins when both are set.
+LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("OLLAMA_API_KEY", "")
+LLM_MODEL = os.environ.get("LLM_MODEL", "minimax-m3.1-flash")
 
-# One pooled client for all outbound HTTP (Groq here, O*NET in main.py). A fresh
+# Ollama caps concurrent requests per account (3 on Pro) and this account also serves
+# other apps, so the site holds at most one of those slots.
+_llm_slot = asyncio.Semaphore(1)
+
+# Ollama Cloud sometimes holds a request ~20 s before answering (2026-11-20: about 1 call
+# in 5); the chat shows its typing indicator meanwhile. Past this, use the template.
+LLM_TIMEOUT = 45.0
+
+# One pooled client for all outbound HTTP (LLM here, O*NET in main.py). A fresh
 # AsyncClient per request rebuilt its TLS context and re-handshook every time
-# (~140 ms vs ~80 ms per Groq round trip in local tests).
+# (~140 ms vs ~80 ms per round trip in local tests).
 http_client = httpx.AsyncClient(timeout=20.0)
 
 # Use an absolute path under the project root for session JSON files.
@@ -198,7 +211,7 @@ def compute_progress(session: dict) -> int:
         pct = (q_idx / total) if total else 0
 
     elif phase == "skills":
-        # Skills is one question, but may also be waiting for Groq categorization
+        # Skills is one question, but may also be waiting for LLM categorization
         pct = 0.5 if data.get("skills") else 0
 
     elif phase == "optional":
@@ -257,8 +270,88 @@ SIMPLE_STEPS = [
     {"field": "education_level", "question": "Education level — high school, associate, bachelor's, master's, doctorate, or certification?"},
 ]
 
-# Skills categories taxonomy (42 categories across 7 tiers)
-# Tiered taxonomy for industry-aware categorization
+# The city and state questions are only asked when the address doesn't give them.
+# US states and territories (code -> name): the same table /api/states serves the form.
+try:
+    with open(os.path.join(BASE_DIR, "data", "cities.json"), encoding="utf-8") as _f:
+        US_STATES: Dict[str, str] = json.load(_f).get("states", {})
+except (OSError, ValueError):
+    US_STATES = {}
+_STATE_NAMES = sorted(((name.lower(), code) for code, name in US_STATES.items()), key=lambda nc: -len(nc[0]))
+_STREET_TYPES = {"st", "street", "ave", "av", "avenue", "rd", "road", "blvd", "boulevard", "dr", "drive", "ln", "lane",
+                 "way", "ct", "court", "pl", "place", "pkwy", "parkway", "hwy", "highway", "cir", "circle", "trl",
+                 "trail", "ter", "terrace", "loop", "sq", "square", "pike", "fwy", "freeway", "expy", "expressway",
+                 "cv", "cove", "xing", "crossing", "plz", "plaza", "aly", "alley", "row", "run", "path"}
+_DIRECTIONS = {"n", "s", "e", "w", "ne", "nw", "se", "sw", "north", "south", "east", "west"}
+_UNIT_WORDS = {"apt", "apartment", "unit", "suite", "ste", "bldg", "building", "fl", "floor", "lot", "rm", "room", "#"}
+
+
+def state_code(text: str) -> str:
+    """'Illinois', 'il' or 'IL' -> 'IL'; '' if it isn't a US state or territory."""
+    t = (text or "").strip().rstrip(".").lower()
+    if t.upper() in US_STATES:
+        return t.upper()
+    return next((code for name, code in _STATE_NAMES if name == t), "")
+
+
+def city_state_from_address(address: str) -> Tuple[str, str]:
+    """Best-effort (city, state code) from a US address; '' for a part it can't find.
+
+    Reads "123 Main St, Anytown, TX 12345", full state names, ZIP+4, a trailing "USA",
+    and dictation without commas ("123 Main Street Anytown Texas 12345").
+    """
+    text = re.sub(r"\s+", " ", address or "").strip().rstrip(".")
+    text = re.sub(r"(?i)[\s,]+(?:usa|u\.s\.a\.?|u\.s\.?|united states(?: of america)?)$", "", text)
+    text = re.sub(r"[\s,]*\b\d{5}(?:-\d{4})?$", "", text).rstrip(" ,")
+    lower, state, head = text.lower(), "", ""
+    for name, code in _STATE_NAMES:                     # longest first: "west virginia" before "virginia"
+        if lower.endswith(name) and (len(lower) == len(name) or lower[-len(name) - 1] in " ,"):
+            state, head = code, text[: -len(name)]
+            break
+    else:
+        m = re.search(r"(?:^|[ ,])([A-Za-z]{2})$", text)
+        if m and m.group(1).upper() in US_STATES:
+            state, head = m.group(1).upper(), text[: m.start(1)]
+    if not state:
+        return "", ""
+    head = head.rstrip(" ,")
+    city = head.rsplit(",", 1)[1].strip() if "," in head else _city_after_street(head)
+    if re.search(r"[\d#@/]", city) or not 1 <= len(city.split()) <= 4:
+        city = ""
+    return city, state
+
+
+def _city_after_street(head: str) -> str:
+    """The city in a comma-less "number name type [direction] [unit] city"."""
+    m = re.match(r"(?i)(?:p\.?\s*o\.?\s*)?box\s+\S+\s+(.+)", head)
+    if m:
+        return m.group(1)
+    words = head.split()
+    if not words or not words[0][0].isdigit():
+        return head                                     # no street at all: "Anytown TX"
+    for i in range(2, len(words)):                      # a street has a name before its type
+        if words[i].lower().rstrip(".") in _STREET_TYPES:
+            j = i + 1
+            if j < len(words) and words[j].lower().rstrip(".") in _DIRECTIONS:
+                j += 1
+            while j < len(words) and (words[j].lower().rstrip(".") in _UNIT_WORDS or words[j].startswith("#")):
+                j += 1 if len(words[j]) > 1 and words[j].startswith("#") else 2   # "#4B" / "Apt 4B"
+            return " ".join(words[j:])
+    return ""
+
+
+def _fill_city_state_from_address(data: dict, ctx: dict) -> None:
+    """Store what the address answer gives; those questions are then skipped."""
+    for field in ctx.get("address_filled", []):        # from an earlier answer to the address question
+        data.pop(field, None)
+    city, state = city_state_from_address(data.get("address", ""))
+    found = {"city": city, "state": state}
+    ctx["address_filled"] = [f for f, v in found.items() if v]
+    for field in ctx["address_filled"]:
+        data[field] = found[field]
+
+# Skill categories by industry tier, most relevant first. The skills panel's list in
+# static/voice_chat.js must hold every category named here.
 SKILL_TIERS = {
     "technology": [
         "Programming & Development", "Frameworks & Libraries", "AI/ML & Data Science",
@@ -289,21 +382,22 @@ SKILL_TIERS = {
         "Heavy Equipment Operation", "Machining & Manufacturing", "Automotive & Mechanical",
         "Agriculture & Landscaping"
     ],
+    "retail_hospitality": [
+        "Retail & Merchandising", "Customer Service & Hospitality", "Sales & Business Development",
+        "Inventory & Supply Chain", "Food Service & Culinary", "Administrative & Operations",
+        "HR & Talent Management", "Education & Training", "Financial & Accounting",
+        "Safety & Risk Management", "Project & Program Management", "Marketing & Communications"
+    ],
+    # Cross-industry categories, broadest first: the whole list for an unrecognized
+    # industry, and what fills the rest of every other industry's list.
     "general": [
-        "Project & Program Management", "Sales & Business Development", "Marketing & Communications",
-        "HR & Talent Management", "Customer Service & Hospitality", "Education & Training",
-        "Administrative & Operations"
+        "Project & Program Management", "Customer Service & Hospitality", "Administrative & Operations",
+        "Safety & Risk Management", "HR & Talent Management", "Education & Training",
+        "Sales & Business Development", "Marketing & Communications", "Financial & Accounting",
+        "Research & Analysis", "Writing & Content", "Legal & Compliance",
+        "Inventory & Supply Chain", "Quality Control & Inspection"
     ]
 }
-
-# Flatten all unique categories
-SKILL_CATEGORIES = []
-seen = set()
-for tier in SKILL_TIERS.values():
-    for cat in tier:
-        if cat not in seen:
-            SKILL_CATEGORIES.append(cat)
-            seen.add(cat)
 
 EXPERIENCE_FIELDS = [
     {"field": "company", "question": "What company did you work at?"},
@@ -358,45 +452,56 @@ SUMMARY_QUESTIONS = [
 # SKILL CATEGORIZATION
 # =============================================================================
 
+def _mentions(text: str, hints: List[str]) -> bool:
+    """True if any hint is in text. Hints match inside words ("comput" finds "computing"),
+    but two-letter ones must be whole words: inside words, "ai" and "it" sent "retail",
+    "hospitality" and "nonprofit" to the tech tier."""
+    return any(re.search(rf"\b{h}\b", text) if len(h) == 2 else h in text for h in hints)
+
+
 def get_relevant_tiers(industry: str, summary_q4: str = "") -> List[str]:
-    """Return prioritized category list based on industry and keywords."""
+    """Return every skill category, most relevant first, for this industry and job-posting keywords."""
     industry_lower = industry.lower()
-    if any(x in industry_lower for x in ["tech", "software", "ai", "data", "it", "comput"]):
+    if _mentions(industry_lower, ["tech", "software", "ai", "data", "it", "comput",
+                                  "cyber", "infosec", "information sec", "blockchain", "genai"]):
         primary = "technology"
-    elif any(x in industry_lower for x in ["oil", "gas", "energy", "drill", "mining", "petro"]):
+    elif _mentions(industry_lower, ["oil", "gas", "energy", "drill", "mining", "petro"]):
         primary = "oil_gas_energy"
-    elif any(x in industry_lower for x in ["health", "medical", "clinical", "patient", "care"]):
+    elif _mentions(industry_lower, ["health", "medical", "clinical", "patient", "care"]):
         primary = "healthcare"
-    elif any(x in industry_lower for x in ["finance", "bank", "invest", "account", "fintech"]):
+    elif _mentions(industry_lower, ["finance", "bank", "invest", "account", "fintech"]):
         primary = "finance"
-    elif any(x in industry_lower for x in ["creative", "design", "media", "art", "studio", "market"]):
+    elif _mentions(industry_lower, ["creative", "design", "media", "art", "studio", "market"]):
         primary = "creative"
-    elif any(x in industry_lower for x in ["trade", "construc", "manufact", "mechanic", "weld"]):
+    elif _mentions(industry_lower, ["trade", "construc", "manufact", "mechanic", "weld"]):
         primary = "trades"
+    elif _mentions(industry_lower, ["retail", "store", "grocery", "merchandis",
+                                    "hospitality", "hotel", "restaurant", "food"]):
+        primary = "retail_hospitality"
     else:
         primary = "general"
-    
+
     keywords = summary_q4.lower()
     secondary = None
-    if any(x in keywords for x in ["mlops", "llm", "ai", "inference", "cloud", "docker", "kubernet", "python"]):
+    if _mentions(keywords, ["mlops", "llm", "ai", "genai", "inference", "cloud", "docker", "kubernet", "python"]):
         secondary = "technology"
-    elif any(x in keywords for x in ["safety", "rig", "drill", "mud", "fluids", "petro"]):
+    elif _mentions(keywords, ["safety", "rig", "drill", "mud", "fluids", "petro"]):
         secondary = "oil_gas_energy"
-    elif any(x in keywords for x in ["health", "clinical", "patient", "care"]):
+    elif _mentions(keywords, ["health", "clinical", "patient", "care"]):
         secondary = "healthcare"
-    elif any(x in keywords for x in ["finance", "account", "audit", "invest"]):
+    elif _mentions(keywords, ["finance", "account", "audit", "invest"]):
         secondary = "finance"
-    
+
+    # An unrecognized industry says nothing, so the keywords' tier leads. Cross-industry
+    # categories come next and tech comes last, so a non-tech list is never filled out
+    # with tech categories (the skills prompt only gets the first 15).
+    lead = [secondary, primary] if primary == "general" else [primary, secondary]
+    rest = ["general"] + [t for t in SKILL_TIERS if t not in ("general", "technology")] + ["technology"]
     ordered = []
-    if primary in SKILL_TIERS:
-        ordered.extend(SKILL_TIERS[primary])
-    if secondary and secondary in SKILL_TIERS and secondary != primary:
-        ordered.extend(SKILL_TIERS[secondary])
-    for tier_name, tier_cats in SKILL_TIERS.items():
-        if tier_name not in [primary, secondary]:
-            for cat in tier_cats:
-                if cat not in ordered:
-                    ordered.append(cat)
+    for tier in lead + rest:
+        for cat in SKILL_TIERS.get(tier, []):
+            if cat not in ordered:
+                ordered.append(cat)
     return ordered
 
 def _has_tech_skills(session: dict) -> bool:
@@ -733,9 +838,15 @@ async def process_answer(session: dict, transcript: str) -> dict:
         idx = session.get("step_index", 0)
         if idx < len(SIMPLE_STEPS):
             field = SIMPLE_STEPS[idx]["field"]
-            data[field] = extracted
+            data[field] = (state_code(extracted) or extracted) if field == "state" else extracted
+            if field == "address":
+                _fill_city_state_from_address(data, ctx)
+            idx += 1
+            while idx < len(SIMPLE_STEPS) and SIMPLE_STEPS[idx]["field"] in ctx.get("address_filled", []):
+                idx += 1
             session["data"] = data
-            session["step_index"] = idx + 1
+            session["context"] = ctx
+            session["step_index"] = idx
         return get_current_state(session)
     
     # Phase 2: Experience
@@ -755,11 +866,11 @@ async def process_answer(session: dict, transcript: str) -> dict:
             data["skills"] = extracted
         session["data"] = data
         
-        # Categorize skills with Groq
+        # Categorize skills with the LLM
         skills_text = data.get("skills", "")
         if skills_text:
             try:
-                categorized = await groq_categorize_skills(skills_text, session)
+                categorized = await llm_categorize_skills(skills_text, session)
                 data["skills_categorized"] = categorized
                 session["data"] = data
             except Exception as e:
@@ -943,7 +1054,7 @@ async def _process_summary(session: dict, extracted: str) -> dict:
         # Check if this was the LAST question - generate summary immediately
         if q_idx + 1 >= len(SUMMARY_QUESTIONS):
             # Generate summary before transitioning to skills
-            summary = await generate_summary_with_groq(session)
+            summary = await generate_summary_with_llm(session)
             data["summary"] = summary
             
             # Store keywords separately
@@ -957,7 +1068,7 @@ async def _process_summary(session: dict, extracted: str) -> dict:
         return get_current_state(session)
     
     # Fallback: should not reach here normally
-    summary = await generate_summary_with_groq(session)
+    summary = await generate_summary_with_llm(session)
     data["summary"] = summary
     
     # Store keywords separately
@@ -1106,12 +1217,20 @@ def go_back(session: dict) -> dict:
     # Simple fields
     if phase == "simple":
         idx = session.get("step_index", 0)
+        filled = ctx.get("address_filled", [])
+        while idx > 0 and SIMPLE_STEPS[idx - 1]["field"] in filled:   # never asked: step over them
+            idx -= 1
         if idx > 0:
-            session["step_index"] = idx - 1
-            field = SIMPLE_STEPS[idx - 1]["field"]
-            if field in data:
-                del data[field]
+            idx -= 1
+            field = SIMPLE_STEPS[idx]["field"]
+            data.pop(field, None)
+            if field == "address":                     # what it filled goes with it
+                for f in filled:
+                    data.pop(f, None)
+                ctx["address_filled"] = []
+            session["step_index"] = idx
             session["data"] = data
+            session["context"] = ctx
         return get_current_state(session)
     
     # Experience
@@ -1279,26 +1398,55 @@ def _go_back_optional(session: dict) -> dict:
 
 
 # =============================================================================
-# GROQ SKILL CATEGORIZATION
+# LLM: SKILL CATEGORIZATION AND SUMMARY
 # =============================================================================
 
-async def groq_categorize_skills(skills_text: str, session: dict = None) -> Dict[str, List[Dict]]:
-    """Send skills to Groq and get categorized JSON with weights back."""
-    if not GROQ_API_KEY:
-        # Fallback: put all skills in "Other Skills" with neutral weight
-        skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
-        return {"Other Skills": [{"name": s, "weight": 50} for s in skills_list]}
-    
+async def _llm_chat(system: str, prompt: str, *, temperature: float, max_tokens: int,
+                    timeout: float, json_mode: bool = False) -> Optional[str]:
+    """One chat completion from the configured LLM, or None if it fails (callers fall back)."""
+    body = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        "temperature": temperature,
+        # Reasoning tokens count against max_tokens: at default effort MiniMax spent the
+        # old 300-token summary budget thinking and returned the summary cut off.
+        "reasoning_effort": "low",
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    try:
+        async with _llm_slot:
+            response = await http_client.post(f"{LLM_BASE_URL}/chat/completions", timeout=timeout,
+                                              headers={"Authorization": f"Bearer {LLM_API_KEY}"}, json=body)
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"].strip()
+        logger.warning(f"[LLM] {LLM_MODEL}: HTTP {response.status_code} {response.text[:200]}")
+    except Exception as e:
+        logger.warning(f"[LLM] {LLM_MODEL}: {type(e).__name__}: {e}")
+    return None
+
+
+async def llm_categorize_skills(skills_text: str, session: dict = None) -> Dict[str, List[Dict]]:
+    """Send skills to the LLM and get categorized JSON with weights back."""
+    skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
+    # Fallback: all skills in "Other Skills" with neutral weight
+    fallback = {"Other Skills": [{"name": s, "weight": 50} for s in skills_list]}
+    if not LLM_API_KEY:
+        return fallback
+
     # Get career context from session if available
     data = session.get("data", {}) if session else {}
     job_title = data.get("job_title", "")
     industry = data.get("industry", "")
-    target_keywords = data.get("summary_q4", "")
-    core_edge = data.get("summary_q1", "")
-    
+    # The summary answers live in context, not data (reading data left both blank).
+    summary_answers = session.get("context", {}).get("summary_answers", {}) if session else {}
+    target_keywords = summary_answers.get("summary_q4", "")
+    core_edge = summary_answers.get("summary_q1", "")
+
     # Get prioritized category list based on industry + keywords
     prioritized_cats = get_relevant_tiers(industry, target_keywords)
-    # Send top 15 categories first (reduce noise for Groq)
+    # Send top 15 categories first (reduce noise for the model)
     primary_cats = prioritized_cats[:15]
     categories_text = ", ".join(primary_cats)
     
@@ -1315,12 +1463,14 @@ CATEGORIZE AND WEIGHT these skills (1-100):
 - 70-89: Highly relevant (supports the core edge or industry)
 - 50-69: Moderately relevant (transferable but not core)
 - 30-49: Nice-to-have (adjacent skills)
-- 1-29: Legacy or minimally relevant (only include if user explicitly listed them)
+- 1-29: Legacy or minimally relevant
 
 PRIORITIZED CATEGORIES (most relevant first):
 {categories_text}
 
 Use ONLY these categories. If a skill does not fit, put it in "Other Skills".
+
+Use ONLY the skills listed under "User skills", each exactly once. The job context is for weighting only: never add a skill from it. You may fix spelling, capitalization and filler words like "um".
 
 Return ONLY a JSON object where keys are category names and values are arrays of objects with "name" and "weight" fields.
 
@@ -1329,42 +1479,19 @@ Example output:
 
 User skills: {skills_text}"""
     
-    try:
-        response = await http_client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            timeout=20.0,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": "You are a resume skill organizer. Output valid JSON only."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.2,
-                "max_tokens": 1500,
-                "response_format": {"type": "json_object"}
-            }
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            content = data["choices"][0]["message"]["content"].strip()
-            parsed = json.loads(content)
+    content = await _llm_chat("You are a resume skill organizer. Output valid JSON only.", prompt,
+                              temperature=0.2, max_tokens=3000, timeout=LLM_TIMEOUT, json_mode=True)
+    if content:
+        try:
             # Remove empty categories
-            return {k: v for k, v in parsed.items() if v}
-    except Exception as e:
-        pass
-    
-    # Fallback
-    skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
-    return {"Other Skills": [{"name": s, "weight": 50} for s in skills_list]}
+            return {k: v for k, v in json.loads(content).items() if v}
+        except Exception as e:
+            logger.warning(f"[LLM] {LLM_MODEL}: skills reply is not a JSON object: {e}")
+    return fallback
 
 
-async def generate_summary_with_groq(session: dict) -> str:
-    """Generate professional summary from summary_answers using Groq."""
+async def generate_summary_with_llm(session: dict) -> str:
+    """Generate professional summary from summary_answers using the LLM."""
     ctx = session.get("context", {})
     data = session.get("data", {})
     summary_answers = ctx.get("summary_answers", {})
@@ -1378,7 +1505,7 @@ async def generate_summary_with_groq(session: dict) -> str:
     q4 = summary_answers.get("summary_q4", "")
     job_title = data.get("job_title", "")
     
-    if not GROQ_API_KEY:
+    if not LLM_API_KEY:
         # Fallback: concatenate answers
         return f"{q1} {q2} {q3}".strip()
     
@@ -1392,35 +1519,12 @@ USER INPUTS:
 - Hard numbers / achievements: {q3}
 - Keywords from job posting: {q4}
 
-Write a concise, compelling professional summary that incorporates the keywords and targets the role. Use active voice. Avoid generic buzzwords. Return ONLY the summary text, no quotes or explanations."""
-    
-    try:
-        response = await http_client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            timeout=15.0,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": "You are an expert resume writer. Write concise, compelling professional summaries."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 300
-            }
-        )
+Write a concise, compelling professional summary that incorporates the keywords and targets the role. Use active voice in resume style: no "I", "my" or "me", and no generic buzzwords such as "proven", "track record", "results-driven" or "seasoned". Return ONLY the summary text, no quotes or explanations."""
 
-        if response.status_code == 200:
-            result = response.json()
-            return result["choices"][0]["message"]["content"].strip()
-    except Exception:
-        pass
-    
-    # Fallback
-    return f"{q1} {q2} {q3}".strip()
+    summary = await _llm_chat("You are an expert resume writer. Write concise, compelling professional summaries.", prompt,
+                              temperature=0.3, max_tokens=1024, timeout=LLM_TIMEOUT)
+    # Fallback: concatenate answers
+    return summary or f"{q1} {q2} {q3}".strip()
 
 
 # =============================================================================
@@ -1523,7 +1627,7 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
     
     # ── Skills sanitization ──
     # CORRUPTION DETECTION: skills field may contain project names, control words, or be truncated
-    # The real skills are in skills_categorized (from Groq) or must be reconstructed
+    # The real skills are in skills_categorized (from the LLM) or must be reconstructed
     
     skills_categorized_raw = raw_data.get("skills_categorized", {})
     skills_raw = raw_data.get("skills", "")
@@ -1573,7 +1677,7 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
                 # Control words are corruption regardless of category
                 if name_lower in CONTROL_WORDS:
                     return True
-        # If the ONLY category is "Other Skills", it's likely Groq failed to categorize properly
+        # If the ONLY category is "Other Skills", it's likely the LLM failed to categorize properly
         keys = list(categorized.keys())
         if len(keys) == 1 and keys[0].lower() in ("other skills", "other"):
             skills = categorized.get(keys[0], [])
@@ -2116,12 +2220,13 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
             session["done"] = False
             data = session.get("data", {})
             simple_fields = [s["field"] for s in SIMPLE_STEPS]
-            answered = [f for f in simple_fields if data.get(f)]
-            if len(answered) < len(simple_fields):
-                # Still in the simple phase: land exactly on next unanswered field
+            unanswered = [i for i, f in enumerate(simple_fields) if not data.get(f)]
+            if unanswered:
+                # Still in the simple phase: land exactly on the first unanswered field
+                # (not a count: the address can fill city/state out of order)
                 ctx["phase"] = "simple"
-                session["step_index"] = len(answered)
-                ctx["current_field"] = simple_fields[len(answered)]
+                session["step_index"] = unanswered[0]
+                ctx["current_field"] = simple_fields[unanswered[0]]
             else:
                 # Past simple phase: resume precisely via the stamp if present
                 ctx["phase"] = ctx.get("_resume_phase", "experience")
