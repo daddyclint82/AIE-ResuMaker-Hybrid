@@ -140,7 +140,7 @@ session = {
 
 1. **Summary Generation** — MiniMax M3.1 Flash on Ollama Cloud (`LLM_MODEL`, `LLM_BASE_URL`), 2-3 sentences from 4 interview answers.
 2. **Skills Categorization** — Same model, returns weighted JSON with 15 prioritized categories.
-3. **Fallback** — If no `LLM_API_KEY` or the call fails, uses template concatenation for summary, flat list for skills.
+3. **Fallback** — If no key or the call fails, uses template concatenation for summary, flat list for skills.
 
 ## Critical Fixes Applied
 
@@ -193,13 +193,13 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 ### 2026-11-20 — Summary and Skills Model: MiniMax M3.1 Flash on Ollama Cloud
 
 - Groq retired `llama-3.3-70b-versatile` for non-enterprise keys, so production was writing template summaries. On the app's real prompts for six made-up candidates, MiniMax M3.1 Flash beat GPT-OSS 20B (`docs/review/llm-model-test/`).
-- The provider is env-only: `LLM_BASE_URL` (default `https://ollama.com/v1`), `LLM_API_KEY`, `LLM_MODEL` (default `minimax-m3.1-flash`). Any OpenAI-compatible API works if the model accepts `reasoning_effort`.
+- The provider is env-only: `LLM_BASE_URL` (default `https://ollama.com/v1`), `LLM_API_KEY` (or Ollama's usual `OLLAMA_API_KEY`, which production uses), `LLM_MODEL` (default `minimax-m3.1-flash`). Any OpenAI-compatible API works if the model accepts `reasoning_effort`.
 - Both calls send `reasoning_effort: "low"` with room for reasoning tokens (summary 1024, skills 3000). At default effort the old 300-token summary budget went on thinking and the summary came back cut off.
 - Ollama caps concurrent requests per account, so the site sends one LLM request at a time.
 - The skills prompt read the core edge and job keywords from `data`, where they never are, so both were always blank. It now reads `context["summary_answers"]`. With the keywords filled in, the model started adding them as skills the user never listed, so the skills prompt now allows only the user's skills, each once.
 - The summary prompt now rules out "I"/"my" and names the buzzwords to skip: in the model test MiniMax wrote in first person in 1 of 6 summaries and used buzzwords in 2; on the final code, 0 of 6 for both.
 - Model text is NFKC-normalized: the PDF's built-in fonts printed "H₂S" as a black box.
-- `/healthz` reports `"llm": true` once `LLM_API_KEY` is set. Failed calls log `[LLM]` warnings instead of failing silently.
+- `/healthz` reports `"llm": true` once a key is set. Failed calls log `[LLM]` warnings instead of failing silently.
 - Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
 
 ### 2026-06-23 — Skip Button + Conditional Tech Stack

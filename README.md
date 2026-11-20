@@ -38,7 +38,7 @@ This is a **separate project** from the live [AIE ResuMaker](https://aie-resumak
   - `POST /api/voice/save` / `POST /api/voice/load` — Persist / restore session state
   - `GET  /api/voice/session-history?sessionId=...` — Returns stored transcript turns (transcript rehydration)
 - **LLM integration** — MiniMax M3.1 Flash on Ollama Cloud writes the summary and weights the skills (any OpenAI-compatible API via `LLM_BASE_URL` / `LLM_MODEL`)
-- **Fallback** — If no `LLM_API_KEY` or API error, uses the raw answers
+- **Fallback** — If no `LLM_API_KEY` / `OLLAMA_API_KEY` or API error, uses the raw answers
 - **Disk-persisted sessions** — Each turn is written to `voice_sessions/<session_id>.json`
   (loaded from memory first, then disk). Sessions survive restarts; transcripts can be rehydrated.
 - **`progress_pct`** — Server now returns `progress_pct` (0–100) instead of raw `step_index`.
@@ -144,7 +144,7 @@ kill $(cat /tmp/hybrid.pid)
 
 | Variable | Required | Default |
 |----------|----------|---------|
-| `LLM_API_KEY` | No (falls back to raw) | None |
+| `LLM_API_KEY` or `OLLAMA_API_KEY` | No (falls back to raw) | None |
 | `LLM_MODEL` | No | `minimax-m3.1-flash` |
 | `LLM_BASE_URL` | No | `https://ollama.com/v1` |
 

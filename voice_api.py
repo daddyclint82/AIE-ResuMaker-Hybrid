@@ -50,9 +50,10 @@ session_locks: Dict[str, asyncio.Lock] = {}
 
 # The summary and skills steps call an OpenAI-compatible chat API. Default: MiniMax
 # M3.1 Flash on Ollama's cloud (chosen in docs/review/llm-model-test/); another
-# provider is an env change. Without LLM_API_KEY both steps use template fallbacks.
+# provider is an env change. Without a key both steps use template fallbacks.
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://ollama.com/v1").rstrip("/")
-LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+# OLLAMA_API_KEY is the name Ollama's docs use; LLM_API_KEY wins when both are set.
+LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("OLLAMA_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL", "minimax-m3.1-flash")
 
 # Ollama caps concurrent requests per account (3 on Pro) and this account also serves

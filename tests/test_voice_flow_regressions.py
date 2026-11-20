@@ -8,11 +8,13 @@ Run: python tests/test_voice_flow_regressions.py   (or pytest)
    not loop.
 3. The LLM gets the job context (core edge, keywords) and its answers are
    used; when it fails, the summary and skills fall back to templates.
+4. The key is read from OLLAMA_API_KEY when LLM_API_KEY is unset.
 
 Drives the state machine directly: no server, no LLM key, no network.
 """
 import asyncio
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -169,6 +171,21 @@ def test_llm_failure_falls_back_to_templates():
     assert s["data"]["summary"] == "Fast shipper Slow APIs 40% faster", s["data"]["summary"]
     assert s["data"]["skills_categorized"] == {"Other Skills": [{"name": "Python", "weight": 50},
                                                                 {"name": "Docker", "weight": 50}]}
+
+
+
+def test_key_comes_from_ollama_api_key_when_llm_api_key_is_unset():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    base = {k: v for k, v in os.environ.items() if k not in ("LLM_API_KEY", "OLLAMA_API_KEY")}
+
+    def key_seen(**env):              # the key is read at import, so import in a fresh process
+        out = subprocess.run([sys.executable, "-c", "import voice_api; print(voice_api.LLM_API_KEY)"],
+                             cwd=root, env={**base, **env}, capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+
+    assert key_seen(OLLAMA_API_KEY="ollama-key") == "ollama-key"
+    assert key_seen(OLLAMA_API_KEY="ollama-key", LLM_API_KEY="llm-key") == "llm-key"
+    assert key_seen() == ""
 
 
 if __name__ == "__main__":
