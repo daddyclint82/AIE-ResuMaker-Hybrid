@@ -14,6 +14,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import hashlib
+from html import escape
 import json
 import os
 import re
@@ -540,18 +541,18 @@ async def verify_student_token(request: Request, token: str = ""):
         return HTMLResponse(f"""
         <html><body style="font-family: Arial; text-align: center; padding: 50px; background: #f0fdf4;">
             <h2 style="color: #16a34a;">✅ Student Status Verified!</h2>
-            <p>Your .edu email <strong>{verification["email"]}</strong> has been verified.</p>
+            <p>Your .edu email <strong>{escape(verification["email"])}</strong> has been verified.</p>
             <p>You can now close this tab and return to AIE ResuMaker to complete your student purchase.</p>
             <br>
             <a href="/build" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Return to AIE ResuMaker</a>
         </body></html>
         """)
 
-    except Exception as e:
-        return HTMLResponse(f"""
+    except Exception:
+        return HTMLResponse("""
         <html><body style="font-family: Arial; text-align: center; padding: 50px;">
             <h2 style="color: #dc2626;">❌ Error</h2>
-            <p>{str(e)}</p>
+            <p>We couldn't verify this link. Please request a new one.</p>
         </body></html>
         """)
 
@@ -666,7 +667,7 @@ async def build_page(request: Request):
         return templates.TemplateResponse(request=request, name="voice_chat.html")
     elif mode == "form":
         return templates.TemplateResponse(request=request, name="index.html", context={
-            "voice_data": json.dumps(voice_data) if voice_data else "null",
+            "voice_data": voice_data,
             "session_id": voice_session
         })
     
@@ -678,7 +679,7 @@ async def build_page(request: Request):
         return templates.TemplateResponse(request=request, name="voice_chat.html")
     else:
         ctx = {
-            "voice_data": json.dumps(voice_data) if voice_data else "null",
+            "voice_data": voice_data,
             "session_id": voice_session
         }
         return templates.TemplateResponse(request=request, name="index.html", context=ctx)
@@ -1301,9 +1302,25 @@ def generate_docx(resume_id: str, data: dict):
     
     return filepath
 
+def _escape_tree(value):
+    """A copy of value with every string in it, dict keys included, HTML-escaped."""
+    if isinstance(value, str):
+        return escape(value)
+    if isinstance(value, dict):
+        return {_escape_tree(k): _escape_tree(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_escape_tree(v) for v in value]
+    return value
+
+
 def generate_preview_html(data: dict, template_style: str = "professional"):
     """Generate HTML preview of resume based on template style"""
-    
+    # Every field is the user's own text: escape it all once, here, so none of
+    # the f-strings below can emit it as markup. The stored resume is untouched.
+    data = _escape_tree(data)
+    if template_style not in ("modern", "minimal"):
+        template_style = "professional"
+
     # Build contact line
     contact_parts = []
     if data.get("location"): contact_parts.append(data["location"])

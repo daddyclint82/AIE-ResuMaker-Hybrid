@@ -270,7 +270,7 @@
     </footer>
 
     <!-- Voice Session Data (if coming from voice chat) -->
-    <script id="voice-data" type="application/json">{{ voice_data | safe }}</script>
+    <script id="voice-data" type="application/json">{{ voice_data | tojson }}</script>
     
     <script src="{{ asset_url('app.js') }}"></script>
 </body>
