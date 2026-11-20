@@ -83,6 +83,14 @@ Legal acceptance is enforced before the chat flow begins. `/terms` carries a `re
 - Pricing tiers: $9.99 regular, $4.99 referral/student.
 - Referral system: real backend tracking for $4.99 discount with "Give $5, Get $5" messaging.
 
+### Resume Access & Payment
+
+- A resume ID is the only key to a resume, so it is random: `secrets.token_urlsafe(16)`, 128 bits. `get_resume()` rejects anything not in that format before it touches storage.
+- `/api/preview-timer` and `/api/check-payment` need only the ID. Only the browser that built the resume, which already received the full preview from `/api/build`, and Stripe ever hold it.
+- `/api/download` serves paid resumes only (402 otherwise). `/success` and the Stripe webhook record the payment for the resume stored in the checkout session's metadata. The webhook needs `STRIPE_WEBHOOK_SECRET` (503 without it).
+- Stripe 15 objects have no dict `.get()`, so these routes call `.to_dict()` first.
+- Guarded by `tests/test_resume_access.py` (no server, no network).
+
 ### Resume Themes
 
 - Professional, Modern, Minimal with distinct CSS.
@@ -196,6 +204,7 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - Groq retired `llama-3.3-70b-versatile` for non-enterprise keys, so production was writing template summaries. On the app's real prompts for six made-up candidates, MiniMax M3.1 Flash beat GPT-OSS 20B (`docs/review/llm-model-test/`).
 - The provider is env-only: `LLM_BASE_URL` (default `https://ollama.com/v1`), `LLM_API_KEY` (or Ollama's usual `OLLAMA_API_KEY`, which production uses), `LLM_MODEL` (default `minimax-m3.1-flash`). Any OpenAI-compatible API works if the model accepts `reasoning_effort`.
 - Both calls send `reasoning_effort: "low"` with room for reasoning tokens (summary 1024, skills 3000). At default effort the old 300-token summary budget went on thinking and the summary came back cut off.
+- Both calls wait up to 45 s (`LLM_TIMEOUT`). On 2026-11-20 about 1 call in 5 sat ~20 s at Ollama before answering, and the old 15 s / 20 s limits (sized for Groq) sent those to the template; on production the summary and the skills each fell back once that way. The chat shows its typing indicator while it waits.
 - Ollama caps concurrent requests per account, so the site sends one LLM request at a time.
 - The skills prompt read the core edge and job keywords from `data`, where they never are, so both were always blank. It now reads `context["summary_answers"]`. With the keywords filled in, the model started adding them as skills the user never listed, so the skills prompt now allows only the user's skills, each once.
 - The summary prompt now rules out "I"/"my" and names the buzzwords to skip: in the model test MiniMax wrote in first person in 1 of 6 summaries and used buzzwords in 2; on the final code, 0 of 6 for both.

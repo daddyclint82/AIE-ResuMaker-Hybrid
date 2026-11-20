@@ -162,6 +162,7 @@ def test_llm_gets_the_job_context_and_its_answers_are_used():
         assert req["json"]["model"] == va.LLM_MODEL and req["json"].get("reasoning_effort") == "low", req["json"]
     assert summary_req["json"]["max_tokens"] >= 1024           # reasoning tokens count against it
     assert skills_req["json"]["response_format"] == {"type": "json_object"}
+    assert min(summary_req["timeout"], skills_req["timeout"]) >= 30, "Ollama can hold a call ~20 s"
     prompt = skills_req["json"]["messages"][1]["content"]
     assert "User's Core Edge: Fast shipper" in prompt, prompt[:400]
     assert "Target Keywords from Job Posting: Kubernetes, Terraform" in prompt, prompt[:400]
