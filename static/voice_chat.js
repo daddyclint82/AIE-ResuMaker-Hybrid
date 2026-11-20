@@ -840,7 +840,7 @@
             for (const skill of skills) {
                 const skillName = typeof skill === 'object' ? (skill.name || JSON.stringify(skill)) : skill;
                 const skillWeight = typeof skill === 'object' ? (skill.weight || 50) : 50;
-                html += `<div class="skill-tag" title="Relevance: ${skillWeight}/100">
+                html += `<div class="skill-tag" title="Relevance: ${escapeHtml(skillWeight)}/100">
                     <span>${escapeHtml(skillName)}</span>
                     <button class="skill-remove" data-skill="${escapeHtml(skillName)}" data-category="${escapeHtml(category)}">−</button>
                 </div>`;
@@ -1331,7 +1331,8 @@
     function escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
-        return div.innerHTML;
+        // innerHTML escapes & < > but not quotes; values also go inside attributes
+        return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function formatTime() {
