@@ -25,6 +25,7 @@ import httpx
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from xml.sax.saxutils import escape
 
 from typing import Dict, Any
 # python-docx and reportlab are imported inside generate_docx()/generate_pdf():
@@ -2190,13 +2191,37 @@ def _register_pdf_fonts() -> frozenset:
     return frozenset.intersection(*(frozenset(font.face.charToGlyph) for font in fonts))
 
 
+def _standard_fonts_draw(c: str) -> bool:
+    """Whether <font name="Times-Roman"> draws c from Times, Symbol or
+    ZapfDingbats, rather than as ZapfDingbats' black box."""
+    from reportlab.pdfbase.pdfmetrics import getFont
+
+    times = getFont("Times-Roman")
+    for font in (times, *times.substitutionFonts):
+        try:
+            c.encode(font.encName)
+            return True
+        except UnicodeEncodeError:
+            pass
+    return False
+
+
 def _pdf_markup(text: str, covered: frozenset) -> str:
     """NFC-compose accents typed as combining marks (reportlab can't position
     them: "Nguyê" + U+0303 + "n" put the tilde on the n), then send the few
     characters the fonts lack (✓ ★ ⇒ ❖ ...) to reportlab's standard fonts,
-    which draw them from Symbol/ZapfDingbats as before."""
-    return "".join(c if c.isascii() or ord(c) in covered else f'<font name="Times-Roman">{c}</font>'
-                   for c in unicodedata.normalize("NFC", text))
+    which draw them from Symbol/ZapfDingbats as before. A character those lack
+    too prints as its NFKC form when the fonts have that: the non-breaking
+    hyphen (U+2011) models and ChatGPT put in "high-performance" was a black box."""
+    def markup(c):
+        if c.isascii() or ord(c) in covered:
+            return c
+        plain = unicodedata.normalize("NFKC", c)
+        if not _standard_fonts_draw(c) and all(p.isascii() or ord(p) in covered for p in plain):
+            return escape(plain)  # fullwidth ＜ and ＆ fold to markup characters
+        return f'<font name="Times-Roman">{c}</font>'
+
+    return "".join(map(markup, unicodedata.normalize("NFC", text)))
 
 
 def generate_pdf(resume_id: str, data: dict):

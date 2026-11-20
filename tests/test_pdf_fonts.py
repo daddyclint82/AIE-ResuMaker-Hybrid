@@ -42,6 +42,14 @@ def test_characters_the_fonts_lack_keep_their_old_glyphs():
     assert b"/ZapfDingbats" in _pdf({"full_name": "Test", "skills": ["✓ OSHA 30", "★ Python"]})
 
 
+def test_characters_no_font_has_print_as_their_nfkc_form():
+    covered = main._register_pdf_fonts()
+    assert main._pdf_markup("high‑performance", covered) == "high‐performance"  # non-breaking hyphen
+    assert main._pdf_markup("＜R＆D＞", covered) == "&lt;R&amp;D&gt;"        # fullwidth: text, not markup
+    assert main._pdf_markup("①", covered) == '<font name="Times-Roman">①</font>'          # ZapfDingbats draws it
+    assert b"/ZapfDingbats" not in _pdf({"full_name": "Test", "summary": "Cross‑functional, 40℃"})
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

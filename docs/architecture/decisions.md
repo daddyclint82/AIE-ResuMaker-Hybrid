@@ -217,6 +217,7 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - `generate_pdf` now embeds Liberation Serif (Regular, Bold, Italic) and, for the contact line, Liberation Sans, from `fonts/` (2.1.5, SIL OFL 1.1). They are metric-compatible with Times New Roman/Arial: on a 3-page resume every line breaks at the same word and no word moves more than 0.11 pt (`docs/review/pdf-unicode-fonts/`). Each PDF grows by about 85 KB of embedded font subsets.
 - Text is NFC-composed first. reportlab can't position combining marks, so accents typed as separate marks (as the Windows Vietnamese keyboard does) landed on the next letter.
 - About 225 symbols the Liberation fonts lack (✓ ★ ⇒ ① ❖ ➤ …) still go to the standard Symbol/ZapfDingbats fonts that drew them before. CJK and emoji have no glyph in either and still print as boxes.
+- A character neither has prints as its NFKC form when Liberation has that. The non-breaking hyphen (U+2011) that GPT-style models and ChatGPT put in words like "high-performance" printed as a black box; it now prints as a hyphen, and ℃ as °C. The folded text is XML-escaped, so fullwidth ＜ and ＆ stay text instead of becoming Paragraph markup.
 - Guarded by `tests/test_pdf_fonts.py`.
 
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
