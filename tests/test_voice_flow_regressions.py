@@ -8,6 +8,8 @@ Run: python tests/test_voice_flow_regressions.py   (or pytest)
    not loop.
 3. The LLM gets the job context (core edge, keywords) and its answers are
    used; when it fails, the summary and skills fall back to templates.
+4. The skills prompt's categories fit the industry: retail gets the retail
+   tier, and no non-tech list is filled out with tech categories.
 
 Drives the state machine directly: no server, no LLM key, no network.
 """
@@ -169,6 +171,25 @@ def test_llm_failure_falls_back_to_templates():
     assert s["data"]["summary"] == "Fast shipper Slow APIs 40% faster", s["data"]["summary"]
     assert s["data"]["skills_categorized"] == {"Other Skills": [{"name": "Python", "weight": 50},
                                                                 {"name": "Docker", "weight": 50}]}
+
+
+def test_retail_gets_retail_skill_categories():
+    # "ai" inside "retail" (and "it" inside "hospitality") used to pick the tech tier.
+    retail = va.SKILL_TIERS["retail_hospitality"]
+    for industry, keywords in (("Retail", "retail management, P&L, inventory"), ("Hospitality", "")):
+        cats = va.get_relevant_tiers(industry, keywords)[:15]       # the skills prompt gets 15
+        assert cats[:len(retail)] == retail, (industry, cats)
+        assert not va.TECH_CATEGORIES & set(cats), (industry, cats)
+
+
+def test_non_tech_lists_are_not_filled_with_tech_categories():
+    for industry, keywords in (("Nonprofit", ""), ("Healthcare", "patient advocacy, training"),
+                               ("Construction", "NEC, conduit bending, safety")):
+        cats = va.get_relevant_tiers(industry, keywords)[:15]
+        assert not va.TECH_CATEGORIES & set(cats), (industry, cats)
+        assert len(set(cats)) == 15, (industry, cats)                # no duplicates taking slots
+    assert va.get_relevant_tiers("Nonprofit")[:14] == va.SKILL_TIERS["general"]
+    assert va.get_relevant_tiers("Information Security")[:12] == va.SKILL_TIERS["technology"]
 
 
 if __name__ == "__main__":

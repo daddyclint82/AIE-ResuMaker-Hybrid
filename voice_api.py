@@ -266,8 +266,8 @@ SIMPLE_STEPS = [
     {"field": "education_level", "question": "Education level — high school, associate, bachelor's, master's, doctorate, or certification?"},
 ]
 
-# Skills categories taxonomy (42 categories across 7 tiers)
-# Tiered taxonomy for industry-aware categorization
+# Skill categories by industry tier, most relevant first. The skills panel's list in
+# static/voice_chat.js must hold every category named here.
 SKILL_TIERS = {
     "technology": [
         "Programming & Development", "Frameworks & Libraries", "AI/ML & Data Science",
@@ -298,21 +298,22 @@ SKILL_TIERS = {
         "Heavy Equipment Operation", "Machining & Manufacturing", "Automotive & Mechanical",
         "Agriculture & Landscaping"
     ],
+    "retail_hospitality": [
+        "Retail & Merchandising", "Customer Service & Hospitality", "Sales & Business Development",
+        "Inventory & Supply Chain", "Food Service & Culinary", "Administrative & Operations",
+        "HR & Talent Management", "Education & Training", "Financial & Accounting",
+        "Safety & Risk Management", "Project & Program Management", "Marketing & Communications"
+    ],
+    # Cross-industry categories, broadest first: the whole list for an unrecognized
+    # industry, and what fills the rest of every other industry's list.
     "general": [
-        "Project & Program Management", "Sales & Business Development", "Marketing & Communications",
-        "HR & Talent Management", "Customer Service & Hospitality", "Education & Training",
-        "Administrative & Operations"
+        "Project & Program Management", "Customer Service & Hospitality", "Administrative & Operations",
+        "Safety & Risk Management", "HR & Talent Management", "Education & Training",
+        "Sales & Business Development", "Marketing & Communications", "Financial & Accounting",
+        "Research & Analysis", "Writing & Content", "Legal & Compliance",
+        "Inventory & Supply Chain", "Quality Control & Inspection"
     ]
 }
-
-# Flatten all unique categories
-SKILL_CATEGORIES = []
-seen = set()
-for tier in SKILL_TIERS.values():
-    for cat in tier:
-        if cat not in seen:
-            SKILL_CATEGORIES.append(cat)
-            seen.add(cat)
 
 EXPERIENCE_FIELDS = [
     {"field": "company", "question": "What company did you work at?"},
@@ -367,45 +368,56 @@ SUMMARY_QUESTIONS = [
 # SKILL CATEGORIZATION
 # =============================================================================
 
+def _mentions(text: str, hints: List[str]) -> bool:
+    """True if any hint is in text. Hints match inside words ("comput" finds "computing"),
+    but two-letter ones must be whole words: inside words, "ai" and "it" sent "retail",
+    "hospitality" and "nonprofit" to the tech tier."""
+    return any(re.search(rf"\b{h}\b", text) if len(h) == 2 else h in text for h in hints)
+
+
 def get_relevant_tiers(industry: str, summary_q4: str = "") -> List[str]:
-    """Return prioritized category list based on industry and keywords."""
+    """Return every skill category, most relevant first, for this industry and job-posting keywords."""
     industry_lower = industry.lower()
-    if any(x in industry_lower for x in ["tech", "software", "ai", "data", "it", "comput"]):
+    if _mentions(industry_lower, ["tech", "software", "ai", "data", "it", "comput",
+                                  "cyber", "infosec", "information sec", "blockchain", "genai"]):
         primary = "technology"
-    elif any(x in industry_lower for x in ["oil", "gas", "energy", "drill", "mining", "petro"]):
+    elif _mentions(industry_lower, ["oil", "gas", "energy", "drill", "mining", "petro"]):
         primary = "oil_gas_energy"
-    elif any(x in industry_lower for x in ["health", "medical", "clinical", "patient", "care"]):
+    elif _mentions(industry_lower, ["health", "medical", "clinical", "patient", "care"]):
         primary = "healthcare"
-    elif any(x in industry_lower for x in ["finance", "bank", "invest", "account", "fintech"]):
+    elif _mentions(industry_lower, ["finance", "bank", "invest", "account", "fintech"]):
         primary = "finance"
-    elif any(x in industry_lower for x in ["creative", "design", "media", "art", "studio", "market"]):
+    elif _mentions(industry_lower, ["creative", "design", "media", "art", "studio", "market"]):
         primary = "creative"
-    elif any(x in industry_lower for x in ["trade", "construc", "manufact", "mechanic", "weld"]):
+    elif _mentions(industry_lower, ["trade", "construc", "manufact", "mechanic", "weld"]):
         primary = "trades"
+    elif _mentions(industry_lower, ["retail", "store", "grocery", "merchandis",
+                                    "hospitality", "hotel", "restaurant", "food"]):
+        primary = "retail_hospitality"
     else:
         primary = "general"
-    
+
     keywords = summary_q4.lower()
     secondary = None
-    if any(x in keywords for x in ["mlops", "llm", "ai", "inference", "cloud", "docker", "kubernet", "python"]):
+    if _mentions(keywords, ["mlops", "llm", "ai", "genai", "inference", "cloud", "docker", "kubernet", "python"]):
         secondary = "technology"
-    elif any(x in keywords for x in ["safety", "rig", "drill", "mud", "fluids", "petro"]):
+    elif _mentions(keywords, ["safety", "rig", "drill", "mud", "fluids", "petro"]):
         secondary = "oil_gas_energy"
-    elif any(x in keywords for x in ["health", "clinical", "patient", "care"]):
+    elif _mentions(keywords, ["health", "clinical", "patient", "care"]):
         secondary = "healthcare"
-    elif any(x in keywords for x in ["finance", "account", "audit", "invest"]):
+    elif _mentions(keywords, ["finance", "account", "audit", "invest"]):
         secondary = "finance"
-    
+
+    # An unrecognized industry says nothing, so the keywords' tier leads. Cross-industry
+    # categories come next and tech comes last, so a non-tech list is never filled out
+    # with tech categories (the skills prompt only gets the first 15).
+    lead = [secondary, primary] if primary == "general" else [primary, secondary]
+    rest = ["general"] + [t for t in SKILL_TIERS if t not in ("general", "technology")] + ["technology"]
     ordered = []
-    if primary in SKILL_TIERS:
-        ordered.extend(SKILL_TIERS[primary])
-    if secondary and secondary in SKILL_TIERS and secondary != primary:
-        ordered.extend(SKILL_TIERS[secondary])
-    for tier_name, tier_cats in SKILL_TIERS.items():
-        if tier_name not in [primary, secondary]:
-            for cat in tier_cats:
-                if cat not in ordered:
-                    ordered.append(cat)
+    for tier in lead + rest:
+        for cat in SKILL_TIERS.get(tier, []):
+            if cat not in ordered:
+                ordered.append(cat)
     return ordered
 
 def _has_tech_skills(session: dict) -> bool:
