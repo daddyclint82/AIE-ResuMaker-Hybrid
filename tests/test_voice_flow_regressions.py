@@ -10,6 +10,8 @@ Run: python tests/test_voice_flow_regressions.py   (or pytest)
    used; when it fails, the summary and skills fall back to templates.
 4. The key is read from OLLAMA_API_KEY when LLM_API_KEY is unset.
 5. City and state come from the address answer; only what it lacks is asked.
+6. The skills prompt's categories fit the industry: retail gets the retail
+   tier, and no non-tech list is filled out with tech categories.
 
 Drives the state machine directly: no server, no LLM key, no network.
 """
@@ -241,6 +243,25 @@ def test_unreadable_address_asks_city_and_state_and_stores_the_state_code():
     assert say(s, "Springfield")["field"] == "state"
     assert say(s, "illinois")["field"] == "industry"
     assert s["data"]["state"] == "IL"                         # the form's State list uses codes
+
+
+def test_retail_gets_retail_skill_categories():
+    # "ai" inside "retail" (and "it" inside "hospitality") used to pick the tech tier.
+    retail = va.SKILL_TIERS["retail_hospitality"]
+    for industry, keywords in (("Retail", "retail management, P&L, inventory"), ("Hospitality", "")):
+        cats = va.get_relevant_tiers(industry, keywords)[:15]       # the skills prompt gets 15
+        assert cats[:len(retail)] == retail, (industry, cats)
+        assert not va.TECH_CATEGORIES & set(cats), (industry, cats)
+
+
+def test_non_tech_lists_are_not_filled_with_tech_categories():
+    for industry, keywords in (("Nonprofit", ""), ("Healthcare", "patient advocacy, training"),
+                               ("Construction", "NEC, conduit bending, safety")):
+        cats = va.get_relevant_tiers(industry, keywords)[:15]
+        assert not va.TECH_CATEGORIES & set(cats), (industry, cats)
+        assert len(set(cats)) == 15, (industry, cats)                # no duplicates taking slots
+    assert va.get_relevant_tiers("Nonprofit")[:14] == va.SKILL_TIERS["general"]
+    assert va.get_relevant_tiers("Information Security")[:12] == va.SKILL_TIERS["technology"]
 
 
 if __name__ == "__main__":

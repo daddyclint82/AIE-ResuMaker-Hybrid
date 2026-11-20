@@ -13,12 +13,14 @@ from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import functools
 import hashlib
 import json
 import logging
 import os
 import re
 import smtplib
+import unicodedata
 import httpx
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -2159,6 +2161,44 @@ async def get_timed_preview(request: Request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
+# reportlab's built-in Times/Helvetica cover only cp1252 and draw any other
+# character as a black box ("H■S", "Nguy■n"). The PDF embeds these TrueType
+# fonts instead. Liberation Serif/Sans are metric-compatible with Times New
+# Roman/Arial, so the layout is unchanged. License (SIL OFL 1.1): fonts/LICENSE.
+PDF_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+PDF_FONTS = {
+    "LiberationSerif": "LiberationSerif-Regular.ttf",
+    "LiberationSerif-Bold": "LiberationSerif-Bold.ttf",
+    "LiberationSerif-Italic": "LiberationSerif-Italic.ttf",
+    "LiberationSans": "LiberationSans-Regular.ttf",
+}
+
+
+@functools.cache
+def _register_pdf_fonts() -> frozenset:
+    """Register the PDF fonts (once) and return the code points all of them draw."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    fonts = [TTFont(name, os.path.join(PDF_FONTS_DIR, filename)) for name, filename in PDF_FONTS.items()]
+    for font in fonts:
+        pdfmetrics.registerFont(font)
+    # Lets <b> and <i> in Paragraph markup switch to the matching face.
+    pdfmetrics.registerFontFamily("LiberationSerif", normal="LiberationSerif",
+                                  bold="LiberationSerif-Bold", italic="LiberationSerif-Italic")
+    pdfmetrics.registerFontFamily("LiberationSans", normal="LiberationSans")
+    return frozenset.intersection(*(frozenset(font.face.charToGlyph) for font in fonts))
+
+
+def _pdf_markup(text: str, covered: frozenset) -> str:
+    """NFC-compose accents typed as combining marks (reportlab can't position
+    them: "Nguyê" + U+0303 + "n" put the tilde on the n), then send the few
+    characters the fonts lack (✓ ★ ⇒ ❖ ...) to reportlab's standard fonts,
+    which draw them from Symbol/ZapfDingbats as before."""
+    return "".join(c if c.isascii() or ord(c) in covered else f'<font name="Times-Roman">{c}</font>'
+                   for c in unicodedata.normalize("NFC", text))
+
+
 def generate_pdf(resume_id: str, data: dict):
     """Generate PDF document"""
     from reportlab.lib import colors
@@ -2166,7 +2206,13 @@ def generate_pdf(resume_id: str, data: dict):
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Spacer
+    from reportlab.platypus import Paragraph as _Paragraph
+
+    covered = _register_pdf_fonts()
+
+    def Paragraph(text, style):  # every Paragraph below goes through _pdf_markup
+        return _Paragraph(_pdf_markup(text, covered), style)
 
     output_dir = RESUME_STORAGE_DIR
     os.makedirs(output_dir, exist_ok=True)
@@ -2187,7 +2233,7 @@ def generate_pdf(resume_id: str, data: dict):
         textColor=colors.HexColor('#000000'),
         spaceAfter=4,
         alignment=TA_CENTER,
-        fontName='Times-Bold'
+        fontName='LiberationSerif-Bold'
     )
     
     contact_style = ParagraphStyle(
@@ -2196,7 +2242,8 @@ def generate_pdf(resume_id: str, data: dict):
         fontSize=9,
         textColor=colors.HexColor('#333333'),
         alignment=TA_CENTER,
-        spaceAfter=12
+        spaceAfter=12,
+        fontName='LiberationSans'
     )
     
     section_style = ParagraphStyle(
@@ -2206,7 +2253,7 @@ def generate_pdf(resume_id: str, data: dict):
         textColor=colors.HexColor('#2c5aa0'),
         spaceAfter=6,
         spaceBefore=14,
-        fontName='Times-Bold',
+        fontName='LiberationSerif-Bold',
         borderColor=colors.HexColor('#2c5aa0'),
         borderWidth=1,
         borderPadding=2,
@@ -2219,7 +2266,7 @@ def generate_pdf(resume_id: str, data: dict):
         parent=styles['Normal'],
         fontSize=10,
         spaceAfter=8,
-        fontName='Times-Roman'
+        fontName='LiberationSerif'
     )
     
     # Name
@@ -2257,7 +2304,7 @@ def generate_pdf(resume_id: str, data: dict):
             title_text = f"<b>{job.get('title', '')}</b>"
             if job.get("company"):
                 title_text += f" — <b>{job['company']}</b>"
-            story.append(Paragraph(title_text, ParagraphStyle('JobTitle', parent=normal_style, fontSize=10.5, fontName='Times-Bold', spaceAfter=2)))
+            story.append(Paragraph(title_text, ParagraphStyle('JobTitle', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold', spaceAfter=2)))
             
             # Location and dates
             location_parts = []
@@ -2313,7 +2360,7 @@ def generate_pdf(resume_id: str, data: dict):
         story.append(Paragraph("PROJECTS", section_style))
         for project in data["projects"]:
             if isinstance(project, dict):
-                story.append(Paragraph(f"<b>{project.get('name', '')}</b>", ParagraphStyle('ProjectTitle', parent=normal_style, fontSize=10.5, fontName='Times-Bold')))
+                story.append(Paragraph(f"<b>{project.get('name', '')}</b>", ParagraphStyle('ProjectTitle', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold')))
                 if project.get("tech"):
                     story.append(Paragraph(f"<i>{project['tech']}</i>", ParagraphStyle('ProjectTech', parent=normal_style, fontSize=9, textColor=colors.HexColor('#666666'))))
                 if project.get("description"):
@@ -2340,7 +2387,7 @@ def generate_pdf(resume_id: str, data: dict):
             school_text = f"<b>{edu.get('school', '')}</b>"
             if edu.get("location"):
                 school_text += f" — <b>{edu['location']}</b>"
-            story.append(Paragraph(school_text, ParagraphStyle('School', parent=normal_style, fontSize=10.5, fontName='Times-Bold')))
+            story.append(Paragraph(school_text, ParagraphStyle('School', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold')))
             
             degree_parts = []
             if edu.get("degree"): degree_parts.append(edu["degree"])
@@ -2376,7 +2423,7 @@ def generate_pdf(resume_id: str, data: dict):
     
     # References
     story.append(Spacer(1, 16))
-    story.append(Paragraph("*References available upon request*", ParagraphStyle('References', parent=normal_style, alignment=TA_CENTER, fontSize=9, fontName='Times-Italic')))
+    story.append(Paragraph("*References available upon request*", ParagraphStyle('References', parent=normal_style, alignment=TA_CENTER, fontSize=9, fontName='LiberationSerif-Italic')))
     
     doc.build(story)
     return filepath
