@@ -60,6 +60,10 @@ LLM_MODEL = os.environ.get("LLM_MODEL", "minimax-m3.1-flash")
 # other apps, so the site holds at most one of those slots.
 _llm_slot = asyncio.Semaphore(1)
 
+# Ollama Cloud sometimes holds a request ~20 s before answering (2026-11-20: about 1 call
+# in 5); the chat shows its typing indicator meanwhile. Past this, use the template.
+LLM_TIMEOUT = 45.0
+
 # One pooled client for all outbound HTTP (LLM here, O*NET in main.py). A fresh
 # AsyncClient per request rebuilt its TLS context and re-handshook every time
 # (~140 ms vs ~80 ms per round trip in local tests).
@@ -1479,7 +1483,7 @@ Example output:
 User skills: {skills_text}"""
     
     content = await _llm_chat("You are a resume skill organizer. Output valid JSON only.", prompt,
-                              temperature=0.2, max_tokens=3000, timeout=20.0, json_mode=True)
+                              temperature=0.2, max_tokens=3000, timeout=LLM_TIMEOUT, json_mode=True)
     if content:
         try:
             # Remove empty categories
@@ -1521,7 +1525,7 @@ USER INPUTS:
 Write a concise, compelling professional summary that incorporates the keywords and targets the role. Use active voice in resume style: no "I", "my" or "me", and no generic buzzwords such as "proven", "track record", "results-driven" or "seasoned". Return ONLY the summary text, no quotes or explanations."""
 
     summary = await _llm_chat("You are an expert resume writer. Write concise, compelling professional summaries.", prompt,
-                              temperature=0.3, max_tokens=1024, timeout=15.0)
+                              temperature=0.3, max_tokens=1024, timeout=LLM_TIMEOUT)
     # Fallback: concatenate answers
     return summary or f"{q1} {q2} {q3}".strip()
 
