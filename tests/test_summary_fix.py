@@ -25,6 +25,13 @@ async def test_summary_generation():
     
     # Create a mock request
     class MockRequest:
+        # voice_start() reads these for request IDs and structured logs
+        headers = {}
+        query_params = {}
+        method = "POST"
+        client = None
+        url = type("URL", (), {"path": "/api/voice/start"})()
+
         async def json(self):
             return {}
     
