@@ -227,6 +227,8 @@ def _request_id(request: Request) -> str:
 
 def _voice_log(tag: str, request: Request, rid: str, **kwargs):
     """Structured voice API log line. Render dashboard will show these."""
+    if not logger.isEnabledFor(logging.INFO):
+        return
     line = {
         "ts": datetime.utcnow().isoformat() + "Z",
         "tag": tag,
@@ -1947,16 +1949,14 @@ async def voice_start(request: Request):
         "done": False
     }
     voice_sessions[session_id] = session
-    _persist_session(session_id)
-    
+
     # Defensive: ensure all context flags are initialized for new sessions
     ctx = session.get("context", {})
     for flag in ["exp_field_idx", "in_bullet_loop", "bullet_count", "exp_done", "awaiting_more_bullets", "exp_idx", "summary_idx", "opt_idx", "opt_field_idx"]:
         if flag not in ctx:
             ctx[flag] = 0 if "idx" in flag or "count" in flag else False
     session["context"] = ctx
-    _persist_session(session_id)
-    
+
     step = get_current_state(session)
     # Record opening AI question for transcript rehydration
     _opening_label = step.get("context_label", "")
@@ -2135,7 +2135,6 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
                 "done": step.get("done", False),
                 "can_go_back": True,
                 "show_add_job": step.get("show_add_job", False),
-                "data_preview": session.get("data", {})
             }
     # === END UN-DONE RECOVERY ===
     
@@ -2202,7 +2201,6 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
         "done": step.get("done", False),
         "can_go_back": can_go_back,
         "show_add_job": show_add_job,
-        "data_preview": session.get("data", {})
     }
     return response
 
@@ -2360,7 +2358,6 @@ async def voice_load(request: Request):
                 "done": step.get("done", False),
                 "can_go_back": can_go_back,
                 "show_add_job": step.get("show_add_job", False),
-                "data_preview": session.get("data", {})
             }
         
     except Exception as e:
