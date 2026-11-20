@@ -182,7 +182,9 @@ async def static_cache_headers(request: Request, call_next):
 @app.head("/")
 @app.get("/healthz")
 async def health_check():
-    return {"status": "ok", "env": APP_ENV, "llm": bool(LLM_API_KEY)}
+    # "referral_secret" false = referral codes stop working at every restart
+    return {"status": "ok", "env": APP_ENV, "llm": bool(LLM_API_KEY),
+            "referral_secret": bool(os.getenv("REFERRAL_SECRET"))}
 
 # O*NET API Configuration
 ONET_API_KEY = os.getenv("ONET_API_KEY", "AYRvP-2AaMc-2BKqY-4UFda")
