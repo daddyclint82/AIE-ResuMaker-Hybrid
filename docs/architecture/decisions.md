@@ -13,7 +13,7 @@ Conversational resume builder with ADHD-friendly micro-question design. Users an
 └─────────┘    └──────────┘    └─────────┘    └────────┘    └──────────┘    └──────┘
 ```
 
-**Simple:** full_name, email, phone, address, city, state, industry, job_title, experience_level, education_level
+**Simple:** full_name, email, phone, address, city, state, industry, job_title, experience_level, education_level (city and state are read from the address and asked only if it lacks them)
 
 **Experience:** For each job: company → title → dates → location → bullets (loop: "Add another bullet?") → "Add another job?"
 
@@ -200,6 +200,13 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - The summary prompt now rules out "I"/"my" and names the buzzwords to skip: in the model test MiniMax wrote in first person in 1 of 6 summaries and used buzzwords in 2; on the final code, 0 of 6 for both.
 - Model text is NFKC-normalized: the PDF's built-in fonts printed "H₂S" as a black box.
 - `/healthz` reports `"llm": true` once a key is set. Failed calls log `[LLM]` warnings instead of failing silently.
+- Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
+
+### 2026-11-20 — The Address Fills City and State
+
+- The chat asked for the full address and then for city and state again. `city_state_from_address` in `voice_api.py` reads both from the address answer (commas or dictation without them, full state names or codes, ZIP+4, a trailing "USA"); only a part it can't read is asked. Back steps over the skipped questions to the address and clears what it filled.
+- A typed state answer is stored as its code ("illinois" to "IL"): the form's State list uses codes.
+- The review form lost both: `loadVoiceData` ran before `/api/states` had filled the State list, so no state was selected, the City box stayed disabled, and a disabled field is left out of the build. The PDF and preview header had no location. The form now applies the state once the options exist and enables City; its duplicate address parsing is gone.
 - Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
 
 ### 2026-06-23 — Skip Button + Conditional Tech Stack

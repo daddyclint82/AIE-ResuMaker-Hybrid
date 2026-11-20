@@ -36,9 +36,13 @@ def run_questionnaire(fixture: dict) -> dict:
     print(f"Session: {sid}")
 
     errors = []
+    asked = session.get("field", "")
     
     # Process each answer
     for i, step in enumerate(fixture["answers"]):
+        # The chat skips city/state when the address gave them; skip those answers too
+        if step.get("field") in ("city", "state") and asked not in ("address", "city", "state"):
+            continue
         r = requests.post(f"{BASE_URL}/api/voice/turn", json={
             "session_id": sid,
             "action": "answer",
@@ -53,7 +57,7 @@ def run_questionnaire(fixture: dict) -> dict:
             break
         
         # Show key transitions
-        field = resp.get("field", "")
+        field = asked = resp.get("field", "")
         if field in ["summary_q1", "summary_q2", "summary_q3", "summary_q4", "skills"]:
             print(f"  {step['step']}: {field} → OK")
 
