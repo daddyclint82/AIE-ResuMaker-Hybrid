@@ -218,6 +218,14 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - About 225 symbols the Liberation fonts lack (✓ ★ ⇒ ① ❖ ➤ …) still go to the standard Symbol/ZapfDingbats fonts that drew them before. CJK and emoji have no glyph in either and still print as boxes.
 - Guarded by `tests/test_pdf_fonts.py`.
 
+### 2026-11-20 — PDF: User Text Is Escaped Before It Enters reportlab Markup
+
+- `generate_pdf` builds reportlab Paragraph markup with its own `<b>`/`<i>` tags and inserted user values into it raw. "AT&T" and "R&D" printed as "AT&T;" and "R&D;", a literal "&amp;" printed as "&", and text that parsed as a tag made `generate_pdf` raise, so `/api/download/{id}?format=pdf` returned 500.
+- Every user value now goes through `_pdf_text` where it is inserted: NFC, then `xml.sax.saxutils.escape`. The code's tags stay markup. The name is upper-cased first, because "&amp;".upper() is not an entity.
+- NFC moved out of `_pdf_markup`, which runs on the finished markup. There it could fuse a combining mark at the start of a value with the ">" of the tag before it and break the tag. `_pdf_markup` now only sends glyphs the fonts lack to Symbol/ZapfDingbats.
+- The DOCX export writes plain text through python-docx and needs no escaping.
+- Guarded by `tests/test_pdf_markup_escape.py`.
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.
