@@ -15,16 +15,22 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import hashlib
 import json
+import logging
 import os
 import re
+import smtplib
 import httpx
 from datetime import datetime, timedelta
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from typing import Dict, Any
 # python-docx and reportlab are imported inside generate_docx()/generate_pdf():
 # they are only needed at download time and cost ~60 ms of every cold start.
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # Environment detection
 APP_ENV = os.getenv("APP_ENV", "development").lower()
@@ -144,7 +150,8 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
         
         return True
         
-    except Exception as e:
+    except Exception:
+        logger.exception("[Student Email] verification email not sent")
         return False
 
 
