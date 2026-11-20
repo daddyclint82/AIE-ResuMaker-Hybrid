@@ -34,7 +34,7 @@ def test_text_outside_cp1252_comes_from_the_embedded_fonts():
 
 
 def test_accents_typed_as_combining_marks_are_composed():
-    assert main._pdf_markup("Nguyễn", main._register_pdf_fonts()) == "Nguyễn"
+    assert main._pdf_text("Nguyễn") == "Nguyễn"
 
 
 def test_characters_the_fonts_lack_keep_their_old_glyphs():

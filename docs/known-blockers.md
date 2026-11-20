@@ -9,6 +9,8 @@ None at the moment. The project runs locally and on Render with `/healthz` retur
 - **`tests/run_questionnaire.py` fixtures are out of sync.**
   A `skills_review` panel now sits between the skills question and optional sections.
   Fixtures need to send a "done" action (or click equivalent) to exit skills review before optional sections will advance correctly.
+- **`tests/test_voice_browser.py` is out of date.**
+  It calls `/api/voice/preview`, which no longer exists. It also expects DOCX/PDF files on disk right after preview (they are now rendered on first download) and a 200 from `/api/download` before payment (now 402).
 
 ## Known Issues / Risks
 

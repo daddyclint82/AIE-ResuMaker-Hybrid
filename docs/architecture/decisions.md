@@ -83,6 +83,14 @@ Legal acceptance is enforced before the chat flow begins. `/terms` carries a `re
 - Pricing tiers: $9.99 regular, $4.99 referral/student.
 - Referral system: real backend tracking for $4.99 discount with "Give $5, Get $5" messaging.
 
+### Resume Access & Payment
+
+- A resume ID is the only key to a resume, so it is random: `secrets.token_urlsafe(16)`, 128 bits. `get_resume()` rejects anything not in that format before it touches storage.
+- `/api/preview-timer` and `/api/check-payment` need only the ID. Only the browser that built the resume, which already received the full preview from `/api/build`, and Stripe ever hold it.
+- `/api/download` serves paid resumes only (402 otherwise). `/success` and the Stripe webhook record the payment for the resume stored in the checkout session's metadata. The webhook needs `STRIPE_WEBHOOK_SECRET` (503 without it).
+- Stripe 15 objects have no dict `.get()`, so these routes call `.to_dict()` first.
+- Guarded by `tests/test_resume_access.py` (no server, no network).
+
 ### Resume Themes
 
 - Professional, Modern, Minimal with distinct CSS.
@@ -219,6 +227,14 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - About 225 symbols the Liberation fonts lack (✓ ★ ⇒ ① ❖ ➤ …) still go to the standard Symbol/ZapfDingbats fonts that drew them before. CJK and emoji have no glyph in either and still print as boxes.
 - A character neither has prints as its NFKC form when Liberation has that. The non-breaking hyphen (U+2011) that GPT-style models and ChatGPT put in words like "high-performance" printed as a black box; it now prints as a hyphen, and ℃ as °C. The folded text is XML-escaped, so fullwidth ＜ and ＆ stay text instead of becoming Paragraph markup.
 - Guarded by `tests/test_pdf_fonts.py`.
+
+### 2026-11-20 — PDF: User Text Is Escaped Before It Enters reportlab Markup
+
+- `generate_pdf` builds reportlab Paragraph markup with its own `<b>`/`<i>` tags and inserted user values into it raw. "AT&T" and "R&D" printed as "AT&T;" and "R&D;", a literal "&amp;" printed as "&", and text that parsed as a tag made `generate_pdf` raise, so `/api/download/{id}?format=pdf` returned 500.
+- Every user value now goes through `_pdf_text` where it is inserted: NFC, then `xml.sax.saxutils.escape`. The code's tags stay markup. The name is upper-cased first, because "&amp;".upper() is not an entity.
+- NFC moved out of `_pdf_markup`, which runs on the finished markup. There it could fuse a combining mark at the start of a value with the ">" of the tag before it and break the tag. `_pdf_markup` now only sends glyphs the fonts lack to Symbol/ZapfDingbats.
+- The DOCX export writes plain text through python-docx and needs no escaping.
+- Guarded by `tests/test_pdf_markup_escape.py`.
 
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 

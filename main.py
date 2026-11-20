@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import functools
 import hashlib
+from html import escape
 import json
 import logging
 import os
@@ -25,9 +26,9 @@ import httpx
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from xml.sax.saxutils import escape
 
 from typing import Dict, Any
+from xml.sax.saxutils import escape as xml_escape
 # python-docx and reportlab are imported inside generate_docx()/generate_pdf():
 # they are only needed at download time and cost ~60 ms of every cold start.
 
@@ -373,6 +374,15 @@ import secrets
 # In-memory storage for demo (use Redis/DB in production)
 resumes = {}
 
+# A resume ID is the only key to a resume: whoever holds it can preview it, pay
+# for it and, once paid, download it. So it is 128 random bits, never derived
+# from the resume's contents.
+_RESUME_ID_RE = re.compile(r"[A-Za-z0-9_-]{22}")
+
+
+def new_resume_id() -> str:
+    return secrets.token_urlsafe(16)  # 22 chars, matches _RESUME_ID_RE
+
 def save_resume_json(resume_id: str, data: dict):
     """Persist resume data to disk as JSON sidecar so it survives restarts."""
     try:
@@ -395,6 +405,9 @@ def load_resume_from_disk(resume_id: str) -> dict | None:
 
 def get_resume(resume_id: str) -> dict | None:
     """Get resume data from memory, falling back to disk."""
+    # Only IDs we issue get anywhere near a file path.
+    if not isinstance(resume_id, str) or not _RESUME_ID_RE.fullmatch(resume_id):
+        return None
     if resume_id in resumes:
         return resumes[resume_id]
     # Disk fallback
@@ -403,6 +416,13 @@ def get_resume(resume_id: str) -> dict | None:
         resumes[resume_id] = data  # restore to memory
         return data
     return None
+
+def mark_resume_paid(resume_id: str) -> None:
+    """Record a payment Stripe has confirmed (from /success or the webhook)."""
+    resume = get_resume(resume_id)
+    if resume:
+        resume["paid"] = True
+        save_resume_json(resume_id, resume)
 
 # Student verification tokens: {token: {email: str, verified: bool, expires: datetime}}
 student_verifications = {}
@@ -531,18 +551,18 @@ async def verify_student_token(request: Request, token: str = ""):
         return HTMLResponse(f"""
         <html><body style="font-family: Arial; text-align: center; padding: 50px; background: #f0fdf4;">
             <h2 style="color: #16a34a;">✅ Student Status Verified!</h2>
-            <p>Your .edu email <strong>{verification["email"]}</strong> has been verified.</p>
+            <p>Your .edu email <strong>{escape(verification["email"])}</strong> has been verified.</p>
             <p>You can now close this tab and return to AIE ResuMaker to complete your student purchase.</p>
             <br>
             <a href="/build" style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">Return to AIE ResuMaker</a>
         </body></html>
         """)
 
-    except Exception as e:
-        return HTMLResponse(f"""
+    except Exception:
+        return HTMLResponse("""
         <html><body style="font-family: Arial; text-align: center; padding: 50px;">
             <h2 style="color: #dc2626;">❌ Error</h2>
-            <p>{str(e)}</p>
+            <p>We couldn't verify this link. Please request a new one.</p>
         </body></html>
         """)
 
@@ -657,7 +677,7 @@ async def build_page(request: Request):
         return templates.TemplateResponse(request=request, name="voice_chat.html")
     elif mode == "form":
         return templates.TemplateResponse(request=request, name="index.html", context={
-            "voice_data": json.dumps(voice_data) if voice_data else "null",
+            "voice_data": voice_data,
             "session_id": voice_session
         })
     
@@ -669,7 +689,7 @@ async def build_page(request: Request):
         return templates.TemplateResponse(request=request, name="voice_chat.html")
     else:
         ctx = {
-            "voice_data": json.dumps(voice_data) if voice_data else "null",
+            "voice_data": voice_data,
             "session_id": voice_session
         }
         return templates.TemplateResponse(request=request, name="index.html", context=ctx)
@@ -867,7 +887,7 @@ async def build_resume(
         "created_at": datetime.now().isoformat()
     }
     
-    resume_id = f"{full_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    resume_id = new_resume_id()
     resumes[resume_id] = resume_data
     save_resume_json(resume_id, resume_data)
     # DOCX/PDF are rendered on first download (see download_resume), not on
@@ -1292,9 +1312,25 @@ def generate_docx(resume_id: str, data: dict):
     
     return filepath
 
+def _escape_tree(value):
+    """A copy of value with every string in it, dict keys included, HTML-escaped."""
+    if isinstance(value, str):
+        return escape(value)
+    if isinstance(value, dict):
+        return {_escape_tree(k): _escape_tree(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_escape_tree(v) for v in value]
+    return value
+
+
 def generate_preview_html(data: dict, template_style: str = "professional"):
     """Generate HTML preview of resume based on template style"""
-    
+    # Every field is the user's own text: escape it all once, here, so none of
+    # the f-strings below can emit it as markup. The stored resume is untouched.
+    data = _escape_tree(data)
+    if template_style not in ("modern", "minimal"):
+        template_style = "professional"
+
     # Build contact line
     contact_parts = []
     if data.get("location"): contact_parts.append(data["location"])
@@ -1802,20 +1838,24 @@ def _get_minimal_css():
 
 @app.get("/api/download/{resume_id}")
 def download_resume(resume_id: str, format: str = "docx"):
-    """Download the resume as .docx (default) or .pdf (?format=pdf).
+    """Download a paid resume as .docx (default) or .pdf (?format=pdf).
 
     The file is rendered on first request from the stored resume data, so
     preview builds don't pay for documents nobody downloads. Sync def: FastAPI
     runs it in the threadpool, keeping CPU-bound rendering off the event loop.
     """
+    data = get_resume(resume_id)
+    if not data:
+        return JSONResponse({"error": "Resume not found"}, status_code=404)
+    if not data.get("paid"):
+        return JSONResponse({"error": "Payment required"}, status_code=402)
     ext = "pdf" if format == "pdf" else "docx"
     filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.{ext}")
     if not os.path.exists(filepath):
-        data = get_resume(resume_id)
-        if not data:
-            return JSONResponse({"error": "Resume not found"}, status_code=404)
         (generate_pdf if ext == "pdf" else generate_docx)(resume_id, data)
-    return FileResponse(filepath, filename=f"resume_{resume_id}.{ext}")
+    # Name the file after the person: the ID is a key and shouldn't travel with it.
+    name = re.sub(r"\W+", "_", data.get("full_name", "").lower()).strip("_")
+    return FileResponse(filepath, filename=f"resume_{name}.{ext}" if name else f"resume.{ext}")
 
 @app.get("/api/companies/search")
 async def search_companies(query: str = ""):
@@ -1984,7 +2024,10 @@ async def create_checkout_session(request: Request):
         
         if not resume_id:
             return JSONResponse({"error": "Resume ID required"}, status_code=400)
-        
+        # Don't take payment for a resume we can't deliver.
+        if not get_resume(resume_id):
+            return JSONResponse({"error": "Resume not found. Please build your resume again."}, status_code=404)
+
         # Verify student status if requesting student price
         if tier == "student":
             verified = False
@@ -2017,8 +2060,10 @@ async def create_checkout_session(request: Request):
                 "quantity": 1,
             }],
             mode="payment",
-            success_url=f"{BASE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}&resume_id={resume_id}",
-            cancel_url=f"{BASE_URL}/cancel?resume_id={resume_id}",
+            # /success reads the resume from this session's metadata, so the ID
+            # stays out of both redirect URLs.
+            success_url=f"{BASE_URL}/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{BASE_URL}/cancel",
             metadata={
                 "resume_id": resume_id,
                 "tier": tier,
@@ -2032,22 +2077,21 @@ async def create_checkout_session(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/success")
-async def payment_success(request: Request, session_id: str = "", resume_id: str = "", ref: str = ""):
+async def payment_success(request: Request, session_id: str = "", ref: str = ""):
     """Handle successful payment - show download page"""
     try:
-        # Verify payment with Stripe
-        session = stripe.checkout.Session.retrieve(session_id)
-        
-        if session.payment_status == "paid":
-            # Payment confirmed - mark resume as premium
-            resume = get_resume(resume_id)
-            if resume:
-                resume["paid"] = True
-                resumes[resume_id] = resume
-                save_resume_json(resume_id, resume)
-            
+        # Verify payment with Stripe. to_dict(): Stripe objects have no .get().
+        session = stripe.checkout.Session.retrieve(session_id).to_dict()
+
+        if session.get("payment_status") == "paid":
+            # A paid session unlocks the resume it was created for, which
+            # create_checkout_session recorded in its metadata.
+            metadata = session.get("metadata") or {}
+            resume_id = metadata.get("resume_id", "")
+            mark_resume_paid(resume_id)
+
             # Track referral conversion
-            ref_code = ref or session.get("metadata", {}).get("referral_code", "")
+            ref_code = ref or metadata.get("referral_code", "")
             if ref_code and ref_code in referral_codes:
                 referral_codes[ref_code]["conversions"] += 1
                 referral_codes[ref_code]["reward_unlocked"] = True
@@ -2062,9 +2106,10 @@ async def payment_success(request: Request, session_id: str = "", resume_id: str
             )
         else:
             return HTMLResponse("Payment not completed. Please try again.")
-    
-    except Exception as e:
-        return HTMLResponse(f"Error verifying payment: {str(e)}")
+
+    except Exception:
+        # Don't echo the error: Stripe's messages repeat the session_id from the URL.
+        return HTMLResponse("Error verifying payment. Please try again.")
 
 @app.get("/cancel")
 async def payment_cancel(request: Request, resume_id: str = ""):
@@ -2077,31 +2122,23 @@ async def payment_cancel(request: Request, resume_id: str = ""):
 
 @app.post("/api/webhook")
 async def stripe_webhook(request: Request):
-    """Handle Stripe webhook events"""
+    """Handle Stripe webhook events. Only events signed with STRIPE_WEBHOOK_SECRET count."""
+    if not STRIPE_WEBHOOK_SECRET:
+        return JSONResponse({"error": "Webhook signing secret not configured"}, status_code=503)
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature", "")
-    webhook_secret = STRIPE_WEBHOOK_SECRET
-    
+
     try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
-        else:
-            # For testing without webhook secret
-            event = json.loads(payload)
-        
+        # Raises on a bad signature. to_dict(): Stripe objects have no .get().
+        event = stripe.Webhook.construct_event(payload, sig_header, STRIPE_WEBHOOK_SECRET).to_dict()
+
         # Handle successful payment
         if event.get("type") == "checkout.session.completed":
             session = event["data"]["object"]
-            resume_id = session.get("metadata", {}).get("resume_id", "")
-            ref_code = session.get("metadata", {}).get("referral_code", "")
-            
-            if resume_id:
-                resume = get_resume(resume_id)
-                if resume:
-                    resume["paid"] = True
-                    resumes[resume_id] = resume
-                    save_resume_json(resume_id, resume)
-            
+            metadata = session.get("metadata") or {}
+            mark_resume_paid(metadata.get("resume_id", ""))
+            ref_code = metadata.get("referral_code", "")
+
             # Track referral conversion from webhook
             if ref_code and ref_code in referral_codes:
                 referral_codes[ref_code]["conversions"] += 1
@@ -2206,22 +2243,30 @@ def _standard_fonts_draw(c: str) -> bool:
     return False
 
 
+def _pdf_text(value) -> str:
+    """Make a user-entered value safe to insert into Paragraph markup. NFC-compose
+    accents typed as combining marks (reportlab can't position them: "Nguyê" +
+    U+0303 + "n" put the tilde on the n), then escape & < > so the value prints as
+    typed. Both happen per value: NFC over finished markup fused a value's leading
+    U+0338 with the ">" of the tag before it."""
+    return xml_escape(unicodedata.normalize("NFC", str(value)))
+
+
 def _pdf_markup(text: str, covered: frozenset) -> str:
-    """NFC-compose accents typed as combining marks (reportlab can't position
-    them: "Nguyê" + U+0303 + "n" put the tilde on the n), then send the few
-    characters the fonts lack (✓ ★ ⇒ ❖ ...) to reportlab's standard fonts,
-    which draw them from Symbol/ZapfDingbats as before. A character those lack
-    too prints as its NFKC form when the fonts have that: the non-breaking
-    hyphen (U+2011) models and ChatGPT put in "high-performance" was a black box."""
+    """Send the few characters the fonts lack (✓ ★ ⇒ ❖ ...) to reportlab's
+    standard fonts, which draw them from Symbol/ZapfDingbats as before. A character
+    those lack too prints as its NFKC form when the fonts have that: the non-breaking
+    hyphen (U+2011) models and ChatGPT put in "high-performance" was a black box.
+    It only touches non-ASCII characters, so the entities _pdf_text writes pass through."""
     def markup(c):
         if c.isascii() or ord(c) in covered:
             return c
         plain = unicodedata.normalize("NFKC", c)
         if not _standard_fonts_draw(c) and all(p.isascii() or ord(p) in covered for p in plain):
-            return escape(plain)  # fullwidth ＜ and ＆ fold to markup characters
+            return xml_escape(plain)  # fullwidth ＜ and ＆ fold to markup characters
         return f'<font name="Times-Roman">{c}</font>'
 
-    return "".join(map(markup, unicodedata.normalize("NFC", text)))
+    return "".join(map(markup, text))
 
 
 def generate_pdf(resume_id: str, data: dict):
@@ -2236,7 +2281,9 @@ def generate_pdf(resume_id: str, data: dict):
 
     covered = _register_pdf_fonts()
 
-    def Paragraph(text, style):  # every Paragraph below goes through _pdf_markup
+    # Every Paragraph below goes through _pdf_markup, and every user value
+    # through _pdf_text where it is inserted into the markup.
+    def Paragraph(text, style):
         return _Paragraph(_pdf_markup(text, covered), style)
 
     output_dir = RESUME_STORAGE_DIR
@@ -2295,14 +2342,10 @@ def generate_pdf(resume_id: str, data: dict):
     )
     
     # Name
-    story.append(Paragraph(data['full_name'].upper(), name_style))
+    story.append(Paragraph(_pdf_text(data['full_name'].upper()), name_style))
     
     # Contact info
-    contact_parts = []
-    if data.get("location"): contact_parts.append(data["location"])
-    if data.get("phone"): contact_parts.append(data["phone"])
-    if data.get("email"): contact_parts.append(data["email"])
-    if data.get("linkedin"): contact_parts.append(data["linkedin"])
+    contact_parts = [_pdf_text(data[k]) for k in ("location", "phone", "email", "linkedin") if data.get(k)]
     
     if contact_parts:
         story.append(Paragraph(" | ".join(contact_parts), contact_style))
@@ -2313,12 +2356,12 @@ def generate_pdf(resume_id: str, data: dict):
     # Professional Summary
     if data.get("summary"):
         story.append(Paragraph("PROFESSIONAL SUMMARY", section_style))
-        story.append(Paragraph(data["summary"], normal_style))
+        story.append(Paragraph(_pdf_text(data["summary"]), normal_style))
     
     # Technical Skills
     if data.get("skills"):
         story.append(Paragraph("TECHNICAL SKILLS", section_style))
-        skills_text = ", ".join(data["skills"]) if isinstance(data["skills"], list) else str(data["skills"])
+        skills_text = ", ".join(map(_pdf_text, data["skills"])) if isinstance(data["skills"], list) else _pdf_text(data["skills"])
         story.append(Paragraph(skills_text, normal_style))
     
     # Professional Experience
@@ -2326,21 +2369,21 @@ def generate_pdf(resume_id: str, data: dict):
         story.append(Paragraph("PROFESSIONAL EXPERIENCE", section_style))
         for job in data["experience"]:
             # Job title and company
-            title_text = f"<b>{job.get('title', '')}</b>"
+            title_text = f"<b>{_pdf_text(job.get('title', ''))}</b>"
             if job.get("company"):
-                title_text += f" — <b>{job['company']}</b>"
+                title_text += f" — <b>{_pdf_text(job['company'])}</b>"
             story.append(Paragraph(title_text, ParagraphStyle('JobTitle', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold', spaceAfter=2)))
             
             # Location and dates
             location_parts = []
-            if job.get("city"): location_parts.append(job["city"])
-            if job.get("state"): location_parts.append(job["state"])
+            if job.get("city"): location_parts.append(_pdf_text(job["city"]))
+            if job.get("state"): location_parts.append(_pdf_text(job["state"]))
             location_str = ", ".join(location_parts)
             
             loc_date_parts = []
             if location_str: loc_date_parts.append(f"<i>{location_str}</i>")
-            if job.get("dates"): loc_date_parts.append(f"<i>{job['dates']}</i>")
-            if job.get("phone"): loc_date_parts.append(f"<i>{job['phone']}</i>")
+            if job.get("dates"): loc_date_parts.append(f"<i>{_pdf_text(job['dates'])}</i>")
+            if job.get("phone"): loc_date_parts.append(f"<i>{_pdf_text(job['phone'])}</i>")
             
             if loc_date_parts:
                 story.append(Paragraph("  |  ".join(loc_date_parts), ParagraphStyle('JobMeta', parent=normal_style, fontSize=9.5, textColor=colors.HexColor('#666666'))))
@@ -2357,7 +2400,7 @@ def generate_pdf(resume_id: str, data: dict):
                         clean_bullet = bullet.strip()
                         if clean_bullet.startswith('•') or clean_bullet.startswith('-'):
                             clean_bullet = clean_bullet[1:].strip()
-                        story.append(Paragraph(f"• {clean_bullet}", bullet_style))
+                        story.append(Paragraph(f"• {_pdf_text(clean_bullet)}", bullet_style))
             elif description and isinstance(description, list):
                 # Render description list as bullets
                 bullet_style = ParagraphStyle('JobBullet', parent=normal_style, leftIndent=14, spaceAfter=2, bulletIndent=4)
@@ -2366,7 +2409,7 @@ def generate_pdf(resume_id: str, data: dict):
                         clean_item = item.strip()
                         if clean_item.startswith('•') or clean_item.startswith('-'):
                             clean_item = clean_item[1:].strip()
-                        story.append(Paragraph(f"• {clean_item}", bullet_style))
+                        story.append(Paragraph(f"• {_pdf_text(clean_item)}", bullet_style))
             elif description and isinstance(description, str):
                 if '\n' in description or '\r' in description:
                     # Multi-line description - render as bullets
@@ -2376,22 +2419,22 @@ def generate_pdf(resume_id: str, data: dict):
                         clean_line = line.strip()
                         if clean_line.startswith('•') or clean_line.startswith('-'):
                             clean_line = clean_line[1:].strip()
-                        story.append(Paragraph(f"• {clean_line}", bullet_style))
+                        story.append(Paragraph(f"• {_pdf_text(clean_line)}", bullet_style))
                 else:
-                    story.append(Paragraph(description, ParagraphStyle('JobDesc', parent=normal_style, leftIndent=14)))
+                    story.append(Paragraph(_pdf_text(description), ParagraphStyle('JobDesc', parent=normal_style, leftIndent=14)))
     
     # Projects
     if data.get("projects"):
         story.append(Paragraph("PROJECTS", section_style))
         for project in data["projects"]:
             if isinstance(project, dict):
-                story.append(Paragraph(f"<b>{project.get('name', '')}</b>", ParagraphStyle('ProjectTitle', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold')))
+                story.append(Paragraph(f"<b>{_pdf_text(project.get('name', ''))}</b>", ParagraphStyle('ProjectTitle', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold')))
                 if project.get("tech"):
-                    story.append(Paragraph(f"<i>{project['tech']}</i>", ParagraphStyle('ProjectTech', parent=normal_style, fontSize=9, textColor=colors.HexColor('#666666'))))
+                    story.append(Paragraph(f"<i>{_pdf_text(project['tech'])}</i>", ParagraphStyle('ProjectTech', parent=normal_style, fontSize=9, textColor=colors.HexColor('#666666'))))
                 if project.get("description"):
-                    story.append(Paragraph(project["description"], normal_style))
+                    story.append(Paragraph(_pdf_text(project["description"]), normal_style))
                 if project.get("result"):
-                    story.append(Paragraph(f"<i>{project['result']}</i>", ParagraphStyle('ProjectResult', parent=normal_style, fontSize=9.5, textColor=colors.HexColor('#2c5aa0'))))
+                    story.append(Paragraph(f"<i>{_pdf_text(project['result'])}</i>", ParagraphStyle('ProjectResult', parent=normal_style, fontSize=9.5, textColor=colors.HexColor('#2c5aa0'))))
     
     # Notable Competencies
     if data.get("competencies"):
@@ -2401,37 +2444,37 @@ def generate_pdf(resume_id: str, data: dict):
                 label = comp.get('label', '') or comp.get('name', '')
                 desc = comp.get('description', '')
                 if label and desc:
-                    story.append(Paragraph(f"<b>{label}:</b> {desc}", normal_style))
+                    story.append(Paragraph(f"<b>{_pdf_text(label)}:</b> {_pdf_text(desc)}", normal_style))
                 elif label:
-                    story.append(Paragraph(f"<b>{label}</b>", normal_style))
+                    story.append(Paragraph(f"<b>{_pdf_text(label)}</b>", normal_style))
     
     # Education
     if data.get("education"):
         story.append(Paragraph("EDUCATION", section_style))
         for edu in data["education"]:
-            school_text = f"<b>{edu.get('school', '')}</b>"
+            school_text = f"<b>{_pdf_text(edu.get('school', ''))}</b>"
             if edu.get("location"):
-                school_text += f" — <b>{edu['location']}</b>"
+                school_text += f" — <b>{_pdf_text(edu['location'])}</b>"
             story.append(Paragraph(school_text, ParagraphStyle('School', parent=normal_style, fontSize=10.5, fontName='LiberationSerif-Bold')))
             
             degree_parts = []
-            if edu.get("degree"): degree_parts.append(edu["degree"])
-            if edu.get("field"): degree_parts.append(edu["field"])
-            if edu.get("dates"): degree_parts.append(edu["dates"])
+            if edu.get("degree"): degree_parts.append(_pdf_text(edu["degree"]))
+            if edu.get("field"): degree_parts.append(_pdf_text(edu["field"]))
+            if edu.get("dates"): degree_parts.append(_pdf_text(edu["dates"]))
             if degree_parts:
                 story.append(Paragraph(f"<i>{', '.join(degree_parts)}</i>", ParagraphStyle('Degree', parent=normal_style, fontSize=9.5, textColor=colors.HexColor('#666666'))))
             
             if edu.get("honors"):
-                story.append(Paragraph(edu["honors"], ParagraphStyle('Honors', parent=normal_style, fontSize=9, textColor=colors.HexColor('#666666'))))
+                story.append(Paragraph(_pdf_text(edu["honors"]), ParagraphStyle('Honors', parent=normal_style, fontSize=9, textColor=colors.HexColor('#666666'))))
     
     # Community Involvement
     if data.get("community"):
         story.append(Paragraph("COMMUNITY INVOLVEMENT", section_style))
         for item in data["community"]:
             if isinstance(item, dict):
-                text = item.get("event", "")
+                text = _pdf_text(item.get("event", ""))
                 if item.get("organization"):
-                    text += f" | {item['organization']}"
+                    text += f" | {_pdf_text(item['organization'])}"
                 story.append(Paragraph(text, normal_style))
     
     # Certifications
@@ -2439,11 +2482,11 @@ def generate_pdf(resume_id: str, data: dict):
         story.append(Paragraph("CERTIFICATIONS", section_style))
         for cert in data["certifications"]:
             if isinstance(cert, dict):
-                text = cert.get("name", "")
+                text = _pdf_text(cert.get("name", ""))
                 if cert.get("organization"):
-                    text += f" — {cert['organization']}"
+                    text += f" — {_pdf_text(cert['organization'])}"
                 if cert.get("date"):
-                    text += f", {cert['date']}"
+                    text += f", {_pdf_text(cert['date'])}"
                 story.append(Paragraph(text, normal_style))
     
     # References
