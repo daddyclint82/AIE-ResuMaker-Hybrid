@@ -973,8 +973,8 @@ function handleSkillPaste(e) {
 function renderSkills() {
     skillsTags.innerHTML = skills.map(skill => `
         <span class="tag">
-            ${skill}
-            <span class="remove-tag" onclick="removeSkill('${skill}')">×</span>
+            ${escapeHtml(skill)}
+            <span class="remove-tag" data-skill="${escapeHtml(skill)}" onclick="removeSkill(this.dataset.skill)">×</span>
         </span>
     `).join('');
     skillsHidden.value = skills.join('|');
@@ -996,11 +996,11 @@ function addExperienceField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>Job Title</label>
-            <input type="text" name="exp_title[]" placeholder="Software Engineer" value="${data.title || ''}" autocapitalize="words" class="capitalize-first">
+            <input type="text" name="exp_title[]" placeholder="Software Engineer" value="${escapeHtml(data.title || '')}" autocapitalize="words" class="capitalize-first">
         </div>
         <div class="field-row">
             <label>Company</label>
-            <input type="text" name="exp_company[]" class="company-input" placeholder="Type to search companies..." autocomplete="off" value="${data.company || ''}">
+            <input type="text" name="exp_company[]" class="company-input" placeholder="Type to search companies..." autocomplete="off" value="${escapeHtml(data.company || '')}">
             <div class="company-suggestions suggestions"></div>
         </div>
         <div class="field-row">
@@ -1011,24 +1011,24 @@ function addExperienceField(data = {}) {
         </div>
         <div class="field-row">
             <label>City</label>
-            <input type="text" name="exp_city[]" class="city-input" placeholder="Select a state first" autocomplete="off" disabled value="${data.city || ''}">
+            <input type="text" name="exp_city[]" class="city-input" placeholder="Select a state first" autocomplete="off" disabled value="${escapeHtml(data.city || '')}">
             <div class="city-suggestions suggestions"></div>
         </div>
         <div class="field-row">
             <label>Dates</label>
-            <input type="text" name="exp_dates[]" placeholder="Jan 2020 - Present" value="${data.dates || ''}">
+            <input type="text" name="exp_dates[]" placeholder="Jan 2020 - Present" value="${escapeHtml(data.dates || '')}">
         </div>
         <div class="field-row optional-field">
             <label>Job Phone <span class="optional-tag">(optional)</span></label>
-            <input type="tel" name="exp_phone[]" placeholder="(555) 123-4567" value="${data.phone || ''}">
+            <input type="tel" name="exp_phone[]" placeholder="(555) 123-4567" value="${escapeHtml(data.phone || '')}">
         </div>
         <div class="field-row optional-field">
             <label>Job Address <span class="optional-tag">(optional)</span></label>
-            <input type="text" name="exp_address[]" placeholder="123 Main St, City, ST 12345" value="${data.address || ''}">
+            <input type="text" name="exp_address[]" placeholder="123 Main St, City, ST 12345" value="${escapeHtml(data.address || '')}">
         </div>
         <div class="field-row">
             <label>Description</label>
-            <textarea name="exp_description[]" rows="4" placeholder="Describe your responsibilities and achievements...">${data.description || ''}</textarea>
+            <textarea name="exp_description[]" rows="4" placeholder="Describe your responsibilities and achievements...">${escapeHtml(data.description || '')}</textarea>
         </div>
     `;
     container.appendChild(entry);
@@ -1067,7 +1067,7 @@ function addEducationField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>School / University</label>
-            <input type="text" name="edu_school[]" class="uni-input" placeholder="Type to search universities..." autocomplete="off" value="${data.school || ''}">
+            <input type="text" name="edu_school[]" class="uni-input" placeholder="Type to search universities..." autocomplete="off" value="${escapeHtml(data.school || '')}">
             <div class="uni-suggestions suggestions"></div>
         </div>
         <div class="field-row">
@@ -1078,12 +1078,12 @@ function addEducationField(data = {}) {
         </div>
         <div class="field-row">
             <label>Field of Study</label>
-            <input type="text" name="edu_field[]" class="field-input" placeholder="Type to search fields..." autocomplete="off" value="${data.field || ''}">
+            <input type="text" name="edu_field[]" class="field-input" placeholder="Type to search fields..." autocomplete="off" value="${escapeHtml(data.field || '')}">
             <div class="field-suggestions suggestions"></div>
         </div>
         <div class="field-row">
             <label>Graduation Date</label>
-            <input type="text" name="edu_dates[]" placeholder="May 2020" value="${data.dates || ''}">
+            <input type="text" name="edu_dates[]" placeholder="May 2020" value="${escapeHtml(data.dates || '')}">
         </div>
     `;
     container.appendChild(entry);
@@ -1112,15 +1112,15 @@ function addCertificationField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>Certification Name</label>
-            <input type="text" name="cert_name[]" placeholder="AWS Certified Solutions Architect" value="${data.name || ''}">
+            <input type="text" name="cert_name[]" placeholder="AWS Certified Solutions Architect" value="${escapeHtml(data.name || '')}">
         </div>
         <div class="field-row">
             <label>Issuing Organization</label>
-            <input type="text" name="cert_org[]" placeholder="Amazon Web Services" value="${data.org || ''}">
+            <input type="text" name="cert_org[]" placeholder="Amazon Web Services" value="${escapeHtml(data.org || '')}">
         </div>
         <div class="field-row">
             <label>Date Obtained</label>
-            <input type="text" name="cert_date[]" placeholder="June 2023" value="${data.date || ''}">
+            <input type="text" name="cert_date[]" placeholder="June 2023" value="${escapeHtml(data.date || '')}">
         </div>
     `;
     container.appendChild(entry);
@@ -1137,19 +1137,19 @@ function addProjectField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>Project Name</label>
-            <input type="text" name="proj_name[]" placeholder="AI Orchestration Platform" value="${data.name || ''}">
+            <input type="text" name="proj_name[]" placeholder="AI Orchestration Platform" value="${escapeHtml(data.name || '')}">
         </div>
         <div class="field-row">
             <label>Tech Stack (comma-separated)</label>
-            <input type="text" name="proj_tech[]" placeholder="Python, Flask, OpenAI API" value="${data.tech || ''}">
+            <input type="text" name="proj_tech[]" placeholder="Python, Flask, OpenAI API" value="${escapeHtml(data.tech || '')}">
         </div>
         <div class="field-row">
             <label>Description / Bullet Points</label>
-            <textarea name="proj_description[]" rows="3" placeholder="Describe the project and your contributions...">${data.description || ''}</textarea>
+            <textarea name="proj_description[]" rows="3" placeholder="Describe the project and your contributions...">${escapeHtml(data.description || '')}</textarea>
         </div>
         <div class="field-row">
             <label>Result / Outcome (optional)</label>
-            <input type="text" name="proj_result[]" placeholder="Reduced processing time by 40%" value="${data.result || ''}">
+            <input type="text" name="proj_result[]" placeholder="Reduced processing time by 40%" value="${escapeHtml(data.result || '')}">
         </div>
     `;
     container.appendChild(entry);
@@ -1166,11 +1166,11 @@ function addCompetencyField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>Competency Label</label>
-            <input type="text" name="comp_label[]" placeholder="Operational Leadership" value="${data.label || ''}">
+            <input type="text" name="comp_label[]" placeholder="Operational Leadership" value="${escapeHtml(data.label || '')}">
         </div>
         <div class="field-row">
             <label>Description</label>
-            <input type="text" name="comp_desc[]" placeholder="15+ years managing complex field operations and retail teams" value="${data.description || ''}">
+            <input type="text" name="comp_desc[]" placeholder="15+ years managing complex field operations and retail teams" value="${escapeHtml(data.description || '')}">
         </div>
     `;
     container.appendChild(entry);
@@ -1187,11 +1187,11 @@ function addCommunityField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>Event / Activity</label>
-            <input type="text" name="comm_event[]" placeholder="Nacogdoches 1st Annual Jaycees Mud Run" value="${data.event || ''}">
+            <input type="text" name="comm_event[]" placeholder="Nacogdoches 1st Annual Jaycees Mud Run" value="${escapeHtml(data.event || '')}">
         </div>
         <div class="field-row">
             <label>Organization (optional)</label>
-            <input type="text" name="comm_org[]" placeholder="Nacogdoches Jaycees" value="${data.organization || ''}">
+            <input type="text" name="comm_org[]" placeholder="Nacogdoches Jaycees" value="${escapeHtml(data.organization || '')}">
         </div>
     `;
     container.appendChild(entry);
@@ -1517,7 +1517,7 @@ async function degradePreview(resumeId) {
             
             // Use watermarked image if available, otherwise fall back to watermarked HTML
             const previewContent = result.watermarked_image 
-                ? `<img src="${result.watermarked_image}" 
+                ? `<img src="${escapeHtml(result.watermarked_image)}" 
                      style="max-width:100%;border:1px solid #ccc;" 
                      oncontextmenu="return false;" 
                      draggable="false">`
@@ -1861,7 +1861,7 @@ function showStudentVerificationModal(email) {
             <p style="margin-bottom: 20px; color: #666;">Share your link with a friend and you both save $5!</p>
             
             <div id="verification-step-1">
-                <p style="font-size: 14px; margin-bottom: 15px;">We'll send a code to:<br><strong>${email}</strong></p>
+                <p style="font-size: 14px; margin-bottom: 15px;">We'll send a code to:<br><strong>${escapeHtml(email)}</strong></p>
                 <button id="send-code-btn" style="background: #3b82f6; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%;">
                     Send Verification Code
                 </button>
@@ -1871,7 +1871,7 @@ function showStudentVerificationModal(email) {
             </div>
             
             <div id="verification-step-2" style="display: none;">
-                <p style="font-size: 14px; margin-bottom: 15px;">Enter the 6-digit code sent to <strong>${email}</strong></p>
+                <p style="font-size: 14px; margin-bottom: 15px;">Enter the 6-digit code sent to <strong>${escapeHtml(email)}</strong></p>
                 <input type="text" id="verification-code" maxlength="6" placeholder="000000" style="width: 100%; padding: 12px; font-size: 18px; text-align: center; letter-spacing: 8px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 15px;">
                 <button id="verify-code-btn" style="background: #10b981; color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; width: 100%;">
                     Verify & Get $4.99 Pricing
@@ -2094,11 +2094,11 @@ async function showReferralModal() {
             <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; color: white;">
                 <div style="display: flex; justify-content: space-around; text-align: center;">
                     <div>
-                        <div style="font-size: 28px; font-weight: bold;">${stats.visits || 0}</div>
+                        <div style="font-size: 28px; font-weight: bold;">${escapeHtml(stats.visits || 0)}</div>
                         <div style="font-size: 12px; opacity: 0.9;">Link Views</div>
                     </div>
                     <div>
-                        <div style="font-size: 28px; font-weight: bold;">${stats.conversions || 0}</div>
+                        <div style="font-size: 28px; font-weight: bold;">${escapeHtml(stats.conversions || 0)}</div>
                         <div style="font-size: 12px; opacity: 0.9;">Friends Helped</div>
                     </div>
                     <div>
@@ -2111,7 +2111,7 @@ async function showReferralModal() {
             <div style="background: #f0f4ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
                 <div style="font-size: 12px; color: #666; margin-bottom: 5px;">Your Referral Link:</div>
                 <div style="display: flex; gap: 10px;">
-                    <input type="text" id="referral-link" value="${referralLink}" readonly style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                    <input type="text" id="referral-link" value="${escapeHtml(referralLink)}" readonly style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
                     <button id="copy-referral-link" style="background: #1e3a8a; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 13px;">Copy</button>
                 </div>
             </div>
@@ -2343,7 +2343,7 @@ async function showReferralModal() {
             
             // Generate QR code using Google Charts API
             const qrUrl = `https://chart.googleapis.com/chart?cht=qr&chs=200x200&chld=L|0&chl=${encodeURIComponent(referralLink)}`;
-            qrDisplay.innerHTML = `<img src="${qrUrl}" alt="Referral QR Code" style="width: 200px; height: 200px;">`;
+            qrDisplay.innerHTML = `<img src="${escapeHtml(qrUrl)}" alt="Referral QR Code" style="width: 200px; height: 200px;">`;
             
             // Track QR view
             try {
@@ -2403,6 +2403,16 @@ async function checkReferral() {
 // Old functions removed - replaced with real tracking above
 
 // UI Helpers
+// Escape a value for an innerHTML template, as text or inside a quoted attribute
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function showLoading(message) {
     previewContainer.innerHTML = `<div class="loading">${message}</div>`;
 }
@@ -2492,9 +2502,9 @@ function setupAutocomplete(inputId, suggestionsId, apiUrl, formatItem, onSelect)
                     suggestions.innerHTML = data.results.map(item => {
                         const formatted = formatItem(item);
                         return `
-                            <div class="suggestion-item" data-value="${formatted.value}">
-                                <strong>${formatted.text}</strong>
-                                ${formatted.extra ? `<span style="color: green;">${formatted.extra}</span>` : ''}
+                            <div class="suggestion-item" data-value="${escapeHtml(formatted.value)}">
+                                <strong>${escapeHtml(formatted.text)}</strong>
+                                ${formatted.extra ? `<span style="color: green;">${escapeHtml(formatted.extra)}</span>` : ''}
                             </div>
                         `;
                     }).join('');
@@ -2549,8 +2559,8 @@ function setupCompanyAutocomplete(input, suggestions) {
                 
                 if (data.results && data.results.length > 0) {
                     suggestions.innerHTML = data.results.map(company => `
-                        <div class="suggestion-item" data-value="${company}">
-                            <strong>${company}</strong>
+                        <div class="suggestion-item" data-value="${escapeHtml(company)}">
+                            <strong>${escapeHtml(company)}</strong>
                         </div>
                     `).join('');
                     suggestions.style.display = 'block';
@@ -2653,8 +2663,8 @@ async function setupExperienceStateCity(stateSelect, cityInput, citySuggestions)
             
             if (matches.length > 0) {
                 citySuggestions.innerHTML = matches.map(city => `
-                    <div class="suggestion-item" data-value="${city}">
-                        <strong>${city}</strong>
+                    <div class="suggestion-item" data-value="${escapeHtml(city)}">
+                        <strong>${escapeHtml(city)}</strong>
                     </div>
                 `).join('');
                 citySuggestions.style.display = 'block';
@@ -2711,8 +2721,8 @@ function showSuggestedSkills(suggestedSkills) {
         <label>Suggested Skills (click to add)</label>
         <div class="tags-container" id="suggested-skills-tags">
             ${suggestedSkills.slice(0, 10).map(skill => `
-                <span class="tag" style="background: #27ae60; cursor: pointer;" onclick="addSuggestedSkill('${skill.replace(/'/g, "\\'")}')">
-                    + ${skill}
+                <span class="tag" style="background: #27ae60; cursor: pointer;" data-skill="${escapeHtml(skill)}" onclick="addSuggestedSkill(this.dataset.skill)">
+                    + ${escapeHtml(skill)}
                 </span>
             `).join('')}
         </div>
@@ -2805,8 +2815,8 @@ async function setupStateCityAutocomplete() {
             
             if (matches.length > 0) {
                 citySuggestions.innerHTML = matches.map(city => `
-                    <div class="suggestion-item" data-value="${city}">
-                        <strong>${city}</strong>
+                    <div class="suggestion-item" data-value="${escapeHtml(city)}">
+                        <strong>${escapeHtml(city)}</strong>
                     </div>
                 `).join('');
                 citySuggestions.style.display = 'block';
@@ -2879,8 +2889,8 @@ function setupUniversityAutocomplete(input, suggestions) {
                 
                 if (matches.length > 0) {
                     suggestions.innerHTML = matches.map(uni => `
-                        <div class="suggestion-item" data-value="${uni}">
-                            <strong>${uni}</strong>
+                        <div class="suggestion-item" data-value="${escapeHtml(uni)}">
+                            <strong>${escapeHtml(uni)}</strong>
                         </div>
                     `).join('');
                     suggestions.style.display = 'block';
@@ -2926,8 +2936,8 @@ function setupFieldAutocomplete(input, suggestions) {
                 
                 if (matches.length > 0) {
                     suggestions.innerHTML = matches.map(field => `
-                        <div class="suggestion-item" data-value="${field}">
-                            <strong>${field}</strong>
+                        <div class="suggestion-item" data-value="${escapeHtml(field)}">
+                            <strong>${escapeHtml(field)}</strong>
                         </div>
                     `).join('');
                     suggestions.style.display = 'block';
