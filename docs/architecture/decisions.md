@@ -184,6 +184,12 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 
 - Filters project names, control words, and long phrases from all skill categories.
 
+### 2026-11-20 — Two Loops in the Mobile Flow
+
+- **"Done" at "Add another job?" re-asked forever.** The global "done" safety check in `process_answer` and the hard stop in `_process_experience` caught the word before the `exp_done` branch could move to the summary (a regression of Fix 4). Both now step aside when `exp_done` is set.
+- **The tech-stack project question shifted answers and looped.** Display asked 4 project questions while storage and back used the 3 `PROJECT_FIELDS`, so tech was saved as description, description as result, and "What was the outcome or result?" repeated. `get_current_state`, `_process_optional` and `_go_back_optional` now all use `_project_fields(session)`.
+- Guarded by `tests/test_voice_flow_regressions.py` (no server, no network).
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.

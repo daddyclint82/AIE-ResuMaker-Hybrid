@@ -42,6 +42,7 @@ Keep `.env` out of Git (`git status` should not show it).
 ### Fast backend regression
 
 ```bash
+./venv/bin/python tests/test_voice_flow_regressions.py   # job loop + tech-stack project fields; no server, no network
 ./venv/bin/python tests/test_optional_boundary_patch.py
 ```
 
