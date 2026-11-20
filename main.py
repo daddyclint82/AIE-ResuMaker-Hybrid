@@ -2168,16 +2168,6 @@ async def convert_referral(request: Request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-@app.get("/api/stripe/config")
-async def get_stripe_config():
-    """Return Stripe publishable key to frontend"""
-    return {
-        "publishableKey": STRIPE_PUBLISHABLE_KEY,
-        "priceId": STRIPE_PRICE_ID,
-        "discountPriceId": STRIPE_STUDENT_PRICE_ID,
-        "studentPriceId": STRIPE_STUDENT_PRICE_ID
-    }
-
 @app.post("/api/create-checkout-session")
 async def create_checkout_session(request: Request):
     """Create Stripe Checkout session for premium resume download"""
