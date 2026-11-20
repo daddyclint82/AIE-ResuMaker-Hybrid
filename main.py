@@ -19,19 +19,12 @@ import os
 import re
 import httpx
 from datetime import datetime, timedelta
-from docx import Document
-from docx.shared import Inches, Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 import base64
 from io import BytesIO
 
 from typing import Dict, List, Any
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.lib import colors
+# python-docx and reportlab are imported inside generate_docx()/generate_pdf():
+# they are only needed at download time and cost ~60 ms of every cold start.
 
 from dotenv import load_dotenv
 
@@ -894,6 +887,10 @@ async def build_resume(
 
 def generate_docx(resume_id: str, data: dict):
     """Generate Word document"""
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
     doc = Document()
     
     sections = doc.sections[0]
@@ -2370,6 +2367,13 @@ async def get_timed_preview(request: Request):
 
 def generate_pdf(resume_id: str, data: dict):
     """Generate PDF document"""
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
     output_dir = RESUME_STORAGE_DIR
     os.makedirs(output_dir, exist_ok=True)
     filepath = os.path.join(output_dir, f"{resume_id}.pdf")
