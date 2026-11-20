@@ -2058,6 +2058,12 @@ async function validateReferralCode(code) {
             const data = await response.json();
             return data.visits > 0 || data.reward_unlocked;
         }
+        if (response.status === 404) {
+            // Not a code this server issued (an old or offline one): forget it
+            // so the share dialog asks the server for a new one.
+            localStorage.removeItem('aie_referral_code');
+            localStorage.removeItem('aie_referral_link');
+        }
     } catch (error) {
         console.error('[REFERRAL] Error validating code:', error);
     }

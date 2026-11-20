@@ -358,6 +358,8 @@ def categorize_skills(skills_list):
     # Remove empty categories
     return {k: v for k, v in grouped.items() if v}
 
+import base64
+import hmac
 import secrets
 
 # In-memory storage for demo (use Redis/DB in production)
@@ -416,11 +418,48 @@ def mark_resume_paid(resume_id: str) -> None:
 # Student verification tokens: {token: {email: str, verified: bool, expires: datetime}}
 student_verifications = {}
 
-# Referral tracking: {code: {created_by: str, created_at: datetime, visits: int, conversions: int}}
+# Referral tracking: {code: {created_by: str, created_at: datetime, visits: int, conversions: int, reward_unlocked: bool}}
 referral_codes = {}
 
 # Referral visits log: [{code: str, ip: str, timestamp: datetime, converted: bool}]
 referral_visits = []
+
+# Referral codes vouch for themselves: 5 random bytes, then the first 5 bytes of
+# their HMAC under REFERRAL_SECRET, in base32 (16 characters). The server can
+# tell a code it issued from any other string without a lookup, which matters
+# because Render's free tier empties referral_codes on every deploy, restart and
+# idle spin-down. Without REFERRAL_SECRET each process signs with a random key:
+# codes still can't be forged, but they stop working at the next restart.
+_REFERRAL_KEY = (os.getenv("REFERRAL_SECRET") or secrets.token_urlsafe(32)).encode()
+_REFERRAL_CODE_RE = re.compile(r"[A-Z2-7]{16}")
+
+
+def _referral_tag(nonce: bytes) -> bytes:
+    return hmac.new(_REFERRAL_KEY, b"referral-code:" + nonce, hashlib.sha256).digest()[:5]
+
+
+def new_referral_code() -> str:
+    nonce = secrets.token_bytes(5)
+    return base64.b32encode(nonce + _referral_tag(nonce)).decode()
+
+
+def referral_stats(code) -> dict | None:
+    """The stats of a referral code this server issued; None for anything else.
+
+    A code we issued that a restart wiped from memory starts again at zero.
+    """
+    if not isinstance(code, str) or not _REFERRAL_CODE_RE.fullmatch(code):
+        return None
+    raw = base64.b32decode(code)
+    if not hmac.compare_digest(raw[5:], _referral_tag(raw[:5])):
+        return None
+    return referral_codes.setdefault(code, {
+        "created_by": "unknown",
+        "created_at": datetime.now(),
+        "visits": 0,
+        "conversions": 0,
+        "reward_unlocked": False,
+    })
 
 
 def is_edu_email(email: str) -> bool:
@@ -635,8 +674,9 @@ async def build_page(request: Request):
     voice_session = request.query_params.get("voice_session", "")
     
     # Track referral visit if ref code provided
-    if ref_code and ref_code in referral_codes:
-        referral_codes[ref_code]["visits"] += 1
+    referral = referral_stats(ref_code)
+    if referral:
+        referral["visits"] += 1
         referral_visits.append({
             "code": ref_code,
             "ip": request.client.host if request.client else "unknown",
@@ -1895,7 +1935,7 @@ async def create_referral(request: Request):
         user_email = data.get("email", "anonymous")
         
         # Generate unique referral code
-        code = secrets.token_urlsafe(8).upper()[:10]
+        code = new_referral_code()
         
         # Store referral code
         referral_codes[code] = {
@@ -1922,11 +1962,12 @@ async def track_referral_visit(request: Request):
         code = data.get("code", "")
         ip_address = request.client.host if request.client else "unknown"
         
-        if not code or code not in referral_codes:
+        stats = referral_stats(code)
+        if not stats:
             return JSONResponse({"error": "Invalid referral code"}, status_code=400)
         
         # Record visit
-        referral_codes[code]["visits"] += 1
+        stats["visits"] += 1
         referral_visits.append({
             "code": code,
             "ip": ip_address,
@@ -1936,9 +1977,9 @@ async def track_referral_visit(request: Request):
         
         return {
             "success": True,
-            "visits": referral_codes[code]["visits"],
-            "conversions": referral_codes[code]["conversions"],
-            "reward_unlocked": referral_codes[code]["reward_unlocked"]
+            "visits": stats["visits"],
+            "conversions": stats["conversions"],
+            "reward_unlocked": stats["reward_unlocked"]
         }
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
@@ -1946,10 +1987,10 @@ async def track_referral_visit(request: Request):
 @app.get("/api/referral/stats/{code}")
 async def get_referral_stats(code: str):
     """Get referral statistics for a code"""
-    if code not in referral_codes:
+    stats = referral_stats(code)
+    if not stats:
         return JSONResponse({"error": "Referral code not found"}, status_code=404)
     
-    stats = referral_codes[code]
     return {
         "code": code,
         "visits": stats["visits"],
@@ -1957,34 +1998,6 @@ async def get_referral_stats(code: str):
         "reward_unlocked": stats["reward_unlocked"],
         "link": f"{BASE_URL}/build?ref={code}"
     }
-
-@app.post("/api/referral/convert")
-async def convert_referral(request: Request):
-    """Mark a referral as converted (friend made a purchase)"""
-    try:
-        data = await request.json()
-        code = data.get("code", "")
-        
-        if not code or code not in referral_codes:
-            return JSONResponse({"error": "Invalid referral code"}, status_code=400)
-        
-        # Mark conversion
-        referral_codes[code]["conversions"] += 1
-        referral_codes[code]["reward_unlocked"] = True
-        
-        # Update visit log
-        for visit in reversed(referral_visits):
-            if visit["code"] == code and not visit["converted"]:
-                visit["converted"] = True
-                break
-        
-        return {
-            "success": True,
-            "conversions": referral_codes[code]["conversions"],
-            "reward_unlocked": True
-        }
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.post("/api/create-checkout-session")
 async def create_checkout_session(request: Request):
@@ -2016,6 +2029,15 @@ async def create_checkout_session(request: Request):
                     "error": "Student verification required. Please verify your .edu email first."
                 }, status_code=403)
         
+        # The referral price follows the Share & Save rule (terms 5.4): a code
+        # this server issued whose link has had a visit.
+        if tier == "discount":
+            referral = referral_stats(data.get("referral_code", ""))
+            if not referral or not (referral["visits"] > 0 or referral["reward_unlocked"]):
+                return JSONResponse({
+                    "error": "Share your referral link first: the referral price unlocks once someone opens it."
+                }, status_code=403)
+
         # Map tier to price ID
         if tier == "student" or tier == "discount":
             price_id = STRIPE_STUDENT_PRICE_ID
@@ -2064,10 +2086,10 @@ async def payment_success(request: Request, session_id: str = "", ref: str = "")
             mark_resume_paid(resume_id)
 
             # Track referral conversion
-            ref_code = ref or metadata.get("referral_code", "")
-            if ref_code and ref_code in referral_codes:
-                referral_codes[ref_code]["conversions"] += 1
-                referral_codes[ref_code]["reward_unlocked"] = True
+            referral = referral_stats(ref or metadata.get("referral_code", ""))
+            if referral:
+                referral["conversions"] += 1
+                referral["reward_unlocked"] = True
             
             return templates.TemplateResponse(
                 request=request,
@@ -2113,9 +2135,10 @@ async def stripe_webhook(request: Request):
             ref_code = metadata.get("referral_code", "")
 
             # Track referral conversion from webhook
-            if ref_code and ref_code in referral_codes:
-                referral_codes[ref_code]["conversions"] += 1
-                referral_codes[ref_code]["reward_unlocked"] = True
+            referral = referral_stats(ref_code)
+            if referral:
+                referral["conversions"] += 1
+                referral["reward_unlocked"] = True
         
         return {"status": "success"}
     

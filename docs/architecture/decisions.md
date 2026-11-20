@@ -82,6 +82,9 @@ Legal acceptance is enforced before the chat flow begins. `/terms` carries a `re
 
 - Pricing tiers: $9.99 regular, $4.99 referral/student.
 - Referral system: real backend tracking for $4.99 discount with "Give $5, Get $5" messaging.
+- The server decides the price. `tier: "discount"` gets the student price only with a referral code the server issued whose link has a recorded visit (the Share & Save rule, terms 5.4); otherwise checkout answers 403.
+- Referral codes vouch for themselves: 5 random bytes plus the first 5 bytes of their HMAC-SHA256 under `REFERRAL_SECRET`, base32, 16 characters. Visit counts stay in memory, which Render's free tier empties on every deploy, restart and idle spin-down, so an issued code starts again at zero instead of being refused. The browser forgets a stored code the server answers 404 for and gets a new one. Without `REFERRAL_SECRET` each process signs with a random key, and codes last until the next restart.
+- Guarded by `tests/test_referral_pricing.py` (no server, no network).
 
 ### Resume Access & Payment
 

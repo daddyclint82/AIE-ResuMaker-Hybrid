@@ -35,3 +35,5 @@ services:
         sync: false
       - key: BASE_URL
         sync: false
+      - key: REFERRAL_SECRET
+        sync: false
