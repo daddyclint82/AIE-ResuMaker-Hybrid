@@ -1304,9 +1304,6 @@
         if (navButtons) navButtons.style.display = 'none';
         hideSkillsPanel();
 
-        // ABANDONED: Broken inline preview — replaced with direct redirect button
-        // fetchPreviewAndDisplay();
-
         // Create visible "Preview Resume" CTA button
         const previewBtn = document.createElement('button');
         previewBtn.textContent = 'Preview Resume';
@@ -1325,65 +1322,6 @@
         }
     }
 
-    async function fetchPreviewAndDisplay() {
-        console.log('[DEBUG] fetchPreviewAndDisplay started');
-        showTyping();
-        try {
-            console.log('[DEBUG] Making fetch to /api/voice/preview with sessionId:', sessionId);
-            const response = await fetch('/api/voice/preview', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: sessionId, template_style: 'professional' })
-            });
-            console.log('[DEBUG] Fetch response status:', response.status);
-            const data = await response.json();
-            console.log('[DEBUG] Fetch response data:', { success: data.success, has_preview: !!data.preview_html });
-            hideTyping();
-
-            if (data.success && data.preview_html) {
-                console.log('[DEBUG] Preview HTML received, creating container');
-                // Add preview message
-                addMessage('ai', '📄 Here is your resume preview:', false);
-                
-                // Create preview container
-                const previewDiv = document.createElement('div');
-                previewDiv.className = 'voice-preview-container';
-                previewDiv.innerHTML = data.preview_html;
-                if (chatMessages) chatMessages.appendChild(previewDiv);
-                console.log('[DEBUG] Preview container appended to chat');
-                
-                // Add purchase button
-                const buyBtn = document.createElement('a');
-                buyBtn.href = `/build?mode=form&voice_session=${sessionId}`;
-                buyBtn.className = 'view-resume-btn';
-                buyBtn.textContent = '💳 Purchase Resume ($9.99)';
-                if (chatMessages) chatMessages.appendChild(buyBtn);
-                
-                scrollToBottom();
-            } else {
-                console.log('[DEBUG] No preview HTML, using fallback');
-                // Fallback to old link
-                const btn = document.createElement('a');
-                btn.href = `/build?mode=form&voice_session=${sessionId}`;
-                btn.className = 'view-resume-btn';
-                btn.textContent = '👁️ View Your Resume';
-                if (chatMessages) chatMessages.appendChild(btn);
-                addMessage('ai', 'Great! Your resume is ready. Click below to preview and purchase.', false);
-            }
-        } catch (e) {
-            hideTyping();
-            console.error('[DEBUG] Preview fetch error:', e);
-            // Fallback
-            const btn = document.createElement('a');
-            btn.href = `/build?mode=form&voice_session=${sessionId}`;
-            btn.className = 'view-resume-btn';
-            btn.textContent = '👁️ View Your Resume';
-            if (chatMessages) chatMessages.appendChild(btn);
-            addMessage('ai', 'Great! Your resume is ready. Click below to preview and purchase.', false);
-        }
-        console.log('[DEBUG] fetchPreviewAndDisplay completed');
-    }
-
     function scrollToBottom() {
         if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -1399,31 +1337,9 @@
         return now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     }
 
-    function initDebugBanner() {
-        let banner = document.getElementById('debug-banner') || document.getElementById('aie-debug-banner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'aie-debug-banner';
-            document.body.appendChild(banner);
-        }
-        banner.style.cssText = 'background:#cc0000;color:#fff;font-size:12px;padding:6px 10px;font-family:monospace;white-space:pre-wrap;word-break:break-word;z-index:9999;position:sticky;top:0;';
-
-        function update() {
-            const st = window.getVoiceState ? window.getVoiceState() : {};
-            banner.textContent = `AIE ${st.version || AIE_VOICE_VERSION} | Field: ${st.currentField || 'none'} | Session: ${st.sessionId || 'none'} | Nav: ${st.navDisplay || '?'} | Skip: ${st.skipBtnDisplay || '?'}`;
-        }
-        update();
-        setInterval(update, 800);
-    }
-
     // Initialize safely
     try {
         init();
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initDebugBanner);
-        } else {
-            initDebugBanner();
-        }
     } catch (e) {
         console.error('Init failed:', e);
     }

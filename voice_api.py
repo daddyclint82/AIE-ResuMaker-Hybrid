@@ -2205,40 +2205,6 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
     return response
 
 
-@router.get("/debug-state")
-async def voice_debug_state(request: Request, sessionId: str = ""):
-    """Return full server-side state for a session (debugging only)."""
-    rid = _request_id(request)
-    _voice_log("voice_debug_state", request, rid, session_id=sessionId)
-    if not sessionId:
-        return JSONResponse({"error": "sessionId required"}, status_code=400)
-    session = voice_sessions.get(sessionId)
-    if session is None:
-        path = os.path.join(SESSIONS_DIR, f"{sessionId}.json")
-        if os.path.exists(path):
-            try:
-                with open(path, "r") as f:
-                    session = json.load(f)
-            except Exception as e:
-                return JSONResponse({"error": str(e)}, status_code=500)
-        else:
-            return JSONResponse({"error": "session not found"}, status_code=404)
-    step = get_current_state(session)
-    return {
-        "session_id": sessionId,
-        "in_memory": sessionId in voice_sessions,
-        "on_disk": os.path.exists(os.path.join(SESSIONS_DIR, f"{sessionId}.json")),
-        "context": session.get("context", {}),
-        "step_index": session.get("step_index", 0),
-        "current_step": step,
-        "can_go_back": not (session.get("context", {}).get("phase") == "simple" and session.get("step_index", 0) == 0),
-        "show_add_job": step.get("show_add_job", False),
-        "history_count": len(session.get("history", [])),
-        "data_keys": list(session.get("data", {}).keys()),
-        "done": session.get("done", False)
-    }
-
-
 @router.get("/session-history")
 async def voice_session_history(request: Request, sessionId: str = ""):
     """Return stored transcript turns for a session (rehydration support)."""
@@ -2364,65 +2330,4 @@ async def voice_load(request: Request):
         import traceback
         traceback.print_exc()
         _voice_log("voice_load_error", request, rid, error=str(e), error_type=type(e).__name__)
-        return JSONResponse({"error": str(e)}, status_code=500)
-
-
-@router.post("/preview")
-async def voice_preview(request: Request):
-    """Generate preview and download URLs from voice session data."""
-    try:
-        body = await request.json()
-        session_id = body.get("session_id", "")
-        
-        # Try to load from memory first, then disk
-        if session_id not in voice_sessions:
-            session_path = os.path.join(SESSIONS_DIR, f"{session_id}.json")
-            if os.path.exists(session_path):
-                try:
-                    with open(session_path, "r") as f:
-                        voice_sessions[session_id] = json.load(f)
-                except Exception:
-                    pass
-        
-        if not session_id or session_id not in voice_sessions:
-            return JSONResponse({"error": "Invalid session"}, status_code=400)
-        
-        session = voice_sessions[session_id]
-        data = session.get("data", {})
-        ctx = session.get("context", {})
-        
-        # ── SANITIZATION LAYER ──
-        # Reconstruct a clean payload from whatever the state machine produced
-        resume_data = sanitize_resume_data(data, ctx)
-        
-        # Build resume_id from sanitized name
-        full_name = resume_data["full_name"]
-        resume_id = f"{full_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        # Store in resumes dict for download - use lazy import to avoid circular dependency
-        from main import resumes, generate_preview_html, generate_docx, generate_pdf
-        resumes[resume_id] = resume_data
-        
-        # Generate DOCX and PDF files for download
-        try:
-            docx_path = generate_docx(resume_id, resume_data)
-            pdf_path = generate_pdf(resume_id, resume_data)
-        except Exception as gen_err:
-            pass
-        
-        # Generate preview HTML
-        preview_html = generate_preview_html(resume_data, resume_data["template_style"])
-        
-        return {
-            "success": True,
-            "resume_id": resume_id,
-            "preview_html": preview_html,
-            "download_url": f"/api/download/{resume_id}",
-            "download_url_pdf": f"/api/download/{resume_id}?format=pdf",
-            "data": resume_data
-        }
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
         return JSONResponse({"error": str(e)}, status_code=500)
