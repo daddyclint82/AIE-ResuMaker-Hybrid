@@ -157,7 +157,7 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
         return False
 
 
-from voice_api import router as voice_router, voice_sessions as voice_session_store
+from voice_api import router as voice_router, voice_sessions as voice_session_store, http_client
 
 app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
@@ -697,28 +697,27 @@ async def search_jobs(query: str = ""):
         return {"results": []}
     
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{ONET_BASE_URL}/online/search",
-                params={"keyword": query, "start": 1, "end": 20},
-                headers={"X-API-Key": ONET_API_KEY},
-                timeout=5.0
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                results = []
-                if "occupation" in data:
-                    for occ in data["occupation"]:
-                        results.append({
-                            "code": occ.get("code", ""),
-                            "title": occ.get("title", ""),
-                            "tags": occ.get("tags", [])
-                        })
-                return {"results": results[:10]}
-            else:
-                return {"results": [], "error": f"API returned {response.status_code}"}
-                
+        response = await http_client.get(
+            f"{ONET_BASE_URL}/online/search",
+            params={"keyword": query, "start": 1, "end": 20},
+            headers={"X-API-Key": ONET_API_KEY},
+            timeout=5.0
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            results = []
+            if "occupation" in data:
+                for occ in data["occupation"]:
+                    results.append({
+                        "code": occ.get("code", ""),
+                        "title": occ.get("title", ""),
+                        "tags": occ.get("tags", [])
+                    })
+            return {"results": results[:10]}
+        else:
+            return {"results": [], "error": f"API returned {response.status_code}"}
+
     except Exception as e:
         return {"results": [], "error": str(e)}
 
@@ -726,18 +725,17 @@ async def search_jobs(query: str = ""):
 async def get_job_details(job_code: str):
     """Get detailed job information from O*NET"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{ONET_BASE_URL}/online/occupations/{job_code}",
-                headers={"X-API-Key": ONET_API_KEY},
-                timeout=5.0
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {"error": f"API returned {response.status_code}"}
-                
+        response = await http_client.get(
+            f"{ONET_BASE_URL}/online/occupations/{job_code}",
+            headers={"X-API-Key": ONET_API_KEY},
+            timeout=5.0
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"error": f"API returned {response.status_code}"}
+
     except Exception as e:
         return {"error": str(e)}
 
@@ -745,25 +743,24 @@ async def get_job_details(job_code: str):
 async def get_job_summary(job_code: str):
     """Get job summary for resume suggestions"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{ONET_BASE_URL}/online/occupations/{job_code}/summary",
-                headers={"X-API-Key": ONET_API_KEY},
-                timeout=5.0
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    "title": data.get("title", ""),
-                    "description": data.get("description", ""),
-                    "skills": data.get("skills", []),
-                    "knowledge": data.get("knowledge", []),
-                    "abilities": data.get("abilities", [])
-                }
-            else:
-                return {"error": f"API returned {response.status_code}"}
-                
+        response = await http_client.get(
+            f"{ONET_BASE_URL}/online/occupations/{job_code}/summary",
+            headers={"X-API-Key": ONET_API_KEY},
+            timeout=5.0
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "title": data.get("title", ""),
+                "description": data.get("description", ""),
+                "skills": data.get("skills", []),
+                "knowledge": data.get("knowledge", []),
+                "abilities": data.get("abilities", [])
+            }
+        else:
+            return {"error": f"API returned {response.status_code}"}
+
     except Exception as e:
         return {"error": str(e)}
 
@@ -2928,36 +2925,36 @@ async def parse_with_groq(transcript: str, state: ResumeState = None) -> dict:
         prompt = build_parser_prompt(transcript)
         system_msg = "You are a resume parser. Extract structured information from natural language. Output valid JSON only."
     
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": system_msg},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.1,
-                "max_tokens": 2000,
-                "response_format": {"type": "json_object"}
-            }
-        )
-        
-        if response.status_code != 200:
-            return {}
-        
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-        
-        try:
-            parsed = json.loads(content)
-            return parsed
-        except json.JSONDecodeError:
-            return {}
+    response = await http_client.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        timeout=30.0,
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": GROQ_MODEL,
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1,
+            "max_tokens": 2000,
+            "response_format": {"type": "json_object"}
+        }
+    )
+
+    if response.status_code != 200:
+        return {}
+
+    data = response.json()
+    content = data["choices"][0]["message"]["content"]
+
+    try:
+        parsed = json.loads(content)
+        return parsed
+    except json.JSONDecodeError:
+        return {}
 
 
 @app.post("/api/parse-voice")
@@ -3060,28 +3057,28 @@ Education:
 Write in third person, professional tone. Highlight key strengths and career trajectory.
 Output ONLY the summary text."""
     
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        response = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": "You are a professional resume writer."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 500
-            }
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
-    
+    response = await http_client.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        timeout=15.0,
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": GROQ_MODEL,
+            "messages": [
+                {"role": "system", "content": "You are a professional resume writer."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": 500
+        }
+    )
+
+    if response.status_code == 200:
+        data = response.json()
+        return data["choices"][0]["message"]["content"].strip()
+
     return ""
 
 

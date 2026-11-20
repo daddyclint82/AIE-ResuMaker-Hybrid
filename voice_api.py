@@ -50,6 +50,11 @@ session_locks: Dict[str, asyncio.Lock] = {}
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
+# One pooled client for all outbound HTTP (Groq here, O*NET in main.py). A fresh
+# AsyncClient per request rebuilt its TLS context and re-handshook every time
+# (~140 ms vs ~80 ms per Groq round trip in local tests).
+http_client = httpx.AsyncClient(timeout=20.0)
+
 # Use an absolute path under the project root for session JSON files.
 # On Render free tier this is ephemeral, but absolute + mkdir ensures consistency.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1313,31 +1318,31 @@ Example output:
 User skills: {skills_text}"""
     
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": GROQ_MODEL,
-                    "messages": [
-                        {"role": "system", "content": "You are a resume skill organizer. Output valid JSON only."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.2,
-                    "max_tokens": 1500,
-                    "response_format": {"type": "json_object"}
-                }
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                content = data["choices"][0]["message"]["content"].strip()
-                parsed = json.loads(content)
-                # Remove empty categories
-                return {k: v for k, v in parsed.items() if v}
+        response = await http_client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            timeout=20.0,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": GROQ_MODEL,
+                "messages": [
+                    {"role": "system", "content": "You are a resume skill organizer. Output valid JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.2,
+                "max_tokens": 1500,
+                "response_format": {"type": "json_object"}
+            }
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            content = data["choices"][0]["message"]["content"].strip()
+            parsed = json.loads(content)
+            # Remove empty categories
+            return {k: v for k, v in parsed.items() if v}
     except Exception as e:
         pass
     
@@ -1378,27 +1383,27 @@ USER INPUTS:
 Write a concise, compelling professional summary that incorporates the keywords and targets the role. Use active voice. Avoid generic buzzwords. Return ONLY the summary text, no quotes or explanations."""
     
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": GROQ_MODEL,
-                    "messages": [
-                        {"role": "system", "content": "You are an expert resume writer. Write concise, compelling professional summaries."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    "temperature": 0.3,
-                    "max_tokens": 300
-                }
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result["choices"][0]["message"]["content"].strip()
+        response = await http_client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            timeout=15.0,
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": GROQ_MODEL,
+                "messages": [
+                    {"role": "system", "content": "You are an expert resume writer. Write concise, compelling professional summaries."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 300
+            }
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            return result["choices"][0]["message"]["content"].strip()
     except Exception:
         pass
     
