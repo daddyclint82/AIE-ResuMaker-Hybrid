@@ -122,7 +122,7 @@ def validate_results(state: dict, expected: dict) -> List[str]:
     if summary:
         print(f"  ✅ Summary: {len(summary)} chars")
     else:
-        errors.append("Summary: MISSING (Groq generation may have failed)")
+        errors.append("Summary: MISSING (LLM generation may have failed)")
     
     # Check keywords
     keywords = data.get("keywords", "")

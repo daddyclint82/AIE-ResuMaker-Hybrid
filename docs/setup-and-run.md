@@ -32,8 +32,9 @@ kill $(cat /tmp/hybrid.pid)
 
 | Variable | Required | Default | Notes |
 |----------|----------|---------|-------|
-| `GROQ_API_KEY` | No | None | Used for summary generation and skills categorization; falls back to templates if missing. |
-| `GROQ_MODEL` | No | `llama-3.1-8b-instant` | Extraction model. |
+| `LLM_API_KEY` | No | None | Ollama API key (ollama.com/settings/keys). Used for summary generation and skills categorization; falls back to templates if missing. `/healthz` shows `"llm": true` when set. |
+| `LLM_MODEL` | No | `minimax-m3.1-flash` | Model for both calls. Must accept `reasoning_effort`. |
+| `LLM_BASE_URL` | No | `https://ollama.com/v1` | Any OpenAI-compatible API, e.g. `https://api.groq.com/openai/v1`. |
 
 Keep `.env` out of Git (`git status` should not show it).
 
@@ -42,7 +43,7 @@ Keep `.env` out of Git (`git status` should not show it).
 ### Fast backend regression
 
 ```bash
-./venv/bin/python tests/test_voice_flow_regressions.py   # job loop + tech-stack project fields; no server, no network
+./venv/bin/python tests/test_voice_flow_regressions.py   # job loop, tech-stack project fields, LLM requests; no server, no network
 ./venv/bin/python tests/test_optional_boundary_patch.py
 ```
 

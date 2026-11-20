@@ -148,7 +148,7 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
         return False
 
 
-from voice_api import router as voice_router, voice_sessions as voice_session_store, http_client
+from voice_api import router as voice_router, voice_sessions as voice_session_store, http_client, LLM_API_KEY
 
 app = FastAPI(title="AIE ResuMaker", version="1.0")
 app.include_router(voice_router)
@@ -171,7 +171,7 @@ async def static_cache_headers(request: Request, call_next):
 @app.head("/")
 @app.get("/healthz")
 async def health_check():
-    return {"status": "ok", "env": APP_ENV}
+    return {"status": "ok", "env": APP_ENV, "llm": bool(LLM_API_KEY)}
 
 # O*NET API Configuration
 ONET_API_KEY = os.getenv("ONET_API_KEY", "AYRvP-2AaMc-2BKqY-4UFda")

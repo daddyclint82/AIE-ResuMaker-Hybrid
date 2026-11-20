@@ -19,6 +19,7 @@ import json
 import secrets
 import re
 import time
+import unicodedata
 import uuid
 from datetime import datetime
 from typing import Dict, List, Any, Optional
@@ -47,12 +48,20 @@ voice_sessions: Dict[str, Any] = {}
 # Per-session async locks to enforce strict sequential processing
 session_locks: Dict[str, asyncio.Lock] = {}
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+# The summary and skills steps call an OpenAI-compatible chat API. Default: MiniMax
+# M3.1 Flash on Ollama's cloud (chosen in docs/review/llm-model-test/); another
+# provider is an env change. Without LLM_API_KEY both steps use template fallbacks.
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://ollama.com/v1").rstrip("/")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+LLM_MODEL = os.environ.get("LLM_MODEL", "minimax-m3.1-flash")
 
-# One pooled client for all outbound HTTP (Groq here, O*NET in main.py). A fresh
+# Ollama caps concurrent requests per account (3 on Pro) and this account also serves
+# other apps, so the site holds at most one of those slots.
+_llm_slot = asyncio.Semaphore(1)
+
+# One pooled client for all outbound HTTP (LLM here, O*NET in main.py). A fresh
 # AsyncClient per request rebuilt its TLS context and re-handshook every time
-# (~140 ms vs ~80 ms per Groq round trip in local tests).
+# (~140 ms vs ~80 ms per round trip in local tests).
 http_client = httpx.AsyncClient(timeout=20.0)
 
 # Use an absolute path under the project root for session JSON files.
@@ -198,7 +207,7 @@ def compute_progress(session: dict) -> int:
         pct = (q_idx / total) if total else 0
 
     elif phase == "skills":
-        # Skills is one question, but may also be waiting for Groq categorization
+        # Skills is one question, but may also be waiting for LLM categorization
         pct = 0.5 if data.get("skills") else 0
 
     elif phase == "optional":
@@ -755,11 +764,11 @@ async def process_answer(session: dict, transcript: str) -> dict:
             data["skills"] = extracted
         session["data"] = data
         
-        # Categorize skills with Groq
+        # Categorize skills with the LLM
         skills_text = data.get("skills", "")
         if skills_text:
             try:
-                categorized = await groq_categorize_skills(skills_text, session)
+                categorized = await llm_categorize_skills(skills_text, session)
                 data["skills_categorized"] = categorized
                 session["data"] = data
             except Exception as e:
@@ -943,7 +952,7 @@ async def _process_summary(session: dict, extracted: str) -> dict:
         # Check if this was the LAST question - generate summary immediately
         if q_idx + 1 >= len(SUMMARY_QUESTIONS):
             # Generate summary before transitioning to skills
-            summary = await generate_summary_with_groq(session)
+            summary = await generate_summary_with_llm(session)
             data["summary"] = summary
             
             # Store keywords separately
@@ -957,7 +966,7 @@ async def _process_summary(session: dict, extracted: str) -> dict:
         return get_current_state(session)
     
     # Fallback: should not reach here normally
-    summary = await generate_summary_with_groq(session)
+    summary = await generate_summary_with_llm(session)
     data["summary"] = summary
     
     # Store keywords separately
@@ -1279,26 +1288,57 @@ def _go_back_optional(session: dict) -> dict:
 
 
 # =============================================================================
-# GROQ SKILL CATEGORIZATION
+# LLM: SKILL CATEGORIZATION AND SUMMARY
 # =============================================================================
 
-async def groq_categorize_skills(skills_text: str, session: dict = None) -> Dict[str, List[Dict]]:
-    """Send skills to Groq and get categorized JSON with weights back."""
-    if not GROQ_API_KEY:
-        # Fallback: put all skills in "Other Skills" with neutral weight
-        skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
-        return {"Other Skills": [{"name": s, "weight": 50} for s in skills_list]}
-    
+async def _llm_chat(system: str, prompt: str, *, temperature: float, max_tokens: int,
+                    timeout: float, json_mode: bool = False) -> Optional[str]:
+    """One chat completion from the configured LLM, or None if it fails (callers fall back)."""
+    body = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        "temperature": temperature,
+        # Reasoning tokens count against max_tokens: at default effort MiniMax spent the
+        # old 300-token summary budget thinking and returned the summary cut off.
+        "reasoning_effort": "low",
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        body["response_format"] = {"type": "json_object"}
+    try:
+        async with _llm_slot:
+            response = await http_client.post(f"{LLM_BASE_URL}/chat/completions", timeout=timeout,
+                                              headers={"Authorization": f"Bearer {LLM_API_KEY}"}, json=body)
+        if response.status_code == 200:
+            # NFKC turns look-alikes models write (H₂S, narrow spaces) into plain characters;
+            # the PDF export's built-in fonts print a black box for a subscript 2.
+            return unicodedata.normalize("NFKC", response.json()["choices"][0]["message"]["content"]).strip()
+        logger.warning(f"[LLM] {LLM_MODEL}: HTTP {response.status_code} {response.text[:200]}")
+    except Exception as e:
+        logger.warning(f"[LLM] {LLM_MODEL}: {type(e).__name__}: {e}")
+    return None
+
+
+async def llm_categorize_skills(skills_text: str, session: dict = None) -> Dict[str, List[Dict]]:
+    """Send skills to the LLM and get categorized JSON with weights back."""
+    skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
+    # Fallback: all skills in "Other Skills" with neutral weight
+    fallback = {"Other Skills": [{"name": s, "weight": 50} for s in skills_list]}
+    if not LLM_API_KEY:
+        return fallback
+
     # Get career context from session if available
     data = session.get("data", {}) if session else {}
     job_title = data.get("job_title", "")
     industry = data.get("industry", "")
-    target_keywords = data.get("summary_q4", "")
-    core_edge = data.get("summary_q1", "")
-    
+    # The summary answers live in context, not data (reading data left both blank).
+    summary_answers = session.get("context", {}).get("summary_answers", {}) if session else {}
+    target_keywords = summary_answers.get("summary_q4", "")
+    core_edge = summary_answers.get("summary_q1", "")
+
     # Get prioritized category list based on industry + keywords
     prioritized_cats = get_relevant_tiers(industry, target_keywords)
-    # Send top 15 categories first (reduce noise for Groq)
+    # Send top 15 categories first (reduce noise for the model)
     primary_cats = prioritized_cats[:15]
     categories_text = ", ".join(primary_cats)
     
@@ -1315,12 +1355,14 @@ CATEGORIZE AND WEIGHT these skills (1-100):
 - 70-89: Highly relevant (supports the core edge or industry)
 - 50-69: Moderately relevant (transferable but not core)
 - 30-49: Nice-to-have (adjacent skills)
-- 1-29: Legacy or minimally relevant (only include if user explicitly listed them)
+- 1-29: Legacy or minimally relevant
 
 PRIORITIZED CATEGORIES (most relevant first):
 {categories_text}
 
 Use ONLY these categories. If a skill does not fit, put it in "Other Skills".
+
+Use ONLY the skills listed under "User skills", each exactly once. The job context is for weighting only: never add a skill from it. You may fix spelling, capitalization and filler words like "um".
 
 Return ONLY a JSON object where keys are category names and values are arrays of objects with "name" and "weight" fields.
 
@@ -1329,42 +1371,19 @@ Example output:
 
 User skills: {skills_text}"""
     
-    try:
-        response = await http_client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            timeout=20.0,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": "You are a resume skill organizer. Output valid JSON only."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.2,
-                "max_tokens": 1500,
-                "response_format": {"type": "json_object"}
-            }
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            content = data["choices"][0]["message"]["content"].strip()
-            parsed = json.loads(content)
+    content = await _llm_chat("You are a resume skill organizer. Output valid JSON only.", prompt,
+                              temperature=0.2, max_tokens=3000, timeout=20.0, json_mode=True)
+    if content:
+        try:
             # Remove empty categories
-            return {k: v for k, v in parsed.items() if v}
-    except Exception as e:
-        pass
-    
-    # Fallback
-    skills_list = [s.strip() for s in skills_text.split(",") if s.strip()]
-    return {"Other Skills": [{"name": s, "weight": 50} for s in skills_list]}
+            return {k: v for k, v in json.loads(content).items() if v}
+        except Exception as e:
+            logger.warning(f"[LLM] {LLM_MODEL}: skills reply is not a JSON object: {e}")
+    return fallback
 
 
-async def generate_summary_with_groq(session: dict) -> str:
-    """Generate professional summary from summary_answers using Groq."""
+async def generate_summary_with_llm(session: dict) -> str:
+    """Generate professional summary from summary_answers using the LLM."""
     ctx = session.get("context", {})
     data = session.get("data", {})
     summary_answers = ctx.get("summary_answers", {})
@@ -1378,7 +1397,7 @@ async def generate_summary_with_groq(session: dict) -> str:
     q4 = summary_answers.get("summary_q4", "")
     job_title = data.get("job_title", "")
     
-    if not GROQ_API_KEY:
+    if not LLM_API_KEY:
         # Fallback: concatenate answers
         return f"{q1} {q2} {q3}".strip()
     
@@ -1392,35 +1411,12 @@ USER INPUTS:
 - Hard numbers / achievements: {q3}
 - Keywords from job posting: {q4}
 
-Write a concise, compelling professional summary that incorporates the keywords and targets the role. Use active voice. Avoid generic buzzwords. Return ONLY the summary text, no quotes or explanations."""
-    
-    try:
-        response = await http_client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            timeout=15.0,
-            headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": "You are an expert resume writer. Write concise, compelling professional summaries."},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 300
-            }
-        )
+Write a concise, compelling professional summary that incorporates the keywords and targets the role. Use active voice in resume style: no "I", "my" or "me", and no generic buzzwords such as "proven", "track record", "results-driven" or "seasoned". Return ONLY the summary text, no quotes or explanations."""
 
-        if response.status_code == 200:
-            result = response.json()
-            return result["choices"][0]["message"]["content"].strip()
-    except Exception:
-        pass
-    
-    # Fallback
-    return f"{q1} {q2} {q3}".strip()
+    summary = await _llm_chat("You are an expert resume writer. Write concise, compelling professional summaries.", prompt,
+                              temperature=0.3, max_tokens=1024, timeout=15.0)
+    # Fallback: concatenate answers
+    return summary or f"{q1} {q2} {q3}".strip()
 
 
 # =============================================================================
@@ -1523,7 +1519,7 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
     
     # ── Skills sanitization ──
     # CORRUPTION DETECTION: skills field may contain project names, control words, or be truncated
-    # The real skills are in skills_categorized (from Groq) or must be reconstructed
+    # The real skills are in skills_categorized (from the LLM) or must be reconstructed
     
     skills_categorized_raw = raw_data.get("skills_categorized", {})
     skills_raw = raw_data.get("skills", "")
@@ -1573,7 +1569,7 @@ def sanitize_resume_data(raw_data: dict, ctx: dict) -> dict:
                 # Control words are corruption regardless of category
                 if name_lower in CONTROL_WORDS:
                     return True
-        # If the ONLY category is "Other Skills", it's likely Groq failed to categorize properly
+        # If the ONLY category is "Other Skills", it's likely the LLM failed to categorize properly
         keys = list(categorized.keys())
         if len(keys) == 1 and keys[0].lower() in ("other skills", "other"):
             skills = categorized.get(keys[0], [])

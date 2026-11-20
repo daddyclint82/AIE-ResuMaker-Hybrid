@@ -17,12 +17,12 @@ Central index for project knowledge. Keep MEMORY.md lean; put durable details he
 - **Status:** Active — in development
 - **Location:** `/home/daddyclint82/.openclaw/workspace/aie-resumaker-hybrid/`
 - **Started:** 2026-06-04
-- **Stack:** Python 3.12, FastAPI, Uvicorn, Jinja2, vanilla JS/CSS, reportlab, python-docx, Stripe, Groq
+- **Stack:** Python 3.12, FastAPI, Uvicorn, Jinja2, vanilla JS/CSS, reportlab, python-docx, Stripe, MiniMax M3.1 Flash on Ollama Cloud
 - **Deployment:** Render (`render.yaml` present; `/healthz` smoke endpoint)
 
 ## What It Is
 
-Conversational resume builder. Users answer micro-questions one at a time through a mobile-friendly chat UI. Voice input is native iOS/Android keyboard dictation — no custom mic button. Server-side state machine drives the questionnaire. Groq `llama-3.3-70b` generates professional summaries and categorized skills. Three resume themes, referral/student pricing, PDF/DOCX export.
+Conversational resume builder. Users answer micro-questions one at a time through a mobile-friendly chat UI. Voice input is native iOS/Android keyboard dictation — no custom mic button. Server-side state machine drives the questionnaire. MiniMax M3.1 Flash on Ollama Cloud generates professional summaries and categorized skills. Three resume themes, referral/student pricing, PDF/DOCX export.
 
 ## Recent Headlines
 
