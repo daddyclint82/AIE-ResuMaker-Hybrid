@@ -159,9 +159,10 @@ def send_verification_email(to_email: str, token: str, base_url: str) -> bool:
         return False
 
 
-from voice_api import router as voice_router, voice_sessions as voice_session_store, http_client, LLM_API_KEY
+from voice_api import router as voice_router, voice_sessions as voice_session_store, LLM_API_KEY
 
-app = FastAPI(title="AIE ResuMaker", version="1.0")
+# Production serves no /docs, /redoc or /openapi.json: they listed every endpoint.
+app = FastAPI(title="AIE ResuMaker", version="1.0", openapi_url=None if IS_PRODUCTION else "/openapi.json")
 app.include_router(voice_router)
 
 @app.middleware("http")
@@ -185,10 +186,6 @@ async def health_check():
     # "referral_secret" false = referral codes stop working at every restart
     return {"status": "ok", "env": APP_ENV, "llm": bool(LLM_API_KEY),
             "referral_secret": bool(os.getenv("REFERRAL_SECRET"))}
-
-# O*NET API Configuration
-ONET_API_KEY = os.getenv("ONET_API_KEY", "AYRvP-2AaMc-2BKqY-4UFda")
-ONET_BASE_URL = "https://api-v2.onetcenter.org"
 
 # Setup templates and static
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -740,80 +737,6 @@ async def build_page(request: Request):
 async def terms(request: Request):
     """Terms of Service page"""
     return templates.TemplateResponse(request=request, name="terms.html")
-
-@app.get("/api/jobs/search")
-async def search_jobs(query: str = ""):
-    """Search job titles via O*NET API proxy"""
-    if not query or len(query) < 2:
-        return {"results": []}
-    
-    try:
-        response = await http_client.get(
-            f"{ONET_BASE_URL}/online/search",
-            params={"keyword": query, "start": 1, "end": 20},
-            headers={"X-API-Key": ONET_API_KEY},
-            timeout=5.0
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            results = []
-            if "occupation" in data:
-                for occ in data["occupation"]:
-                    results.append({
-                        "code": occ.get("code", ""),
-                        "title": occ.get("title", ""),
-                        "tags": occ.get("tags", [])
-                    })
-            return {"results": results[:10]}
-        else:
-            return {"results": [], "error": f"API returned {response.status_code}"}
-
-    except Exception as e:
-        return {"results": [], "error": str(e)}
-
-@app.get("/api/jobs/{job_code}")
-async def get_job_details(job_code: str):
-    """Get detailed job information from O*NET"""
-    try:
-        response = await http_client.get(
-            f"{ONET_BASE_URL}/online/occupations/{job_code}",
-            headers={"X-API-Key": ONET_API_KEY},
-            timeout=5.0
-        )
-
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"error": f"API returned {response.status_code}"}
-
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/api/jobs/{job_code}/summary")
-async def get_job_summary(job_code: str):
-    """Get job summary for resume suggestions"""
-    try:
-        response = await http_client.get(
-            f"{ONET_BASE_URL}/online/occupations/{job_code}/summary",
-            headers={"X-API-Key": ONET_API_KEY},
-            timeout=5.0
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            return {
-                "title": data.get("title", ""),
-                "description": data.get("description", ""),
-                "skills": data.get("skills", []),
-                "knowledge": data.get("knowledge", []),
-                "abilities": data.get("abilities", [])
-            }
-        else:
-            return {"error": f"API returned {response.status_code}"}
-
-    except Exception as e:
-        return {"error": str(e)}
 
 def _load_voice_session_data(session_id: str):
     """Return a voice session's stored 'data' dict, from memory or disk. None if missing."""

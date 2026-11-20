@@ -239,6 +239,16 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - The DOCX export writes plain text through python-docx and needs no escaping.
 - Guarded by `tests/test_pdf_markup_escape.py`.
 
+### 2026-11-20 — No API Docs in Production; the O*NET Job Search Is Gone
+
+- In production, `/docs`, `/redoc` and `/openapi.json` listed every endpoint. `FastAPI(openapi_url=None)` turns all three off when `APP_ENV` is `production`; development keeps them.
+- The O*NET job-title search had no caller: nothing invoked `setupJobAutocomplete()` in `app.js`. Removed:
+  - its three relay endpoints (`/api/jobs/search`, `/api/jobs/{code}` and `/api/jobs/{code}/summary`);
+  - the API key that was hard-coded as their default;
+  - the unused front-end code behind them.
+- Company and city autocomplete are unaffected.
+- Guarded by `tests/test_production_config.py`.
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.
