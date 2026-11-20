@@ -700,10 +700,14 @@ async def process_answer(session: dict, transcript: str) -> dict:
     # === END INTERCEPT ===
     
     # GLOBAL SAFETY CHECK: If user says "done" in experience phase past field collection,
-    # force bullet loop exit regardless of internal flags
+    # force bullet loop exit regardless of internal flags.
+    # Not at the "Add another job?" prompt (exp_done): there "done" means "no more
+    # jobs" and _process_experience moves on to the summary. Intercepting it here
+    # re-asked the same question forever.
     if phase == "experience":
         field_idx = ctx.get("exp_field_idx", 0)
-        if lower in ["done", "no", "stop", "finished"] and field_idx >= len(EXPERIENCE_FIELDS):
+        if (lower in ["done", "no", "stop", "finished"] and field_idx >= len(EXPERIENCE_FIELDS)
+                and not ctx.get("exp_done", False)):
             # Force exit bullet loop and mark job as done
             ctx["in_bullet_loop"] = False
             ctx["exp_done"] = True
@@ -790,7 +794,8 @@ def _process_experience(session: dict, extracted: str) -> dict:
     
     # 3. Hard stop: if user sends "done" at ANY point in experience phase,
     # force exit immediately and do NOT let it leak into field or bullet storage.
-    if sanitized_text in ["done", "no", "stop", "finished"]:
+    # Except at the "Add another job?" decision (exp_done), handled below.
+    if sanitized_text in ["done", "no", "stop", "finished"] and not ctx.get("exp_done", False):
         # If still collecting fields, fast-forward past them
         if field_idx < len(EXPERIENCE_FIELDS):
             ctx["exp_field_idx"] = len(EXPERIENCE_FIELDS)
