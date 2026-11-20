@@ -217,45 +217,6 @@ def asset_url(path: str) -> str:
 
 templates.env.globals["asset_url"] = asset_url
 
-# === Fix: Jinja2's _load_template uses (loader_ref, name) as cache key and
-# passes globals (which may contain unhashable dicts/lists) into the cache.
-# Monkey-patch _load_template to skip the cache lookup entirely.
-import jinja2 as _jinja2
-from jinja2.utils import LRUCache as _LRUCache
-
-# Monkey-patch LRUCache.__getitem__ to avoid hash-based dict lookup
-# which fails when cache keys contain unhashable types (dicts/lists).
-_orig_lru_getitem = _LRUCache.__getitem__
-def _safe_lru_getitem(self, key):
-    with self._wlock:
-        for k, v in self._mapping.items():
-            if k == key:
-                if self._queue[-1] != key:
-                    try:
-                        self._remove(key)
-                    except ValueError:
-                        pass
-                    self._append(key)
-                return v
-        raise KeyError(key)
-_LRUCache.__getitem__ = _safe_lru_getitem
-
-# Also monkey-patch LRUCache.get so it uses our patched __getitem__
-_LRUCache.get = lambda self, key, default=None: self[key] if key in [k for k in self._mapping.keys()] else default
-
-# Monkey-patch _load_template to bypass cache lookup with unhashable keys
-_orig_load_template = _jinja2.Environment._load_template
-def _safe_load_template(self, name, globals):
-    if self.loader is None:
-        raise TypeError("no loader for this environment specified")
-    # Always load fresh template, bypass cache.get()
-    template = self.loader.load(self, name, self.make_globals(globals))
-    if self.cache is not None:
-        cache_key = (self.loader, name)  # use loader object directly instead of weakref
-        self.cache[cache_key] = template
-    return template
-_jinja2.Environment._load_template = _safe_load_template
-
 
 
 # Load Fortune 1000 companies
