@@ -881,10 +881,9 @@ async def build_resume(
     resume_id = f"{full_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     resumes[resume_id] = resume_data
     save_resume_json(resume_id, resume_data)
-    
-    docx_path = generate_docx(resume_id, resume_data)
-    pdf_path = generate_pdf(resume_id, resume_data)
-    
+    # DOCX/PDF are rendered on first download (see download_resume), not on
+    # every preview build.
+
     return {
         "success": True,
         "resume_id": resume_id,
@@ -1987,12 +1986,21 @@ def _get_minimal_css():
     return html
 
 @app.get("/api/download/{resume_id}")
-async def download_resume(resume_id: str):
-    """Download resume as .docx"""
-    filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.docx")
-    if os.path.exists(filepath):
-        return FileResponse(filepath, filename=f"resume_{resume_id}.docx")
-    return JSONResponse({"error": "Resume not found"}, status_code=404)
+def download_resume(resume_id: str, format: str = "docx"):
+    """Download the resume as .docx (default) or .pdf (?format=pdf).
+
+    The file is rendered on first request from the stored resume data, so
+    preview builds don't pay for documents nobody downloads. Sync def: FastAPI
+    runs it in the threadpool, keeping CPU-bound rendering off the event loop.
+    """
+    ext = "pdf" if format == "pdf" else "docx"
+    filepath = os.path.join(RESUME_STORAGE_DIR, f"{resume_id}.{ext}")
+    if not os.path.exists(filepath):
+        data = get_resume(resume_id)
+        if not data:
+            return JSONResponse({"error": "Resume not found"}, status_code=404)
+        (generate_pdf if ext == "pdf" else generate_docx)(resume_id, data)
+    return FileResponse(filepath, filename=f"resume_{resume_id}.{ext}")
 
 @app.get("/api/companies/search")
 async def search_companies(query: str = ""):
