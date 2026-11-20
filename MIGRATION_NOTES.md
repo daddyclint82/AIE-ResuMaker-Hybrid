@@ -21,7 +21,7 @@ STRIPE_STUDENT_PRICE_ID=<REDACTED: set in Render dashboard>
 STRIPE_WEBHOOK_SECRET=<REDACTED: set in Render dashboard>
 
 # Ollama — create at ollama.com/settings/keys (summary + skills LLM)
-LLM_API_KEY=<REDACTED: set in Render dashboard>
+OLLAMA_API_KEY=<REDACTED: set in Render dashboard>
 ```
 
 > ⚠️ Secret key prefixes are intentionally NOT written in this file to avoid

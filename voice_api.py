@@ -22,7 +22,7 @@ import time
 import unicodedata
 import uuid
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
 import httpx
 from fastapi import APIRouter, Request
@@ -50,9 +50,10 @@ session_locks: Dict[str, asyncio.Lock] = {}
 
 # The summary and skills steps call an OpenAI-compatible chat API. Default: MiniMax
 # M3.1 Flash on Ollama's cloud (chosen in docs/review/llm-model-test/); another
-# provider is an env change. Without LLM_API_KEY both steps use template fallbacks.
+# provider is an env change. Without a key both steps use template fallbacks.
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "https://ollama.com/v1").rstrip("/")
-LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+# OLLAMA_API_KEY is the name Ollama's docs use; LLM_API_KEY wins when both are set.
+LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("OLLAMA_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL", "minimax-m3.1-flash")
 
 # Ollama caps concurrent requests per account (3 on Pro) and this account also serves
@@ -265,6 +266,86 @@ SIMPLE_STEPS = [
     {"field": "experience_level", "question": "Experience level — entry, mid, senior, or executive?"},
     {"field": "education_level", "question": "Education level — high school, associate, bachelor's, master's, doctorate, or certification?"},
 ]
+
+# The city and state questions are only asked when the address doesn't give them.
+# US states and territories (code -> name): the same table /api/states serves the form.
+try:
+    with open(os.path.join(BASE_DIR, "data", "cities.json"), encoding="utf-8") as _f:
+        US_STATES: Dict[str, str] = json.load(_f).get("states", {})
+except (OSError, ValueError):
+    US_STATES = {}
+_STATE_NAMES = sorted(((name.lower(), code) for code, name in US_STATES.items()), key=lambda nc: -len(nc[0]))
+_STREET_TYPES = {"st", "street", "ave", "av", "avenue", "rd", "road", "blvd", "boulevard", "dr", "drive", "ln", "lane",
+                 "way", "ct", "court", "pl", "place", "pkwy", "parkway", "hwy", "highway", "cir", "circle", "trl",
+                 "trail", "ter", "terrace", "loop", "sq", "square", "pike", "fwy", "freeway", "expy", "expressway",
+                 "cv", "cove", "xing", "crossing", "plz", "plaza", "aly", "alley", "row", "run", "path"}
+_DIRECTIONS = {"n", "s", "e", "w", "ne", "nw", "se", "sw", "north", "south", "east", "west"}
+_UNIT_WORDS = {"apt", "apartment", "unit", "suite", "ste", "bldg", "building", "fl", "floor", "lot", "rm", "room", "#"}
+
+
+def state_code(text: str) -> str:
+    """'Illinois', 'il' or 'IL' -> 'IL'; '' if it isn't a US state or territory."""
+    t = (text or "").strip().rstrip(".").lower()
+    if t.upper() in US_STATES:
+        return t.upper()
+    return next((code for name, code in _STATE_NAMES if name == t), "")
+
+
+def city_state_from_address(address: str) -> Tuple[str, str]:
+    """Best-effort (city, state code) from a US address; '' for a part it can't find.
+
+    Reads "123 Main St, Anytown, TX 12345", full state names, ZIP+4, a trailing "USA",
+    and dictation without commas ("123 Main Street Anytown Texas 12345").
+    """
+    text = re.sub(r"\s+", " ", address or "").strip().rstrip(".")
+    text = re.sub(r"(?i)[\s,]+(?:usa|u\.s\.a\.?|u\.s\.?|united states(?: of america)?)$", "", text)
+    text = re.sub(r"[\s,]*\b\d{5}(?:-\d{4})?$", "", text).rstrip(" ,")
+    lower, state, head = text.lower(), "", ""
+    for name, code in _STATE_NAMES:                     # longest first: "west virginia" before "virginia"
+        if lower.endswith(name) and (len(lower) == len(name) or lower[-len(name) - 1] in " ,"):
+            state, head = code, text[: -len(name)]
+            break
+    else:
+        m = re.search(r"(?:^|[ ,])([A-Za-z]{2})$", text)
+        if m and m.group(1).upper() in US_STATES:
+            state, head = m.group(1).upper(), text[: m.start(1)]
+    if not state:
+        return "", ""
+    head = head.rstrip(" ,")
+    city = head.rsplit(",", 1)[1].strip() if "," in head else _city_after_street(head)
+    if re.search(r"[\d#@/]", city) or not 1 <= len(city.split()) <= 4:
+        city = ""
+    return city, state
+
+
+def _city_after_street(head: str) -> str:
+    """The city in a comma-less "number name type [direction] [unit] city"."""
+    m = re.match(r"(?i)(?:p\.?\s*o\.?\s*)?box\s+\S+\s+(.+)", head)
+    if m:
+        return m.group(1)
+    words = head.split()
+    if not words or not words[0][0].isdigit():
+        return head                                     # no street at all: "Anytown TX"
+    for i in range(2, len(words)):                      # a street has a name before its type
+        if words[i].lower().rstrip(".") in _STREET_TYPES:
+            j = i + 1
+            if j < len(words) and words[j].lower().rstrip(".") in _DIRECTIONS:
+                j += 1
+            while j < len(words) and (words[j].lower().rstrip(".") in _UNIT_WORDS or words[j].startswith("#")):
+                j += 1 if len(words[j]) > 1 and words[j].startswith("#") else 2   # "#4B" / "Apt 4B"
+            return " ".join(words[j:])
+    return ""
+
+
+def _fill_city_state_from_address(data: dict, ctx: dict) -> None:
+    """Store what the address answer gives; those questions are then skipped."""
+    for field in ctx.get("address_filled", []):        # from an earlier answer to the address question
+        data.pop(field, None)
+    city, state = city_state_from_address(data.get("address", ""))
+    found = {"city": city, "state": state}
+    ctx["address_filled"] = [f for f, v in found.items() if v]
+    for field in ctx["address_filled"]:
+        data[field] = found[field]
 
 # Skill categories by industry tier, most relevant first. The skills panel's list in
 # static/voice_chat.js must hold every category named here.
@@ -754,9 +835,15 @@ async def process_answer(session: dict, transcript: str) -> dict:
         idx = session.get("step_index", 0)
         if idx < len(SIMPLE_STEPS):
             field = SIMPLE_STEPS[idx]["field"]
-            data[field] = extracted
+            data[field] = (state_code(extracted) or extracted) if field == "state" else extracted
+            if field == "address":
+                _fill_city_state_from_address(data, ctx)
+            idx += 1
+            while idx < len(SIMPLE_STEPS) and SIMPLE_STEPS[idx]["field"] in ctx.get("address_filled", []):
+                idx += 1
             session["data"] = data
-            session["step_index"] = idx + 1
+            session["context"] = ctx
+            session["step_index"] = idx
         return get_current_state(session)
     
     # Phase 2: Experience
@@ -1127,12 +1214,20 @@ def go_back(session: dict) -> dict:
     # Simple fields
     if phase == "simple":
         idx = session.get("step_index", 0)
+        filled = ctx.get("address_filled", [])
+        while idx > 0 and SIMPLE_STEPS[idx - 1]["field"] in filled:   # never asked: step over them
+            idx -= 1
         if idx > 0:
-            session["step_index"] = idx - 1
-            field = SIMPLE_STEPS[idx - 1]["field"]
-            if field in data:
-                del data[field]
+            idx -= 1
+            field = SIMPLE_STEPS[idx]["field"]
+            data.pop(field, None)
+            if field == "address":                     # what it filled goes with it
+                for f in filled:
+                    data.pop(f, None)
+                ctx["address_filled"] = []
+            session["step_index"] = idx
             session["data"] = data
+            session["context"] = ctx
         return get_current_state(session)
     
     # Experience
@@ -2124,12 +2219,13 @@ async def _voice_turn_locked(session_id: str, action: str, transcript: str):
             session["done"] = False
             data = session.get("data", {})
             simple_fields = [s["field"] for s in SIMPLE_STEPS]
-            answered = [f for f in simple_fields if data.get(f)]
-            if len(answered) < len(simple_fields):
-                # Still in the simple phase: land exactly on next unanswered field
+            unanswered = [i for i, f in enumerate(simple_fields) if not data.get(f)]
+            if unanswered:
+                # Still in the simple phase: land exactly on the first unanswered field
+                # (not a count: the address can fill city/state out of order)
                 ctx["phase"] = "simple"
-                session["step_index"] = len(answered)
-                ctx["current_field"] = simple_fields[len(answered)]
+                session["step_index"] = unanswered[0]
+                ctx["current_field"] = simple_fields[unanswered[0]]
             else:
                 # Past simple phase: resume precisely via the stamp if present
                 ctx["phase"] = ctx.get("_resume_phase", "experience")
