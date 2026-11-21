@@ -566,6 +566,18 @@ def _seal_works() -> bool:
         return False
 
 
+def resume_key(resume_id: str) -> str:
+    """The key a customer keeps with their PDF, like "K7QMA-2XWTB".
+
+    Reopening a resume takes the PDF and this key: resumes get sent to
+    strangers, and the file alone must not let one of them spend the buyer's
+    edits. It is worked out from the resume the purchase was for, so the server
+    can check it later without having stored it."""
+    tag = hmac.new(_REFERRAL_KEY, b"resume-key:" + resume_id.encode(), hashlib.sha256).digest()
+    code = base64.b32encode(tag[:10]).decode()[:10]  # 50 bits
+    return f"{code[:5]}-{code[5:]}"
+
+
 def new_referral_code() -> str:
     nonce = secrets.token_bytes(5)
     return base64.b32encode(nonce + _referral_tag(nonce)).decode()
@@ -2146,7 +2158,17 @@ async def create_checkout_session(request: Request):
             metadata={
                 "resume_id": resume_id,
                 "tier": tier,
-                "referral_code": ref_code
+                "referral_code": ref_code,
+                # Edits are counted here, on Stripe's record of the purchase:
+                # it is the one place a deploy, restart or idle spin-down
+                # doesn't wipe. Metadata values are strings.
+                "edits_used": "0"
+            },
+            # Stripe prints this on its receipt, so the key reaches the
+            # customer's inbox even if they close the success page.
+            payment_intent_data={
+                "description": f"AIE ResuMaker resume. Your resume key: {resume_key(resume_id)}. "
+                               "Keep it with your PDF."
             }
         )
         
@@ -2180,6 +2202,7 @@ async def payment_success(request: Request, session_id: str = "", ref: str = "")
                 name="success.html",
                 context={
                     "resume_id": resume_id,
+                    "resume_key": resume_key(resume_id),
                     "download_url": f"/api/download/{resume_id}"
                 }
             )

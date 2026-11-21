@@ -266,6 +266,16 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - Nothing reads an uploaded PDF yet; the upload page is a later step.
 - Guarded by `tests/test_pdf_seal.py` (no server, no network).
 
+### 2026-11-21 — The Resume Key, and Edits Counted on Stripe
+
+- **The key.** Each purchase has a key like `K7QMA-2XWTB`: 50 bits of HMAC-SHA256 over the purchased resume's ID under `REFERRAL_SECRET` (label `resume-key:`), base32. Reopening a resume will take the PDF and the key, because resumes are sent to strangers and the file alone must not let one of them spend the buyer's edits. The key is not in the PDF.
+- The server stores nothing: the saved copy in the PDF names the Stripe session, the session's metadata names the purchased `resume_id`, and the key is recomputed from that.
+- The customer sees it on `/success` (with a copy button) and on Stripe's receipt: `payment_intent_data.description` carries it.
+- **Edits.** The checkout session's metadata starts `edits_used` at `"0"`. Stripe's record of the purchase is the one place a deploy, restart or idle spin-down doesn't wipe. Sessions created before this have no `edits_used`; read a missing value as 0.
+- Proved on Stripe test mode, 2026-11-21: a paid, completed Checkout Session accepts `Session.modify(metadata=...)` and a fresh `retrieve` returns the new value; the description appears on the charge and on Stripe's hosted receipt page.
+- Nothing spends an edit or checks a key yet; the upload page and server-side edits are later steps.
+- Guarded by `tests/test_resume_key.py` (no server, no network).
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.

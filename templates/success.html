@@ -58,6 +58,40 @@
         .download-btn.secondary:hover {
             background: #eaf6ec;
         }
+        .key-box {
+            margin: 28px auto 0;
+            padding: 16px;
+            max-width: 420px;
+            background: #f6f8fa;
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+        }
+        .key-label {
+            font-size: 14px;
+            color: #666;
+        }
+        .key-value {
+            margin: 8px 0;
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #222;
+            user-select: all;
+        }
+        .key-copy {
+            padding: 8px 16px;
+            background: white;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .key-note {
+            margin: 12px 0 0;
+            font-size: 14px;
+            color: #666;
+        }
         .back-link {
             display: block;
             margin-top: 20px;
@@ -84,6 +118,15 @@
                 Download Word (.docx)
             </a>
         </div>
+        <div class="key-box">
+            <div class="key-label">Your resume key</div>
+            <div class="key-value" id="resume-key">{{ resume_key }}</div>
+            <button type="button" class="key-copy" id="copy-key">Copy key</button>
+            <p class="key-note">
+                Keep this key with your PDF. You'll need both to reopen your resume later.
+                It's also on your payment receipt.
+            </p>
+        </div>
         <a href="/build" class="back-link">← Back to Builder</a>
     </div>
     <script>
@@ -92,6 +135,17 @@
         localStorage.setItem('aie_purchase_date', new Date().toISOString());
         localStorage.setItem('aie_purchase_complete', 'true');
         localStorage.setItem('aie_show_edit_popup', 'true');
+
+        document.getElementById('copy-key').addEventListener('click', async (e) => {
+            try {
+                await navigator.clipboard.writeText(document.getElementById('resume-key').textContent);
+                e.target.textContent = 'Copied';
+            } catch (err) {
+                // No clipboard access (an in-app browser, say): the key is
+                // selectable, so it can still be copied by hand.
+                e.target.textContent = 'Press and hold the key to copy';
+            }
+        });
     </script>
 </body>
 </html>
