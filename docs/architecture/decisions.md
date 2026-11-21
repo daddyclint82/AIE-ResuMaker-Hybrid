@@ -255,6 +255,17 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - Company, university and field-of-study suggestions share the new `setupListAutocomplete` instead of three copies of the same code.
 - Guarded by `tests/test_production_config.py` and `tests/test_job_titles.py`.
 
+### 2026-11-21 — Every PDF Carries Its Own Saved Copy
+
+- Render's free tier wipes resumes on every deploy, restart and idle spin-down, but the customer keeps the PDF. `generate_pdf` now puts the resume's data inside the PDF so a later upload page can bring it back exactly, including what reading the page never could (the style, each skill's weight).
+- **What is sealed:** the stored resume dict, its `resume_id`, and the Stripe checkout session that paid for it (`mark_resume_paid` now records it). Not `paid`: Stripe says what was paid, never the file.
+- **Encrypted, not just signed.** The data holds things the page does not print (the street address, the Stripe session), and resumes are sent to strangers. Fernet (`cryptography`) encrypts and authenticates, so a copy that opens is one this server wrote. The key is derived from `REFERRAL_SECRET` under its own label; without that secret, copies stop opening at the next restart, like referral codes.
+- **Where it sits:** an uncompressed stream under a private catalog entry, `/AIEResumeCopy`, added with `pypdf` after reportlab writes the file. Viewers ignore it and the pages are identical. A file attachment was tried first and dropped: it shows as a paperclip in the reader's viewer, and mail filters are wary of PDFs with attachments. About 1 KB per PDF.
+- `read_sealed_pdf` returns the copy or `None`. It refuses a compressed or oversized entry without unpacking it, since any file can be handed in.
+- If sealing fails, the customer still gets the PDF; the failure is logged and `/healthz` reports `"seal": false`. `/healthz` `"seal": true` means this process sealed a PDF and read it back.
+- Nothing reads an uploaded PDF yet; the upload page is a later step.
+- Guarded by `tests/test_pdf_seal.py` (no server, no network).
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.

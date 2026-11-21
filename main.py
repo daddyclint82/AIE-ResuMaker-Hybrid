@@ -16,12 +16,14 @@ from fastapi.templating import Jinja2Templates
 import functools
 import hashlib
 from html import escape
+import io
 import json
 import logging
 import os
 import re
 import smtplib
 import unicodedata
+import zlib
 import httpx
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
@@ -183,9 +185,12 @@ async def static_cache_headers(request: Request, call_next):
 @app.head("/")
 @app.get("/healthz")
 async def health_check():
-    # "referral_secret" false = referral codes stop working at every restart
+    # "referral_secret" false = referral codes, and the saved copy sealed in each
+    # PDF, stop working at every restart. "seal" false = PDFs are going out
+    # without their saved copy.
     return {"status": "ok", "env": APP_ENV, "llm": bool(LLM_API_KEY),
-            "referral_secret": bool(os.getenv("REFERRAL_SECRET"))}
+            "referral_secret": bool(os.getenv("REFERRAL_SECRET")),
+            "seal": _seal_works()}
 
 # Setup templates and static
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -431,11 +436,16 @@ def get_resume(resume_id: str) -> dict | None:
         return data
     return None
 
-def mark_resume_paid(resume_id: str) -> None:
-    """Record a payment Stripe has confirmed (from /success or the webhook)."""
+def mark_resume_paid(resume_id: str, stripe_session: str = "") -> None:
+    """Record a payment Stripe has confirmed (from /success or the webhook).
+
+    The checkout session ID is kept so the PDF's saved copy can point back to
+    the payment: Stripe's record of it outlives this server's disk."""
     resume = get_resume(resume_id)
     if resume:
         resume["paid"] = True
+        if stripe_session:
+            resume["stripe_session"] = stripe_session
         save_resume_json(resume_id, resume)
 
 # Student verification tokens: {token: {email: str, verified: bool, expires: datetime}}
@@ -459,6 +469,101 @@ _REFERRAL_CODE_RE = re.compile(r"[A-Z2-7]{16}")
 
 def _referral_tag(nonce: bytes) -> bytes:
     return hmac.new(_REFERRAL_KEY, b"referral-code:" + nonce, hashlib.sha256).digest()[:5]
+
+
+# The saved copy: every PDF carries its own resume data, so a customer who kept
+# the file can bring the resume back after this server has forgotten it. It sits
+# in a private entry of the PDF's catalog, which viewers ignore. (A file
+# attachment would show as a paperclip in the reader's viewer, and mail filters
+# are wary of PDFs with attachments.) It is encrypted, not just signed: the data holds things the page
+# does not print (the street address, the Stripe session), and resumes get sent
+# to strangers. Fernet also authenticates, so a copy that decrypts is one this
+# server wrote. The key comes from REFERRAL_SECRET under its own label; like
+# referral codes, saved copies stop opening at the next restart without it.
+_SEAL_ENTRY = "/AIEResumeCopy"
+_SEAL_MAX_BYTES = 256 * 1024  # a long resume seals to 2-3 KB
+_SEAL_VERSION = 1
+_SEAL_LEFT_OUT = ("paid", "stripe_session")  # Stripe says what was paid, not the file
+
+
+@functools.lru_cache(maxsize=1)
+def _seal_cipher():
+    from cryptography.fernet import Fernet
+    key = hmac.new(_REFERRAL_KEY, b"resume-seal-key", hashlib.sha256).digest()
+    return Fernet(base64.urlsafe_b64encode(key))
+
+
+def seal_resume(resume_id: str, data: dict) -> bytes:
+    """The resume, packed and encrypted for the PDF it is about to go into."""
+    sealed = {
+        "v": _SEAL_VERSION,
+        "resume_id": resume_id,
+        "stripe_session": data.get("stripe_session", ""),
+        "resume": {k: v for k, v in data.items() if k not in _SEAL_LEFT_OUT},
+    }
+    packed = zlib.compress(json.dumps(sealed, separators=(",", ":"), ensure_ascii=False).encode(), 9)
+    return _seal_cipher().encrypt(packed)
+
+
+def unseal_resume(blob) -> dict | None:
+    """What seal_resume() packed, or None for anything this server did not seal."""
+    from cryptography.fernet import InvalidToken
+    try:
+        sealed = json.loads(zlib.decompress(_seal_cipher().decrypt(blob)))
+    except (InvalidToken, TypeError, ValueError, zlib.error):
+        return None
+    return sealed if isinstance(sealed, dict) and sealed.get("v") == _SEAL_VERSION else None
+
+
+def _seal_pdf(filepath: str, resume_id: str, data: dict) -> None:
+    """Put the saved copy into a PDF generate_pdf() has just written."""
+    from pypdf import PdfWriter
+    writer = PdfWriter(clone_from=filepath)
+    _add_seal(writer, seal_resume(resume_id, data))
+    sealed_path = filepath + ".sealing"
+    with open(sealed_path, "wb") as f:
+        writer.write(f)
+    os.replace(sealed_path, filepath)
+
+
+def _add_seal(writer, blob: bytes) -> None:
+    from pypdf.generic import DecodedStreamObject, NameObject
+    stream = DecodedStreamObject()
+    stream.set_data(blob)
+    writer.root_object[NameObject(_SEAL_ENTRY)] = writer._add_object(stream)
+
+
+def read_sealed_pdf(pdf: bytes) -> dict | None:
+    """The saved copy inside a PDF, or None if it has none this server sealed."""
+    try:
+        from pypdf import PdfReader
+        stream = PdfReader(io.BytesIO(pdf)).root_object[_SEAL_ENTRY].get_object()
+        # Ours is stored as written. A compressed one is someone else's, and
+        # unpacking it could cost any amount of memory.
+        if "/Filter" in stream or len(stream._data) > _SEAL_MAX_BYTES:
+            return None
+        blob = stream._data
+    except Exception:
+        # Any file can be handed in here, and pypdf fails on bad ones in many
+        # ways (PdfReadError, KeyError, RecursionError, ...). All mean "no copy".
+        return None
+    return unseal_resume(blob)
+
+
+@functools.lru_cache(maxsize=1)
+def _seal_works() -> bool:
+    """For /healthz: can this process seal a PDF and read it back?"""
+    try:
+        from pypdf import PdfWriter
+        writer = PdfWriter()
+        writer.add_blank_page(72, 72)
+        _add_seal(writer, seal_resume("healthz", {"full_name": "healthz"}))
+        pdf = io.BytesIO()
+        writer.write(pdf)
+        return (read_sealed_pdf(pdf.getvalue()) or {}).get("resume_id") == "healthz"
+    except Exception:
+        logger.exception("[Seal] self-check failed")
+        return False
 
 
 def new_referral_code() -> str:
@@ -2062,7 +2167,7 @@ async def payment_success(request: Request, session_id: str = "", ref: str = "")
             # create_checkout_session recorded in its metadata.
             metadata = session.get("metadata") or {}
             resume_id = metadata.get("resume_id", "")
-            mark_resume_paid(resume_id)
+            mark_resume_paid(resume_id, session.get("id", ""))
 
             # Track referral conversion
             referral = referral_stats(ref or metadata.get("referral_code", ""))
@@ -2110,7 +2215,7 @@ async def stripe_webhook(request: Request):
         if event.get("type") == "checkout.session.completed":
             session = event["data"]["object"]
             metadata = session.get("metadata") or {}
-            mark_resume_paid(metadata.get("resume_id", ""))
+            mark_resume_paid(metadata.get("resume_id", ""), session.get("id", ""))
             ref_code = metadata.get("referral_code", "")
 
             # Track referral conversion from webhook
@@ -2469,6 +2574,12 @@ def generate_pdf(resume_id: str, data: dict):
     story.append(Paragraph("*References available upon request*", ParagraphStyle('References', parent=normal_style, alignment=TA_CENTER, fontSize=9, fontName='LiberationSerif-Italic')))
     
     doc.build(story)
+    try:
+        _seal_pdf(filepath, resume_id, data)
+    except Exception:
+        # The customer still gets the resume they paid for; /healthz "seal" and
+        # this log say the saved copy is missing.
+        logger.exception("[Seal] PDF %s went out without its saved copy", resume_id)
     return filepath
 
 

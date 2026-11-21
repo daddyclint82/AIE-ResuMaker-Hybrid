@@ -19,5 +19,9 @@ reportlab==4.5.1
 python-docx==1.2.0
 Pillow==12.2.0
 
+# The saved copy sealed inside each PDF (encrypt it, attach it, read it back)
+pypdf==7.1.1
+cryptography==50.0.2
+
 # Watermarked preview rendering: DISABLED on Render free tier (Chromium doesn't persist)
 # playwright==1.60.0
