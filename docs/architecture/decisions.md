@@ -276,6 +276,20 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - Nothing spends an edit or checks a key yet; the upload page and server-side edits are later steps.
 - Guarded by `tests/test_resume_key.py` (no server, no network).
 
+### 2026-11-21 — The Come-Back Page: a Resume Returns from Its PDF and Key
+
+- `GET /restore` is the page; `POST /api/restore` takes the PDF and the key and puts the resume back on this server, paid, so both downloads work again.
+- Three checks, all on the server, in this order:
+  1. The PDF carries a saved copy this server sealed (`read_sealed_pdf`). Otherwise 422.
+  2. The key is that resume's key (`resume_key_matches`: forgiving of case, spaces, dashes, and 0/1 typed for O/I). Otherwise 403. This comes before Stripe, so a wrong key costs one hash and no API call.
+  3. Stripe says the checkout session the copy names is `paid` and was for this `resume_id`. Otherwise 402. The file never says what was paid.
+- Stripe not answering is a 503 that tells the customer their PDF and key are fine and to try again. It is not a refusal.
+- Uploads over 2 MB are turned away (413) before anything parses them; a resume PDF from this site is 60-150 KB. The route is a sync `def`, so PDF parsing runs in the threadpool.
+- A PDF that lost its saved copy (printed, scanned, re-saved by a program that drops unknown entries) cannot be restored: without the copy nothing names the payment. Reading such a PDF's text back into the form is a later feature, with the import of outside resumes.
+- The page restores and re-downloads. Opening the restored resume in the editor ships with server-side edits, so the page never offers an edit it can't save.
+- `templates/*.html` is caught by `.gitignore`'s `*.html`; new templates need `git add -f`.
+- Guarded by `tests/test_restore.py` (no server, no network).
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.

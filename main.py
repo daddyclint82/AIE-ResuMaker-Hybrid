@@ -9,7 +9,7 @@
 # Project hub: docs/project-memory.md
 # ================================================
 
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -578,6 +578,13 @@ def resume_key(resume_id: str) -> str:
     return f"{code[:5]}-{code[5:]}"
 
 
+def resume_key_matches(resume_id: str, typed: str) -> bool:
+    """Is `typed` this resume's key? Forgiving of case, spaces and dashes, and of
+    0 and 1 typed for O and I (the key's alphabet has no 0 or 1)."""
+    cleaned = re.sub(r"[^A-Z0-9]", "", str(typed).upper()).translate(str.maketrans("01", "OI"))
+    return hmac.compare_digest(cleaned.encode(), resume_key(resume_id).replace("-", "").encode())
+
+
 def new_referral_code() -> str:
     nonce = secrets.token_bytes(5)
     return base64.b32encode(nonce + _referral_tag(nonce)).decode()
@@ -867,6 +874,71 @@ async def build_page(request: Request):
 async def terms(request: Request):
     """Terms of Service page"""
     return templates.TemplateResponse(request=request, name="terms.html")
+
+@app.get("/restore", response_class=HTMLResponse)
+async def restore_page(request: Request):
+    """The come-back page: reopen a resume from its PDF and key."""
+    return templates.TemplateResponse(request=request, name="restore.html",
+                                      context={"max_bytes": RESTORE_MAX_BYTES})
+
+
+# A resume PDF from this site is 60-150 KB.
+RESTORE_MAX_BYTES = 2 * 1024 * 1024
+
+
+def _restore_refused(status: int, message: str):
+    return JSONResponse({"error": message}, status_code=status)
+
+
+@app.post("/api/restore")
+def restore_resume(request: Request, pdf: UploadFile = File(...), key: str = Form("")):
+    """Bring back a resume this server has forgotten, from the PDF and its key.
+
+    Three things must hold, each checked by this server and none taken from the
+    browser: the PDF carries a saved copy this server sealed, the key is that
+    resume's key, and Stripe says the purchase it names was paid. Sync def:
+    reading a PDF is CPU work, so FastAPI runs it in the threadpool."""
+    too_big = _restore_refused(413, "That file is too big to be a resume from this site.")
+    if int(request.headers.get("content-length") or 0) > RESTORE_MAX_BYTES + 64 * 1024:
+        return too_big
+    data = pdf.file.read(RESTORE_MAX_BYTES + 1)
+    if len(data) > RESTORE_MAX_BYTES:
+        return too_big
+
+    sealed = read_sealed_pdf(data)
+    if not sealed or not sealed.get("stripe_session"):
+        return _restore_refused(422, "We couldn't find a saved copy in that file. Upload the PDF exactly as "
+                                     "you downloaded it from this site. A copy that was printed, scanned or "
+                                     "re-saved by another program won't work.")
+    resume_id = sealed["resume_id"]
+    # Before Stripe is asked anything: a wrong key costs one hash.
+    if not resume_key_matches(resume_id, key):
+        return _restore_refused(403, "That key doesn't match this PDF. It's on the page you saw after paying "
+                                     "and on your payment receipt.")
+
+    not_paid = _restore_refused(402, "We couldn't find a completed payment for this resume.")
+    try:
+        # to_dict(): Stripe objects have no .get().
+        session = stripe.checkout.Session.retrieve(sealed["stripe_session"]).to_dict()
+    except stripe.InvalidRequestError:
+        return not_paid  # Stripe has no such checkout
+    except stripe.StripeError:
+        logger.exception("[Restore] Stripe did not answer")
+        return _restore_refused(503, "We couldn't reach our payment records just now. Your PDF and key are "
+                                     "fine. Please try again in a minute.")
+    if session.get("payment_status") != "paid" or (session.get("metadata") or {}).get("resume_id") != resume_id:
+        return not_paid
+
+    resume = dict(sealed["resume"], paid=True, stripe_session=sealed["stripe_session"])
+    resumes[resume_id] = resume
+    save_resume_json(resume_id, resume)
+    return {
+        "success": True,
+        "name": resume.get("full_name", ""),
+        "download_url_pdf": f"/api/download/{resume_id}?format=pdf",
+        "download_url_docx": f"/api/download/{resume_id}?format=docx",
+    }
+
 
 def _load_voice_session_data(session_id: str):
     """Return a voice session's stored 'data' dict, from memory or disk. None if missing."""

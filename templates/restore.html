@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reopen Your Resume - AIE ResuMaker</title>
+    <link rel="stylesheet" href="{{ asset_url('style.css') }}">
+    <style>
+        .restore-container {
+            max-width: 600px;
+            margin: 60px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .restore-container h1 {
+            font-size: 26px;
+            color: #222;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .restore-intro {
+            font-size: 16px;
+            color: #666;
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .restore-field {
+            margin-bottom: 20px;
+        }
+        .restore-field label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+        }
+        .restore-field .hint {
+            font-size: 14px;
+            color: #666;
+            margin-top: 6px;
+        }
+        .restore-field input[type=file],
+        .restore-field input[type=text] {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            font-size: 16px; /* 16px stops iOS zooming the page on focus */
+            background: white;
+        }
+        #restore-key {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .restore-btn, .download-btn {
+            display: inline-block;
+            padding: 14px 32px;
+            background: #28a745;
+            color: white;
+            border: 0;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .restore-btn {
+            width: 100%;
+        }
+        .restore-btn:disabled {
+            background: #9bd3a7;
+            cursor: default;
+        }
+        .restore-error {
+            margin-top: 16px;
+            padding: 12px 14px;
+            background: #fdecea;
+            border: 1px solid #f5c2c0;
+            border-radius: 6px;
+            color: #8a1f17;
+        }
+        .restore-done {
+            text-align: center;
+        }
+        .restore-done .tick {
+            font-size: 56px;
+            color: #28a745;
+        }
+        .download-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .download-btn.secondary {
+            background: white;
+            color: #28a745;
+            box-shadow: inset 0 0 0 2px #28a745;
+        }
+        .back-link {
+            display: block;
+            margin-top: 24px;
+            color: #666;
+            text-align: center;
+            text-decoration: none;
+        }
+        @media (max-width: 480px) {
+            .restore-container {
+                margin: 16px;
+                padding: 24px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="restore-container">
+        <form id="restore-form">
+            <h1>Reopen your resume</h1>
+            <p class="restore-intro">
+                We don't keep your resume. You do. Upload the PDF you downloaded
+                and enter your resume key to get it back.
+            </p>
+            <div class="restore-field">
+                <label for="restore-pdf">Your resume PDF</label>
+                <input type="file" id="restore-pdf" name="pdf" accept="application/pdf,.pdf" required>
+                <div class="hint">The PDF exactly as you downloaded it from this site.</div>
+            </div>
+            <div class="restore-field">
+                <label for="restore-key">Your resume key</label>
+                <input type="text" id="restore-key" name="key" placeholder="XXXXX-XXXXX" maxlength="24"
+                       autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" required>
+                <div class="hint">It was on the page you saw after paying, and it's on your payment receipt.</div>
+            </div>
+            <button type="submit" class="restore-btn" id="restore-submit">Reopen my resume</button>
+            <div class="restore-error" id="restore-error" role="alert" hidden></div>
+        </form>
+        <div class="restore-done" id="restore-done" hidden>
+            <div class="tick">✓</div>
+            <h1 id="restore-welcome">Your resume is back</h1>
+            <p class="restore-intro">Download it again any time you need it.</p>
+            <div class="download-buttons">
+                <a id="restore-dl-pdf" class="download-btn" download>Download PDF</a>
+                <a id="restore-dl-docx" class="download-btn secondary" download>Download Word (.docx)</a>
+            </div>
+        </div>
+        <a href="/" class="back-link">← Back to AIE ResuMaker</a>
+    </div>
+    <script>
+        const MAX_BYTES = {{ max_bytes }};
+        const form = document.getElementById('restore-form');
+        const errorBox = document.getElementById('restore-error');
+        const submit = document.getElementById('restore-submit');
+
+        function showError(message) {
+            errorBox.textContent = message;
+            errorBox.hidden = false;
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorBox.hidden = true;
+            const file = document.getElementById('restore-pdf').files[0];
+            if (!file) return showError('Choose your resume PDF first.');
+            if (file.size > MAX_BYTES) return showError('That file is too big to be a resume from this site.');
+
+            submit.disabled = true;
+            submit.textContent = 'Checking…';
+            try {
+                const response = await fetch('/api/restore', { method: 'POST', body: new FormData(form) });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || !result.success) {
+                    return showError(result.error || 'Something went wrong. Please try again.');
+                }
+                if (result.name) {
+                    document.getElementById('restore-welcome').textContent = `Welcome back, ${result.name}`;
+                }
+                document.getElementById('restore-dl-pdf').href = result.download_url_pdf;
+                document.getElementById('restore-dl-docx').href = result.download_url_docx;
+                form.hidden = true;
+                document.getElementById('restore-done').hidden = false;
+            } catch (err) {
+                showError("We couldn't reach the site. Check your connection and try again.");
+            } finally {
+                submit.disabled = false;
+                submit.textContent = 'Reopen my resume';
+            }
+        });
+    </script>
+</body>
+</html>
