@@ -1021,6 +1021,12 @@ input.city-input:disabled {
     text-decoration: underline;
 }
 
+.app-footer .data-credit {
+    font-size: 11px;
+    opacity: 0.75;
+    margin-bottom: 6px;
+}
+
 /* Prevent body scroll when modal is open */
 body.modal-open {
     overflow: hidden;

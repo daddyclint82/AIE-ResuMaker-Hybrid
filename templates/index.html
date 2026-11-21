@@ -102,6 +102,7 @@
                         <div class="field-row">
                             <label for="job-title">Job Title</label>
                             <input type="text" id="job-title" name="job_title" placeholder="Store Manager" autocomplete="off">
+                            <div id="job-title-suggestions" class="suggestions"></div>
                         </div>
                         <div class="field-row">
                             <label for="experience-level">Experience Level</label>
@@ -262,8 +263,15 @@
 
     <!-- Footer -->
     <footer class="app-footer">
-        <p>© 2026 AIe ResuMaker | 
-            <a href="/terms" target="_blank">Terms of Service</a> | 
+        {% if onet_version %}
+        <p class="data-credit">This page includes information from the
+            <a href="https://www.onetcenter.org/database.html" target="_blank" rel="noopener">O*NET {{ onet_version }} Database</a>
+            by the U.S. Department of Labor, Employment and Training Administration (USDOL/ETA). Used under the
+            <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> license.
+            O*NET&reg; is a trademark of USDOL/ETA.</p>
+        {% endif %}
+        <p>© 2026 AIe ResuMaker |
+            <a href="/terms" target="_blank">Terms of Service</a> |
             All purchases are final. No refunds.
         </p>
     </footer>

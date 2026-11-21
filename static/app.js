@@ -899,6 +899,9 @@ function setupEventListeners() {
         }
     });
     
+    setupListAutocomplete(document.getElementById('job-title'), document.getElementById('job-title-suggestions'),
+                          '/api/job-titles?q=');
+
     // State/City autocomplete
     setupStateCityAutocomplete();
 }
@@ -996,7 +999,8 @@ function addExperienceField(data = {}) {
         <button type="button" class="remove-entry" onclick="removeEntry(this)" title="Remove">×</button>
         <div class="field-row">
             <label>Job Title</label>
-            <input type="text" name="exp_title[]" placeholder="Software Engineer" value="${escapeHtml(data.title || '')}" autocapitalize="words" class="capitalize-first">
+            <input type="text" name="exp_title[]" placeholder="Software Engineer" value="${escapeHtml(data.title || '')}" autocapitalize="words" class="capitalize-first title-input" autocomplete="off">
+            <div class="title-suggestions suggestions"></div>
         </div>
         <div class="field-row">
             <label>Company</label>
@@ -1047,7 +1051,10 @@ function addExperienceField(data = {}) {
     // Setup company autocomplete for this new entry
     const companyInput = entry.querySelector('.company-input');
     const companySuggestions = entry.querySelector('.company-suggestions');
-    setupCompanyAutocomplete(companyInput, companySuggestions);
+    setupListAutocomplete(companyInput, companySuggestions, '/api/companies/search?query=');
+
+    setupListAutocomplete(entry.querySelector('.title-input'), entry.querySelector('.title-suggestions'),
+                          '/api/job-titles?q=');
     
     // Setup state/city autocomplete for this new entry
     const stateSelect = entry.querySelector('.state-select');
@@ -1091,14 +1098,14 @@ function addEducationField(data = {}) {
     // Setup autocomplete for this entry
     const uniInput = entry.querySelector('.uni-input');
     const uniSuggestions = entry.querySelector('.uni-suggestions');
-    setupUniversityAutocomplete(uniInput, uniSuggestions);
+    setupListAutocomplete(uniInput, uniSuggestions, '/api/universities?q=');
     
     const degreeSelect = entry.querySelector('.degree-select');
     populateDegreeDropdown(degreeSelect, data.degree || '');
     
     const fieldInput = entry.querySelector('.field-input');
     const fieldSuggestions = entry.querySelector('.field-suggestions');
-    setupFieldAutocomplete(fieldInput, fieldSuggestions);
+    setupListAutocomplete(fieldInput, fieldSuggestions, '/api/fields?q=');
 }
 
 // Certification Fields
@@ -2455,32 +2462,33 @@ function toggleMobilePreview() {
     document.getElementById('preview-section').classList.toggle('active');
 }
 
-// Company autocomplete for dynamic experience fields
-function setupCompanyAutocomplete(input, suggestions) {
+// Type-ahead for an input backed by one of the server's lists (companies,
+// universities, fields of study, job titles): `url` gets the typed text appended.
+function setupListAutocomplete(input, suggestions, url) {
     let debounceTimer;
-    
+
     input.addEventListener('input', () => {
         clearTimeout(debounceTimer);
         const query = input.value.trim();
-        
+
         if (query.length < 2) {
             suggestions.style.display = 'none';
             return;
         }
-        
+
         debounceTimer = setTimeout(async () => {
             try {
-                const response = await fetch(`/api/companies/search?query=${encodeURIComponent(query)}`);
+                const response = await fetch(url + encodeURIComponent(query));
                 const data = await response.json();
-                
+
                 if (data.results && data.results.length > 0) {
-                    suggestions.innerHTML = data.results.map(company => `
-                        <div class="suggestion-item" data-value="${escapeHtml(company)}">
-                            <strong>${escapeHtml(company)}</strong>
+                    suggestions.innerHTML = data.results.map(value => `
+                        <div class="suggestion-item" data-value="${escapeHtml(value)}">
+                            <strong>${escapeHtml(value)}</strong>
                         </div>
                     `).join('');
                     suggestions.style.display = 'block';
-                    
+
                     suggestions.querySelectorAll('.suggestion-item').forEach(item => {
                         item.addEventListener('click', () => {
                             input.value = item.dataset.value;
@@ -2491,12 +2499,12 @@ function setupCompanyAutocomplete(input, suggestions) {
                     suggestions.style.display = 'none';
                 }
             } catch (error) {
-                console.error('Error fetching company suggestions:', error);
+                console.error('Error fetching suggestions:', error);
                 suggestions.style.display = 'none';
             }
-        }, 300);
+        }, 200);
     });
-    
+
     document.addEventListener('click', (e) => {
         if (!input.contains(e.target) && !suggestions.contains(e.target)) {
             suggestions.style.display = 'none';
@@ -2734,99 +2742,5 @@ async function populateDegreeDropdown(select, selectedValue = '') {
         option.textContent = degree;
         if (degree === selectedValue) option.selected = true;
         select.appendChild(option);
-    });
-}
-
-function setupUniversityAutocomplete(input, suggestions) {
-    let debounceTimer;
-    input.addEventListener('input', () => {
-        clearTimeout(debounceTimer);
-        const query = input.value.trim().toLowerCase();
-        
-        if (query.length < 2) {
-            suggestions.style.display = 'none';
-            return;
-        }
-        
-        debounceTimer = setTimeout(async () => {
-            try {
-                const response = await fetch(`/api/universities?q=${encodeURIComponent(query)}`);
-                const data = await response.json();
-                const matches = data.results || [];
-                
-                if (matches.length > 0) {
-                    suggestions.innerHTML = matches.map(uni => `
-                        <div class="suggestion-item" data-value="${escapeHtml(uni)}">
-                            <strong>${escapeHtml(uni)}</strong>
-                        </div>
-                    `).join('');
-                    suggestions.style.display = 'block';
-                    
-                    suggestions.querySelectorAll('.suggestion-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            input.value = item.dataset.value;
-                            suggestions.style.display = 'none';
-                        });
-                    });
-                } else {
-                    suggestions.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error searching universities:', error);
-            }
-        }, 150);
-    });
-    
-    document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !suggestions.contains(e.target)) {
-            suggestions.style.display = 'none';
-        }
-    });
-}
-
-function setupFieldAutocomplete(input, suggestions) {
-    let debounceTimer;
-    input.addEventListener('input', () => {
-        clearTimeout(debounceTimer);
-        const query = input.value.trim().toLowerCase();
-        
-        if (query.length < 2) {
-            suggestions.style.display = 'none';
-            return;
-        }
-        
-        debounceTimer = setTimeout(async () => {
-            try {
-                const response = await fetch(`/api/fields?q=${encodeURIComponent(query)}`);
-                const data = await response.json();
-                const matches = data.results || [];
-                
-                if (matches.length > 0) {
-                    suggestions.innerHTML = matches.map(field => `
-                        <div class="suggestion-item" data-value="${escapeHtml(field)}">
-                            <strong>${escapeHtml(field)}</strong>
-                        </div>
-                    `).join('');
-                    suggestions.style.display = 'block';
-                    
-                    suggestions.querySelectorAll('.suggestion-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            input.value = item.dataset.value;
-                            suggestions.style.display = 'none';
-                        });
-                    });
-                } else {
-                    suggestions.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error searching fields:', error);
-            }
-        }, 150);
-    });
-    
-    document.addEventListener('click', (e) => {
-        if (!input.contains(e.target) && !suggestions.contains(e.target)) {
-            suggestions.style.display = 'none';
-        }
     });
 }

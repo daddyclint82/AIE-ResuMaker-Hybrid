@@ -239,15 +239,20 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - The DOCX export writes plain text through python-docx and needs no escaping.
 - Guarded by `tests/test_pdf_markup_escape.py`.
 
-### 2026-11-20 — No API Docs in Production; the O*NET Job Search Is Gone
+### 2026-11-20 — No API Docs in Production; Job Titles from the O*NET Download
 
 - In production, `/docs`, `/redoc` and `/openapi.json` listed every endpoint. `FastAPI(openapi_url=None)` turns all three off when `APP_ENV` is `production`; development keeps them.
 - The O*NET job-title search had no caller: nothing invoked `setupJobAutocomplete()` in `app.js`. Removed:
   - its three relay endpoints (`/api/jobs/search`, `/api/jobs/{code}` and `/api/jobs/{code}/summary`);
   - the API key that was hard-coded as their default;
   - the unused front-end code behind them.
-- Company and city autocomplete are unaffected.
-- Guarded by `tests/test_production_config.py`.
+- **What replaced it.** The form's Job Title box and each job entry's title now suggest titles from `data/job_titles.json`, served by `GET /api/job-titles?q=`.
+  - The file holds O*NET 31.0's 48,332 job titles and short forms, built by `scripts/build_job_titles.py` from the free download (CC BY 4.0).
+  - Why the download and not the API: the API's Database Services serve the same database. Its keyword search returns the 1,016 official occupation names ("General and Operations Managers" for "store manager"), not the titles people write.
+  - Matching: every typed word must start a word of the title. The exact title ranks first, then titles that start with or contain the typed text, shortest first.
+  - To refresh for a new O*NET release, run `python scripts/build_job_titles.py <version>`. The footer's credit reads the version from the file.
+- Company, university and field-of-study suggestions share the new `setupListAutocomplete` instead of three copies of the same code.
+- Guarded by `tests/test_production_config.py` and `tests/test_job_titles.py`.
 
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 

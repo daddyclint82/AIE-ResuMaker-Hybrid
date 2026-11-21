@@ -290,6 +290,19 @@ try:
 except:
     pass
 
+# Job titles for the form's type-ahead: the "lay" titles from the O*NET Database
+# (USDOL/ETA, CC BY 4.0), built by scripts/build_job_titles.py. The form's footer
+# credits the O*NET version stored in the file.
+JOB_TITLES_FILE = os.path.join(BASE_DIR, "data", "job_titles.json")
+try:
+    with open(JOB_TITLES_FILE, encoding="utf-8") as f:
+        _job_titles_data = json.load(f)
+except (OSError, ValueError):
+    _job_titles_data = {"onet_version": "", "titles": []}
+# (title, lowercased, its words): search is case-insensitive and matches word starts
+_job_title_index = [(t, t.casefold(), re.findall(r"[a-z0-9]+", t.casefold())) for t in _job_titles_data["titles"]]
+templates.env.globals["onet_version"] = _job_titles_data["onet_version"]
+
 # Load skill categories for auto-grouping
 SKILL_CATEGORIES_FILE = os.path.join(BASE_DIR, "data", "skill_categories.json")
 skill_categories = {}
@@ -1860,6 +1873,20 @@ async def get_universities(q: str = ""):
     query_lower = q.lower()
     results = [u for u in universities if query_lower in u.lower()]
     return {"results": results[:10]}
+
+@app.get("/api/job-titles")
+async def search_job_titles(q: str = ""):
+    """Up to 10 job titles in which every typed word starts a word. The exact title
+    comes first, then titles that start with or contain the typed text, shortest first."""
+    query = " ".join(q.casefold().split())
+    words = re.findall(r"[a-z0-9]+", query)
+    if len(query) < 2 or not words:
+        return {"results": []}
+    longest = max(words, key=len)                      # cheap substring check first
+    hits = [(low, title) for title, low, title_words in _job_title_index
+            if longest in low and all(any(tw.startswith(w) for tw in title_words) for w in words)]
+    hits.sort(key=lambda h: (h[0] != query, not h[0].startswith(query), query not in h[0], len(h[0]), h[0]))
+    return {"results": [title for _, title in hits[:10]]}
 
 @app.get("/api/degrees")
 async def get_degrees():
