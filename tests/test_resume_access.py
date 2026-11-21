@@ -9,6 +9,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import sys
 import tempfile
 import time
@@ -88,6 +89,19 @@ def test_payment_unlocks_download():
         r = client.get(f"/api/download/{rid}?format={fmt}")
         assert r.status_code == 200, (fmt, r.status_code)
         assert f'filename="resume_jordan_rivera.{fmt}"' in r.headers["content-disposition"], r.headers
+
+
+def test_success_page_offers_the_pdf_and_the_word_file():
+    # The page used to link only the .docx, so no customer could get the PDF.
+    rid = _build()
+    page = client.get(f"/success?session_id={_checkout(rid)}").text
+    links = re.findall(r'href="(/api/download/[^"]+)"', page)
+    assert sorted(links) == [f"/api/download/{rid}?format=docx", f"/api/download/{rid}?format=pdf"], links
+    starts = {"pdf": b"%PDF-", "docx": b"PK"}
+    for link in links:
+        r = client.get(link)
+        fmt = link.rsplit("=", 1)[1]
+        assert r.status_code == 200 and r.content.startswith(starts[fmt]), (link, r.status_code)
 
 
 def test_payment_unlocks_only_its_own_resume():

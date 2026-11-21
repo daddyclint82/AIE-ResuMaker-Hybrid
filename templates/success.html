@@ -44,6 +44,20 @@
         .download-btn:hover {
             background: #218838;
         }
+        .download-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+        .download-btn.secondary {
+            background: white;
+            color: #28a745;
+            box-shadow: inset 0 0 0 2px #28a745;
+        }
+        .download-btn.secondary:hover {
+            background: #eaf6ec;
+        }
         .back-link {
             display: block;
             margin-top: 20px;
@@ -62,9 +76,14 @@
         <p class="success-message">
             Thank you for purchasing AIE ResuMaker Premium. Your professional resume is ready for download.
         </p>
-        <a href="{{ download_url }}" class="download-btn" download>
-            Download Resume (.docx)
-        </a>
+        <div class="download-buttons">
+            <a href="{{ download_url }}?format=pdf" class="download-btn" download>
+                Download PDF
+            </a>
+            <a href="{{ download_url }}?format=docx" class="download-btn secondary" download>
+                Download Word (.docx)
+            </a>
+        </div>
         <a href="/build" class="back-link">← Back to Builder</a>
     </div>
     <script>

@@ -92,6 +92,7 @@ Legal acceptance is enforced before the chat flow begins. `/terms` carries a `re
 - `/api/preview-timer` and `/api/check-payment` need only the ID. Only the browser that built the resume, which already received the full preview from `/api/build`, and Stripe ever hold it.
 - `/api/download` serves paid resumes only (402 otherwise). `/success` and the Stripe webhook record the payment for the resume stored in the checkout session's metadata. The webhook needs `STRIPE_WEBHOOK_SECRET` (503 without it).
 - Stripe 15 objects have no dict `.get()`, so these routes call `.to_dict()` first.
+- The `/success` page links both files, the PDF first. Until 2026-11-20 it linked only the `.docx` and nothing on the site linked the PDF.
 - Guarded by `tests/test_resume_access.py` (no server, no network).
 
 ### Resume Themes
