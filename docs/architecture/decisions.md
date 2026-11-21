@@ -290,6 +290,24 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - `templates/*.html` is caught by `.gitignore`'s `*.html`; new templates need `git add -f`.
 - Guarded by `tests/test_restore.py` (no server, no network).
 
+### 2026-11-21 — Edits That Work: Counted on Stripe, Saved Without a Second Payment
+
+- **What was wrong.** The "5 edits" were a number in the browser's `localStorage` that only a plain-text download (which no button called) ever changed, and rebuilding a paid resume made a new unpaid one that asked for payment again.
+- **An edit** is saving changes and getting new files. `/api/build` still makes a free preview; `POST /api/edit/save {paid_resume_id, resume_id}` then turns that preview into a paid resume by spending one edit instead of money. Restoring, re-downloading and previewing are free.
+- **The count** is `edits_used` in the purchase's Stripe checkout session metadata (`MAX_EDITS = 5`; missing = 0). The server reads it before every save and writes it before marking the new resume paid, so Stripe not answering spends nothing and saves nothing (503). Saving the same preview twice costs one edit.
+- **One purchase, one key.** An edited resume gets a new `resume_id` but carries `purchase_id` (the resume the checkout was for) and the same `stripe_session`. The key and the paid check in `/api/restore` use `purchase_id`, so any version's PDF reopens with the original key, and restoring an old PDF brings back its contents but not its edits.
+- **What an edit keeps.** The form does not carry the AI's skill groups and weights or the street address. If the skills are the same set, the edit keeps the paid resume's `skills_categorized`; if the location is unchanged, it keeps `address`.
+- **The editor.** `POST /api/edit/open {resume_id}` returns the paid resume in the form's shape (`resume_for_editor`) and the edits left. The browser remembers only which paid resume is its own (`aie_paid_resume_id`, set by `/success` and `/restore`); the count always comes from the server.
+  - `/build?mode=form&edit=1` refills the form from the server's copy, then drops `?edit` so a reload keeps changes in progress.
+  - While edits remain, the purchase bar and the watermarked preview offer **Save changes** in place of the buy buttons. At zero they return: a new purchase brings five more edits and its own key.
+  - If the server has forgotten the resume, the builder says so and links to `/restore`.
+  - `fillFormFromData` is the one form filler, shared by chat sessions and paid resumes.
+- `/api/build` now stores `city` and `state` (it kept only "City, ST"), so the form can be refilled. Older saved copies fall back to splitting `location`.
+- **Fixed on the way:** a certification's issuing organization was lost on every form reload (saved as `organization`, read as `org`). On phones, tapping "Preview Resume" now opens and scrolls to the preview, which sat hidden behind the header's Preview toggle. The 3-second preview timer now belongs to the preview it was started for.
+- Removed: the `localStorage` edit counter, the edit popup with no markup, and the unreachable plain-text download.
+- Proved on Stripe test mode, 2026-11-21, in headless Chromium: buy, edit twice, wipe the server, reopen the edited PDF with the original key, use the last three edits, see the sixth offered for purchase.
+- Guarded by `tests/test_edits.py` (no server, no network).
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.

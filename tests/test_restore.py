@@ -66,7 +66,8 @@ def test_a_forgotten_resume_comes_back_from_its_pdf_and_key():
     with _stripe_says(rid):
         r = _restore(pdf, main.resume_key(rid))
     assert r.status_code == 200, r.text
-    assert r.json() == {"success": True, "name": "Jordan Rivera",
+    assert r.json() == {"success": True, "name": "Jordan Rivera", "resume_id": rid,
+                        "edits_left": 5, "max_edits": 5,
                         "download_url_pdf": f"/api/download/{rid}?format=pdf",
                         "download_url_docx": f"/api/download/{rid}?format=docx"}
     again = client.get(f"/api/download/{rid}?format=pdf")

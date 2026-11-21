@@ -9,7 +9,7 @@
 # Project hub: docs/project-memory.md
 # ================================================
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import Body, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -911,8 +911,10 @@ def restore_resume(request: Request, pdf: UploadFile = File(...), key: str = For
                                      "you downloaded it from this site. A copy that was printed, scanned or "
                                      "re-saved by another program won't work.")
     resume_id = sealed["resume_id"]
+    # An edited resume has its own ID; its key and payment are the purchase's.
+    purchase_id = sealed["resume"].get("purchase_id") or resume_id
     # Before Stripe is asked anything: a wrong key costs one hash.
-    if not resume_key_matches(resume_id, key):
+    if not resume_key_matches(purchase_id, key):
         return _restore_refused(403, "That key doesn't match this PDF. It's on the page you saw after paying "
                                      "and on your payment receipt.")
 
@@ -926,7 +928,7 @@ def restore_resume(request: Request, pdf: UploadFile = File(...), key: str = For
         logger.exception("[Restore] Stripe did not answer")
         return _restore_refused(503, "We couldn't reach our payment records just now. Your PDF and key are "
                                      "fine. Please try again in a minute.")
-    if session.get("payment_status") != "paid" or (session.get("metadata") or {}).get("resume_id") != resume_id:
+    if session.get("payment_status") != "paid" or (session.get("metadata") or {}).get("resume_id") != purchase_id:
         return not_paid
 
     resume = dict(sealed["resume"], paid=True, stripe_session=sealed["stripe_session"])
@@ -935,8 +937,122 @@ def restore_resume(request: Request, pdf: UploadFile = File(...), key: str = For
     return {
         "success": True,
         "name": resume.get("full_name", ""),
+        "resume_id": resume_id,  # the uploader has just proved it is theirs
+        "edits_left": _edits_left(session),
+        "max_edits": MAX_EDITS,
         "download_url_pdf": f"/api/download/{resume_id}?format=pdf",
         "download_url_docx": f"/api/download/{resume_id}?format=docx",
+    }
+
+
+# ---- Edits: a purchase includes MAX_EDITS saved changes, counted on Stripe ----
+MAX_EDITS = 5
+_EDITOR_FIELDS = ("full_name", "email", "phone", "linkedin", "website", "summary", "industry",
+                  "template_style", "skills", "experience", "education", "projects",
+                  "competencies", "community", "certifications")
+
+
+def _edits_left(session: dict) -> int:
+    """Edits a purchase has left, from its Stripe checkout session.
+
+    Purchases from before the count existed have no edits_used: that is 0."""
+    try:
+        used = int((session.get("metadata") or {}).get("edits_used") or 0)
+    except ValueError:
+        used = MAX_EDITS  # not a number we wrote: allow nothing
+    return max(0, MAX_EDITS - used)
+
+
+def resume_for_editor(resume: dict) -> dict:
+    """A stored resume in the shape the builder form fills itself from."""
+    data = {field: resume[field] for field in _EDITOR_FIELDS if resume.get(field)}
+    city, state = resume.get("city", ""), resume.get("state", "")
+    if not (city or state):
+        # Resumes stored before city and state were kept have only "City, ST".
+        city, _, state = (resume.get("location") or "").rpartition(", ")
+        if not city:
+            city, state = state, ""
+    data["city"], data["state"] = city, state
+    return data
+
+
+def _paid_purchase(resume_id):
+    """(resume, its Stripe checkout session) for a paid resume this server holds.
+
+    Otherwise (None, the response to send)."""
+    resume = get_resume(resume_id)
+    if not resume or not resume.get("paid") or not resume.get("stripe_session"):
+        return None, JSONResponse({"error": "We don't have that resume on hand right now. Reopen it with "
+                                            "your PDF and key.", "reopen": True}, status_code=404)
+    try:
+        # to_dict(): Stripe objects have no .get().
+        return resume, stripe.checkout.Session.retrieve(resume["stripe_session"]).to_dict()
+    except stripe.StripeError:
+        logger.exception("[Edit] Stripe did not answer")
+        return None, JSONResponse({"error": "We couldn't reach our payment records just now. "
+                                            "Please try again in a minute."}, status_code=503)
+
+
+@app.post("/api/edit/open")
+def open_for_editing(body: dict = Body(...)):
+    """A paid resume's contents for the builder form, and how many edits it has left.
+
+    Sync def, like save_edit below: the Stripe calls block, so FastAPI runs
+    these in the threadpool."""
+    resume, session = _paid_purchase(body.get("resume_id", ""))
+    if resume is None:
+        return session
+    return {"success": True, "resume": resume_for_editor(resume),
+            "edits_left": _edits_left(session), "max_edits": MAX_EDITS}
+
+
+@app.post("/api/edit/save")
+def save_edit(body: dict = Body(...)):
+    """Spend one edit: a resume just built for preview becomes a paid one.
+
+    `paid_resume_id` is the customer's paid resume; `resume_id` is the changed
+    version /api/build made. The count lives on the purchase's Stripe checkout
+    session, so it survives this server forgetting everything, and an old PDF
+    restored later brings back its contents but no edits."""
+    paid_id = body.get("paid_resume_id", "")
+    paid, session = _paid_purchase(paid_id)
+    if paid is None:
+        return session
+    new_id = body.get("resume_id", "")
+    new = get_resume(new_id)
+    if not new:
+        return JSONResponse({"error": "Resume not found. Please preview your changes again."}, status_code=404)
+
+    left = _edits_left(session)
+    if not new.get("paid"):  # saving the same preview twice costs one edit, not two
+        if left <= 0:
+            return JSONResponse({"error": f"You've used all {MAX_EDITS} edits that came with this purchase.",
+                                 "edits_left": 0}, status_code=402)
+        try:
+            stripe.checkout.Session.modify(session["id"], metadata={"edits_used": str(MAX_EDITS - left + 1)})
+        except stripe.StripeError:
+            logger.exception("[Edit] Stripe did not record the edit")
+            return JSONResponse({"error": "We couldn't reach our payment records just now, so nothing was "
+                                          "saved or used. Please try again in a minute."}, status_code=503)
+        left -= 1
+        new["paid"] = True
+        new["stripe_session"] = paid["stripe_session"]
+        new["purchase_id"] = paid.get("purchase_id") or paid_id
+        # The form doesn't carry these, so an edit that left them alone keeps them:
+        # the skill groups and weights the AI gave, and the street address.
+        if sorted(new.get("skills") or []) == sorted(paid.get("skills") or []):
+            new["skills_categorized"] = paid.get("skills_categorized") or new.get("skills_categorized")
+        if new.get("location") == paid.get("location"):
+            new["address"] = paid.get("address", "")
+        save_resume_json(new_id, new)
+    return {
+        "success": True,
+        "resume_id": new_id,
+        "edits_left": left,
+        "max_edits": MAX_EDITS,
+        "download_url_pdf": f"/api/download/{new_id}?format=pdf",
+        "download_url_docx": f"/api/download/{new_id}?format=docx",
+        "preview_html": generate_preview_html(new, new.get("template_style", "professional")),
     }
 
 
@@ -1037,6 +1153,8 @@ async def build_resume(
         "email": email,
         "phone": phone,
         "location": location,
+        "city": city,
+        "state": state,
         "address": session_address,
         "linkedin": linkedin,
         "website": website,
@@ -2275,6 +2393,7 @@ async def payment_success(request: Request, session_id: str = "", ref: str = "")
                 context={
                     "resume_id": resume_id,
                     "resume_key": resume_key(resume_id),
+                    "max_edits": MAX_EDITS,
                     "download_url": f"/api/download/{resume_id}"
                 }
             )

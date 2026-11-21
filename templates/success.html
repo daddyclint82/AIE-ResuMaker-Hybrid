@@ -128,14 +128,12 @@
                 It's also on your payment receipt.
             </p>
         </div>
-        <a href="/build" class="back-link">← Back to Builder</a>
+        <a href="/build?mode=form&edit=1" class="back-link">✏️ Edit my resume ({{ max_edits }} edits included)</a>
     </div>
     <script>
-        // Initialize edit counter on successful payment
-        localStorage.setItem('aie_edit_count', '0');
-        localStorage.setItem('aie_purchase_date', new Date().toISOString());
-        localStorage.setItem('aie_purchase_complete', 'true');
-        localStorage.setItem('aie_show_edit_popup', 'true');
+        // This browser's paid resume: the builder asks the server how many
+        // edits it has left.
+        localStorage.setItem('aie_paid_resume_id', {{ resume_id | tojson }});
 
         document.getElementById('copy-key').addEventListener('click', async (e) => {
             try {

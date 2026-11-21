@@ -21,76 +21,190 @@ const skillsInput = document.getElementById('skill-input');
 const skillsTags = document.getElementById('skills-tags');
 const skillsHidden = document.getElementById('skills');
 
-// Edit tracking (5 edits per purchase)
-const MAX_EDITS = 5;
-let currentResumePaid = false;
+// Edits. A purchase includes saved changes, and the server counts them on
+// Stripe's record of the purchase. This browser only remembers WHICH paid
+// resume is its own; how many edits are left always comes from the server.
+let paidResumeId = localStorage.getItem('aie_paid_resume_id') || null;
+let editsLeft = null;   // null = not editing a paid resume
+let maxEdits = 5;
 
-function getEditCount() {
-    return parseInt(localStorage.getItem('aie_edit_count') || '0');
+function inEditMode() {
+    return paidResumeId !== null && editsLeft !== null;
 }
 
-function setEditCount(count) {
-    localStorage.setItem('aie_edit_count', String(count));
-    updateEditCounterUI();
-}
-
-function getPurchaseDate() {
-    return localStorage.getItem('aie_purchase_date');
-}
-
-function recordPurchase() {
-    localStorage.setItem('aie_purchase_date', new Date().toISOString());
-    setEditCount(0);
-    updateEditCounterUI();
+function canSaveEdit() {
+    return inEditMode() && editsLeft > 0;
 }
 
 function updateEditCounterUI() {
     const counter = document.getElementById('edit-counter');
     if (!counter) return;
-    
-    const count = getEditCount();
-    const remaining = Math.max(0, MAX_EDITS - count);
-    
-    if (remaining > 0) {
-        counter.innerHTML = `✏️ AFTER PURCHASE ${remaining} EDIT${remaining !== 1 ? 'S' : ''} REMAINING`;
-        counter.className = 'edit-counter';
-    } else {
-        counter.innerHTML = `✏️ AFTER PURCHASE 0 EDITS REMAINING — <a href="#" id="repurchase-link">REPURCHASE</a>`;
-        counter.className = 'edit-counter exhausted';
-        
-        // Re-attach click handler
-        setTimeout(() => {
-            document.getElementById('repurchase-link')?.addEventListener('click', (e) => {
-                e.preventDefault();
-                initiatePayment();
-            });
-        }, 0);
-    }
+    counter.className = 'edit-counter' + (inEditMode() && editsLeft === 0 ? ' exhausted' : '');
+    counter.textContent = inEditMode()
+        ? `✏️ ${editsLeft} OF ${maxEdits} EDITS LEFT`
+        : `✏️ ${maxEdits} EDITS INCLUDED WITH PURCHASE`;
 }
 
-function canEdit() {
-    const count = getEditCount();
-    return count < MAX_EDITS;
+// The purchase bar offers "Save changes" while a paid resume has edits left,
+// and the buy buttons the rest of the time.
+function applyPurchaseBar() {
+    const saving = canSaveEdit();
+    const saveBtn = document.getElementById('save-edit');
+    if (saveBtn) saveBtn.style.display = saving ? 'inline-block' : 'none';
+    const buyBtn = document.getElementById('buy-premium');
+    if (buyBtn) buyBtn.style.display = saving ? 'none' : 'inline-block';
+    const referralBtn = document.getElementById('buy-referral');
+    if (referralBtn) referralBtn.style.display = saving ? 'none' : '';
 }
 
-function useEdit() {
-    const count = getEditCount();
-    if (count < MAX_EDITS) {
-        setEditCount(count + 1);
-        return true;
+const EDIT_BANNERS = {
+    editing: () => `You're editing the resume you bought. Preview your changes, then choose Save changes. ` +
+                   `Saving uses 1 of your ${editsLeft} edit${editsLeft === 1 ? '' : 's'} left.`,
+    usedUp: () => `You've used all ${maxEdits} edits that came with this purchase. To save more changes, ` +
+                  `buy again below. A new purchase comes with ${maxEdits} more edits and its own key.`,
+    forgotten: () => `Already bought this resume? We don't have it on hand right now. Reopen it with your PDF ` +
+                     `and key to use your edits.`,
+};
+
+function showEditBanner(kind, message) {
+    const banner = document.getElementById('edit-banner');
+    if (!banner) return;
+    banner.textContent = message || EDIT_BANNERS[kind]();
+    banner.className = 'edit-banner' + (kind === 'editing' ? '' : ' attention');
+    if (kind === 'forgotten') {
+        const reopen = document.createElement('a');
+        reopen.href = '/restore';
+        reopen.textContent = 'Reopen my resume';
+        banner.append(' ', reopen);
     }
-    return false;
+    const fresh = document.createElement('button');
+    fresh.type = 'button';
+    fresh.className = 'edit-banner-link';
+    fresh.textContent = 'Start a new resume instead';
+    fresh.addEventListener('click', leaveEditMode);
+    banner.append(' ', fresh);
+    banner.hidden = false;
 }
 
-function showEditDialog() {
-    const count = getEditCount();
-    const remaining = Math.max(0, MAX_EDITS - count);
-    
-    if (remaining <= 0) {
-        return confirm('You have used all 5 edits. Repurchase for 5 more?');
+function leaveEditMode() {
+    localStorage.removeItem('aie_paid_resume_id');
+    paidResumeId = null;
+    editsLeft = null;
+    const banner = document.getElementById('edit-banner');
+    if (banner) banner.hidden = true;
+    applyPurchaseBar();
+    updateEditCounterUI();
+}
+
+function clearFormLists() {
+    ['experience-list', 'education-list', 'projects-list', 'competencies-list', 'community-list',
+     'certifications-list'].forEach(id => {
+        const list = document.getElementById(id);
+        if (list) list.innerHTML = '';
+    });
+    experienceCount = educationCount = projectCount = competencyCount = communityCount = certificationCount = 0;
+    skills = [];
+    renderSkills();
+}
+
+// Ask the server about this browser's paid resume. With ?edit in the URL
+// (the links on the success and come-back pages), the form is refilled from
+// the server's copy; otherwise whatever is in the form stays.
+async function initEditMode() {
+    if (!paidResumeId) return;
+    const params = new URLSearchParams(window.location.search);
+    let response, data;
+    try {
+        response = await fetch('/api/edit/open', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resume_id: paidResumeId })
+        });
+        data = await response.json();
+    } catch (error) {
+        return;   // offline: the plain builder still works
     }
-    
-    return confirm(`You have ${remaining} edit${remaining !== 1 ? 's' : ''} remaining. Use 1 edit to save changes?`);
+    if (response.status === 404) {
+        showEditBanner('forgotten');
+        return;
+    }
+    if (!response.ok || !data.success) {
+        showEditBanner('attention', data.error || 'We could not check your edits just now. Please reload in a minute.');
+        return;
+    }
+    editsLeft = data.edits_left;
+    maxEdits = data.max_edits;
+    // A preview built before this page load is not the one being saved now.
+    currentResumeId = null;
+    localStorage.removeItem('aie_current_resume_id');
+    if (params.has('edit')) {
+        clearFormLists();
+        fillFormFromData(data.resume);
+        if (!document.querySelector('#experience-list .entry-item')) addExperienceField();
+        if (!document.querySelector('#education-list .entry-item')) addEducationField();
+        updateCharCounter();
+        saveProgress(false);
+        // Drop ?edit so a reload keeps the changes in progress instead of refilling.
+        params.delete('edit');
+        const query = params.toString();
+        history.replaceState(null, '', window.location.pathname + (query ? '?' + query : ''));
+    }
+    updateEditCounterUI();
+    applyPurchaseBar();
+    showEditBanner(editsLeft > 0 ? 'editing' : 'usedUp');
+}
+
+async function saveEdit() {
+    if (!currentResumeId) {
+        showError('Preview your changes first by clicking "Preview Resume".');
+        return;
+    }
+    try {
+        showLoading('Saving your changes...');
+        const response = await fetch('/api/edit/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ paid_resume_id: paidResumeId, resume_id: currentResumeId })
+        });
+        const result = await response.json();
+        if (response.status === 404 && result.reopen) {
+            editsLeft = null;
+            showEditBanner('forgotten');
+        } else if (response.status === 402) {
+            editsLeft = 0;
+            showEditBanner('usedUp');
+        }
+        if (!response.ok || !result.success) {
+            applyPurchaseBar();
+            updateEditCounterUI();
+            showError(result.error || 'Could not save your changes. Please try again.');
+            return;
+        }
+        // The changed resume is now the paid one; the next edit starts from it.
+        paidResumeId = result.resume_id;
+        localStorage.setItem('aie_paid_resume_id', paidResumeId);
+        editsLeft = result.edits_left;
+        maxEdits = result.max_edits;
+        currentResumeId = null;   // also stops the preview timer watermarking this view
+        localStorage.removeItem('aie_current_resume_id');
+        previewContainer.innerHTML = `
+            <div class="edit-saved">
+                <p><strong>✓ Changes saved.</strong> ${editsLeft} of ${maxEdits} edits left.</p>
+                <p>Download your new files and keep the PDF: it replaces your old one, and your key stays the same.</p>
+                <a class="btn-primary" href="${escapeHtml(result.download_url_pdf)}" download>Download PDF</a>
+                <a class="btn-secondary" href="${escapeHtml(result.download_url_docx)}" download>Download Word (.docx)</a>
+            </div>
+            ${result.preview_html}
+        `;
+        updateEditCounterUI();
+        applyPurchaseBar();
+        showEditBanner(editsLeft > 0 ? 'editing' : 'usedUp');
+        showSuccess('Changes saved.');
+    } catch (error) {
+        showError('Could not save your changes. Please check your connection and try again.');
+    } finally {
+        hideLoading();
+    }
 }
 
 // Initialize
@@ -137,41 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (themeSelect) themeSelect.value = savedTheme;
     }
     
-    // Check if we should show edit popup (after purchase return)
-    checkEditPopup();
+    initEditMode();   // async: asks the server about this browser's paid resume
 });
-
-// Edit Popup Functions
-function checkEditPopup() {
-    const showPopup = localStorage.getItem('aie_show_edit_popup');
-    if (showPopup === 'true') {
-        showEditPopup();
-        // Don't clear yet - let user close it
-    }
-}
-
-function showEditPopup() {
-    const popup = document.getElementById('edit-popup');
-    const countSpan = document.getElementById('edit-popup-count');
-    
-    if (popup && countSpan) {
-        const count = getEditCount();
-        const remaining = Math.max(0, MAX_EDITS - count);
-        countSpan.textContent = remaining;
-        popup.style.display = 'block';
-    }
-}
-
-function closeEditPopup() {
-    const popup = document.getElementById('edit-popup');
-    if (popup) {
-        popup.style.display = 'none';
-        localStorage.removeItem('aie_show_edit_popup');
-    }
-}
-
-// Make closeEditPopup globally accessible
-window.closeEditPopup = closeEditPopup;
 
 // Terms of Service check — hybrid: instant localStorage + server confirmation
 // On fail: redirect to /terms. On success: remove .terms-pending to reveal form.
@@ -478,7 +559,19 @@ function loadVoiceData() {
         
         console.log('[AIE ResuMaker] Loading voice session data:', voiceData);
         
-        // Map voice fields to form fields
+        fillFormFromData(voiceData);
+
+        // Save to localStorage so user doesn't lose it
+        saveProgress(false);
+    } catch (e) {
+        console.error('[AIE ResuMaker] Failed to load voice data:', e);
+    }
+}
+
+// Fill the form from resume data: a chat session's, or a paid resume opened
+// for editing. Lists present in the data replace what the form had.
+function fillFormFromData(voiceData) {
+    {
         const fieldMap = {
             'full_name': 'full_name',
             'email': 'email',
@@ -503,7 +596,21 @@ function loadVoiceData() {
         // State: the server reads it from the address (or asks). The <select> gets its
         // options later from /api/states, so setupStateCityAutocomplete applies it then.
         const stateSelect = form.querySelector('select[name="state"]');
-        if (stateSelect && voiceData.state) stateSelect.dataset.pending = voiceData.state;
+        if (stateSelect && voiceData.state) {
+            if (stateSelect.options.length > 1) {
+                // The options are already there (a paid resume opened after page load)
+                const wanted = String(voiceData.state).trim().toLowerCase();
+                const match = Array.from(stateSelect.options).find(opt =>
+                    opt.value && (opt.value.toLowerCase() === wanted || opt.textContent.toLowerCase() === wanted));
+                if (match) stateSelect.value = match.value;
+                const cityInput = form.querySelector('input[name="city"]');
+                if (cityInput && cityInput.value) cityInput.disabled = false;   // a disabled field is left out of the build
+            } else {
+                stateSelect.dataset.pending = voiceData.state;
+            }
+        }
+        const themeSelect = document.getElementById('theme-select');
+        if (themeSelect && voiceData.template_style) themeSelect.value = voiceData.template_style;
 
         // Set skills
         if (voiceData.skills && Array.isArray(voiceData.skills)) {
@@ -536,6 +643,8 @@ function loadVoiceData() {
                     // Handle bullets array -> description string conversion
                     if (exp.bullets && Array.isArray(exp.bullets)) {
                         expData.description = exp.bullets.join('\n');
+                    } else if (Array.isArray(exp.description)) {
+                        expData.description = exp.description.join('\n');
                     }
                     
                     addExperienceField(expData);
@@ -629,7 +738,7 @@ function loadVoiceData() {
                 voiceData.certifications.forEach((cert, i) => {
                     addCertificationField({
                         name: cert.name || '',
-                        org: cert.issuer || cert.org || '',
+                        org: cert.issuer || cert.org || cert.organization || '',
                         date: cert.date || ''
                     });
                 });
@@ -637,13 +746,6 @@ function loadVoiceData() {
             }
         }
         
-        // Save to localStorage so user doesn't lose it
-        saveProgress(false);
-        
-        console.log('[AIE ResuMaker] Voice data loaded successfully');
-        
-    } catch (e) {
-        console.error('[AIE ResuMaker] Failed to load voice data:', e);
     }
 }
 
@@ -872,6 +974,8 @@ function setupEventListeners() {
         }
     });
     
+    document.getElementById('save-edit')?.addEventListener('click', saveEdit);
+
     // Purchase buttons - require resume to be built first
     document.getElementById('buy-premium').addEventListener('click', () => {
         if (!currentResumeId) {
@@ -1123,7 +1227,7 @@ function addCertificationField(data = {}) {
         </div>
         <div class="field-row">
             <label>Issuing Organization</label>
-            <input type="text" name="cert_org[]" placeholder="Amazon Web Services" value="${escapeHtml(data.org || '')}">
+            <input type="text" name="cert_org[]" placeholder="Amazon Web Services" value="${escapeHtml(data.org || data.organization || '')}">
         </div>
         <div class="field-row">
             <label>Date Obtained</label>
@@ -1471,6 +1575,13 @@ async function generatePreview() {
             
             // Show CLEAN preview first
             previewContainer.innerHTML = result.preview_html;
+            // On a phone the preview sits behind the header's Preview toggle. Open it
+            // and go to it, or tapping "Preview Resume" appears to do nothing.
+            const previewSection = document.getElementById('preview-section');
+            previewSection.classList.add('active');
+            if (window.matchMedia('(max-width: 1024px)').matches) {
+                previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
             showSuccess('Preview loaded! Viewing for 3 seconds...');
             
             // Start 3-second timer
@@ -1487,7 +1598,7 @@ async function generatePreview() {
                 if (secondsLeft < 0) {
                     clearInterval(timer);
                     timerElement.remove();
-                    degradePreview(currentResumeId);
+                    degradePreview(result.resume_id);   // the preview this timer was started for
                 }
             }, 1000);
             
@@ -1503,6 +1614,8 @@ async function generatePreview() {
 
 // Degrade preview after timer expires
 async function degradePreview(resumeId) {
+    // Saving an edit, or a newer preview, has replaced the view this timer was for.
+    if (resumeId !== currentResumeId) return;
     try {
         showLoading('Securing preview...');
         
@@ -1537,6 +1650,13 @@ async function degradePreview(resumeId) {
                         <p style="font-size:16px;color:#333;margin-bottom:10px;">
                             <strong>👆 This is a watermarked sample</strong>
                         </p>
+                        ${canSaveEdit() ? `
+                        <p style="font-size:14px;color:#666;margin-bottom:15px;">
+                            Happy with your changes? Saving gives you the new PDF and Word file.
+                        </p>
+                        <button id="buy-premium-inline" class="btn-primary" style="font-size:16px;padding:12px 24px;">
+                            💾 Save changes (uses 1 of your ${editsLeft} edit${editsLeft === 1 ? '' : 's'})
+                        </button>` : `
                         <p style="font-size:14px;color:#666;margin-bottom:15px;">
                             To get the highest quality format, click Purchase below
                         </p>
@@ -1545,13 +1665,14 @@ async function degradePreview(resumeId) {
                         </p>
                         <button id="buy-premium-inline" class="btn-primary" style="font-size:16px;padding:12px 24px;">
                             🚀 Purchase Resume ($9.99)
-                        </button>
+                        </button>`}
                     </div>
                 </div>
             `;
             
             // Re-attach payment handler for inline button - defaults to regular price
-            document.getElementById('buy-premium-inline').addEventListener('click', () => initiatePayment('regular'));
+            document.getElementById('buy-premium-inline').addEventListener('click',
+                () => canSaveEdit() ? saveEdit() : initiatePayment('regular'));
             
             showSuccess('Preview secured. Upgrade for full quality!');
         } else {
@@ -1562,112 +1683,6 @@ async function degradePreview(resumeId) {
     } finally {
         hideLoading();
     }
-}
-
-// Download TXT (Free) - NOW REQUIRES PAYMENT
-async function downloadTxt() {
-    if (!currentResumeId) return;
-
-    // Check if paid
-    try {
-        const response = await fetch(`/api/check-payment/${currentResumeId}`);
-        const data = await response.json();
-
-        if (!data.paid) {
-            showError('Please upgrade to Premium to download your resume.');
-            const buyBtn = document.getElementById('buy-premium');
-            if (buyBtn) buyBtn.style.display = 'inline-block';
-            return;
-        }
-    } catch (error) {
-        console.error('Error checking payment:', error);
-    }
-
-    // Check edit count
-    if (!canEdit()) {
-        const shouldRepurchase = confirm('You have used all 5 edits. Would you like to repurchase for 5 more edits?');
-        if (shouldRepurchase) {
-            initiatePayment();
-        }
-        return;
-    }
-
-    // Use one edit
-    if (!showEditDialog()) {
-        return;
-    }
-
-    useEdit();
-
-    // Generate plain text version
-    const formData = new FormData(form);
-    const text = generatePlainText(formData);
-
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `resume_${currentResumeId}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    showSuccess(`Downloaded! You have ${Math.max(0, MAX_EDITS - getEditCount())} edit${getEditCount() !== MAX_EDITS - 1 ? 's' : ''} remaining.`);
-}
-
-function generatePlainText(formData) {
-    const name = formData.get('full_name');
-    const email = formData.get('email');
-    const phone = formData.get('phone');
-    const location = formData.get('location');
-    const summary = formData.get('summary');
-    const skills = formData.get('skills');
-    
-    let text = `${name}\n`;
-    text += `${email}${phone ? ' | ' + phone : ''}${location ? ' | ' + location : ''}\n`;
-    text += `\nPROFESSIONAL SUMMARY\n${summary}\n`;
-    text += `\nSKILLS\n${skills}\n`;
-    
-    // Add experience
-    const expTitles = form.querySelectorAll('input[name="exp_title[]"]');
-    if (expTitles.length > 0) {
-        text += `\nEXPERIENCE\n`;
-        expTitles.forEach((_, index) => {
-            const title = expTitles[index]?.value;
-            const company = form.querySelectorAll('input[name="exp_company[]"]')[index]?.value;
-            const dates = form.querySelectorAll('input[name="exp_dates[]"]')[index]?.value;
-            const phone = form.querySelectorAll('input[name="exp_phone[]"]')[index]?.value;
-            const address = form.querySelectorAll('input[name="exp_address[]"]')[index]?.value;
-            const desc = form.querySelectorAll('textarea[name="exp_description[]"]')[index]?.value;
-            
-            if (title) {
-                text += `${title}${company ? ' | ' + company : ''}\n`;
-                if (dates) text += `${dates}\n`;
-                if (phone) text += `Phone: ${phone}\n`;
-                if (address) text += `Address: ${address}\n`;
-                if (desc) text += `${desc}\n`;
-                text += `\n`;
-            }
-        });
-    }
-    
-    // Add education
-    const eduSchools = form.querySelectorAll('input[name="edu_school[]"]');
-    if (eduSchools.length > 0) {
-        text += `\nEDUCATION\n`;
-        eduSchools.forEach((_, index) => {
-            const school = eduSchools[index]?.value;
-            const degree = form.querySelectorAll('input[name="edu_degree[]"]')[index]?.value;
-            const dates = form.querySelectorAll('input[name="edu_dates[]"]')[index]?.value;
-            
-            if (school) {
-                text += `${school}${degree ? ' | ' + degree : ''}\n`;
-                if (dates) text += `${dates}\n`;
-                text += `\n`;
-            }
-        });
-    }
-    
-    return text;
 }
 
 // Stripe Payment
@@ -2450,12 +2465,12 @@ function enableDownloadButtons() {
     const buyBtn = document.getElementById('buy-premium');
     if (buyBtn) {
         buyBtn.disabled = false;
-        buyBtn.style.display = 'inline-block';
     }
     const referralBtn = document.getElementById('buy-referral');
     if (referralBtn) {
         referralBtn.disabled = false;
     }
+    applyPurchaseBar();
 }
 
 function toggleMobilePreview() {

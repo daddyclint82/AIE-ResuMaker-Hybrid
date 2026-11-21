@@ -101,6 +101,10 @@
             color: #28a745;
             box-shadow: inset 0 0 0 2px #28a745;
         }
+        .restore-edits {
+            margin: 24px 0 12px;
+            color: #666;
+        }
         .back-link {
             display: block;
             margin-top: 24px;
@@ -141,11 +145,13 @@
         <div class="restore-done" id="restore-done" hidden>
             <div class="tick">✓</div>
             <h1 id="restore-welcome">Your resume is back</h1>
-            <p class="restore-intro">Download it again any time you need it.</p>
+            <p class="restore-intro">Download it again, or change it.</p>
             <div class="download-buttons">
                 <a id="restore-dl-pdf" class="download-btn" download>Download PDF</a>
                 <a id="restore-dl-docx" class="download-btn secondary" download>Download Word (.docx)</a>
             </div>
+            <p class="restore-edits" id="restore-edits"></p>
+            <a href="/build?mode=form&edit=1" class="download-btn secondary" id="restore-edit" hidden>✏️ Edit my resume</a>
         </div>
         <a href="/" class="back-link">← Back to AIE ResuMaker</a>
     </div>
@@ -180,6 +186,12 @@
                 }
                 document.getElementById('restore-dl-pdf').href = result.download_url_pdf;
                 document.getElementById('restore-dl-docx').href = result.download_url_docx;
+                // The builder edits this browser's paid resume; the server keeps the count.
+                localStorage.setItem('aie_paid_resume_id', result.resume_id);
+                document.getElementById('restore-edits').textContent = result.edits_left > 0
+                    ? `You have ${result.edits_left} of ${result.max_edits} edits left.`
+                    : `You've used all ${result.max_edits} edits that came with this purchase.`;
+                document.getElementById('restore-edit').hidden = result.edits_left <= 0;
                 form.hidden = true;
                 document.getElementById('restore-done').hidden = false;
             } catch (err) {
