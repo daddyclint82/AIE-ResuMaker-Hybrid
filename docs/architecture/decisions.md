@@ -308,6 +308,15 @@ Fixed 6 deadlocks: Groq summary auto-gen, experience loop flags, 42-category tax
 - Proved on Stripe test mode, 2026-11-21, in headless Chromium: buy, edit twice, wipe the server, reopen the edited PDF with the original key, use the last three edits, see the sixth offered for purchase.
 - Guarded by `tests/test_edits.py` (no server, no network).
 
+### 2026-11-21 — The Pages Say What the Product Does
+
+- Landing, Terms and the after-payment page now match the product: PDF and Word, the PDF is the customer's saved copy, the key, 5 edits, and what is held where.
+- Terms 4.2 states the real storage: nothing on file; server memory cleared on restart or idle; an encrypted copy inside the customer's PDF; Stripe holds the purchase record with the resume reference and edit count.
+- Terms 4.1 names what goes to the AI provider (target job title and industry, summary answers, skills list). That is all `_llm_chat` is given; name and contact details are not in either prompt. If a prompt ever gains another field, this sentence changes in the same commit.
+- Terms 4.3 no longer says no email is collected: Stripe asks for one at checkout.
+- The referral line says what the server enforces: the sharer's price drops when a friend opens the link.
+- `tests/test_site_wording.py` holds the claims that were wrong so they can't come back.
+
 ### 2026-06-23 — Skip Button + Conditional Tech Stack
 
 - Optional sections show a skip button on first field.
